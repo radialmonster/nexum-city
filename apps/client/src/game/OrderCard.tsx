@@ -311,7 +311,7 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
       blocker = 'No free slot. Upgrade a building you have.';
     else if (GOOD_KEYS.some((g) => own.warehouse[g] < cost[g])) {
       const short = GOOD_KEYS.filter((g) => own.warehouse[g] < cost[g]).map(
-        (g) => `${String(Math.ceil(cost[g] - own.warehouse[g]))} ${g}`,
+        (g) => `${formatUnits(Math.ceil(toUnits(cost[g] - own.warehouse[g])))} ${g}`,
       );
       blocker = `This warehouse is short ${short.join(' and ')}. Buy it at a hub market or haul it in.`;
     }
