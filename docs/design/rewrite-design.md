@@ -270,7 +270,7 @@ How the server runs them (tasks 51 to 53): bots are real players with a row in `
 **Milestone 2:**
 
 - Raids and escorts.
-- Runner carrier (sim done; UI to follow).
+- Runner carrier (sim and UI done). The own-district panel has a BUY RUNNER action with a plain pitch and a disabled reason. Haul and contract cards show a carrier comparison (speed, ETA, cargo, trade-off) and start on an idle Runner when the load is 16 or less and the deadline is tight. The feed shows `raid.evaded` for both sides and your own purchases; the map shows a slim Runner marker and a short evade flash (map tokens `runnerScale`, `runnerSlim`, `evadeFlashMs`).
 - Contracts.
 - Watchtower and Garage.
 - The animated replay.
