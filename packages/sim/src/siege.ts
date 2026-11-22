@@ -11,6 +11,7 @@ import { startMovement } from './travel.js';
 import {
   GOODS,
   type Crew,
+  type GameState,
   type District,
   type Goods,
   type Id,
@@ -32,6 +33,15 @@ const ROUT_STRENGTH = 3;
 
 const big = (n: number): bigint => BigInt(Math.trunc(n));
 const ceilDiv = (a: bigint, b: bigint): bigint => (a + b - 1n) / b;
+
+/**
+ * The defence a siege on `d` has to beat, in strength points: (garrison + neutral guard or
+ * militia) x walls x stance. A neutral plot with no crews on it still has the guard, so "defence 0"
+ * never happens. The neutral guard cannot be worn down: only the attackers lose strength.
+ */
+export function siegeDefence(state: GameState, d: District): number {
+  return defenceScaled({ state, events: [] }, d) / PERCENT_SQUARED;
+}
 
 export function isProtected(d: District, nowMs: number): boolean {
   return d.protectedUntilMs !== undefined && d.protectedUntilMs > nowMs;
@@ -211,11 +221,20 @@ function breakSiege(ctx: Ctx, s: Siege, reason: string): void {
   const { state } = ctx;
   const d = state.districts[s.districtId] as District;
   endSiege(ctx, s);
+  // A bar that fell back to nothing after the crews were worn down is a defeat, not a retreat.
+  const why = reason === 'abandoned' && s.stats.attackerLost > 0 ? 'routed' : reason;
   emit(ctx, 'siege.broken', involved(s, d), [s.districtId], {
     attacker: s.attacker,
     defender: d.owner,
-    reason,
+    reason: why,
     rounds: s.stats.rounds,
+    defence: Math.round(siegeDefence(ctx.state, d) * 10) / 10,
+    attackerStart: s.stats.attackerStart,
+    attackerLost: s.stats.attackerLost,
+    note:
+      why === 'routed'
+        ? 'The crews were worn down by the guard before the bar filled. The guard never tires, so send more strength.'
+        : null,
   });
 }
 
@@ -301,6 +320,9 @@ function runRound(ctx: Ctx, s: Siege): void {
     defenderStrength: strengthOf(defenders),
     attackerLost: lostA,
     defenderLost: lostD,
+    // The whole defence the attack is measured against (garrison + guard or militia, walls, stance).
+    defence: Math.round(defenceUnits * 10) / 10,
+    routed: attackers.filter((c) => c.strength <= ROUT_STRENGTH).map((c) => c.id),
   });
   for (const crew of attackers) {
     if (crew.strength > ROUT_STRENGTH) continue;

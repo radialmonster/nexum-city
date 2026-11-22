@@ -19,10 +19,10 @@ export type {
 export { hashState, canonicalJson } from './hash.js';
 export { addContractScore, addTradeScore, inFinale, settleScore, standings } from './score.js';
 export type { Standing } from './score.js';
-export { isProtected, progressAt, siegeFraction } from './siege.js';
+export { isProtected, progressAt, siegeDefence, siegeFraction } from './siege.js';
 export { crossingTime } from './raid.js';
-export { estimateClear, pickClearCrews, visibleAmbush } from './clear.js';
-export type { ClearEstimate, ClearPick, ClearWorld } from './clear.js';
+export { estimateClear, pickClearCrews, pickClearCrewsOrWhy, visibleAmbush } from './clear.js';
+export type { ClearEstimate, ClearNone, ClearPick, ClearWorld } from './clear.js';
 export { applyOrder, validateOrder } from './orders.js';
 export { boardOf, depositFor, referenceValue } from './contracts.js';
 export { inRush, rushDuration, rushEndsAt, stripNewcomerPerks } from './rush.js';
