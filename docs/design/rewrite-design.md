@@ -230,6 +230,7 @@ How the server runs them (tasks 51 to 53): bots are real players with a row in `
 - **Catch-up:** players below the median get faster recruitment, and the leader's districts are slightly cheaper to besiege.
 - **Final 48 hours:** this is announced; no new players join mid-finale.
 - At season end there's a final leaderboard, then the city resets. Accounts, cosmetics and history carry over.
+- **As built (tasks 61 and 63):** the test season is 7 days (`SEASON_DAYS`). At the end the server freezes the standings into a `seasons` archive and starts a new world with a new seed, re-adding every account (`SEASON_BREAK_HOURS`, default 0, sets a pause). The client shows a season-end screen, a `/hall` hall-of-fame route and a finale countdown in the top bar. Snapshots are versioned; a sim rules change closes the running season and starts a new one rather than replaying old inputs under new rules. `/api/health`, JSON logs, `npm run backup` and the Docker limits are described in `apps/server/src/game/README.md`.
 
 ## Away from the game
 

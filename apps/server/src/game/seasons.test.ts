@@ -155,10 +155,11 @@ describe('snapshot upgrades', () => {
       .prepare('SELECT id, state FROM snapshots ORDER BY id DESC LIMIT 1')
       .get() as { id: number; state: string };
     const old = JSON.parse(row.state) as Record<string, unknown>;
-    for (const k of ['season', 'markets', 'memory', 'sieges']) delete old[k];
+    const { season: _s, markets: _m, memory: _y, sieges: _g, ...rest } = old;
+    void [_s, _m, _y, _g];
     a.game.db
       .prepare('UPDATE snapshots SET state = ?, version = 0, rules_version = 0 WHERE id = ?')
-      .run(JSON.stringify(old), row.id);
+      .run(JSON.stringify(rest), row.id);
     a.game.engine.shutdown = () => undefined;
     a.game.stop();
 

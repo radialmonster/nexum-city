@@ -153,7 +153,7 @@ Each phase ends with something you can open, run or test. Tasks and their status
 
 ### Phase 6: Test season and deploy
 
-- 7-day test season, leaderboard, season end and reset.
+- 7-day test season, leaderboard, season end and reset (done, task 61).
 - Deploy to the owner's FlyWP server as a Docker Compose app behind FlyWP's Nginx. FlyWP's "From GitHub" option reads `docker-compose.yml` from the root of this repo on a chosen branch, so the compose file must be production-ready at the root. Check whether FlyWP builds images from the repo or needs a published image (GHCR). The domain is to be decided.
 - Logs, a health check, automatic restart, nightly SQLite backups.
 - Phone layout pass.

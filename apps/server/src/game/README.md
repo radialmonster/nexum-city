@@ -9,14 +9,15 @@ SQLite via `node:sqlite` (`DatabaseSync`) at `DATA_DIR/nexum.db`, WAL mode, `syn
 Numbered migrations live in `migrations.ts` and are recorded in `schema_migrations`; add a new entry,
 never edit an applied one.
 
-| Table                    | Purpose                                                              |
-| ------------------------ | -------------------------------------------------------------------- |
-| `meta`                   | key/value (world seed, counters)                                     |
-| `snapshots`              | JSON state snapshot plus the `last_seq` of the inputs it already has |
-| `inputs`                 | append-only order log `{seq, at_ms, actor_id, order_json}`           |
-| `events`, `event_actors` | sim events (unique by sim id) and the per-player index for the feed  |
-| `accounts`, `sessions`   | scrypt password hashes; session tokens stored as SHA-256 hashes      |
-| `bots`                   | bot roster: personality, crew name, next check-in, retired time      |
+| Table                    | Purpose                                                                    |
+| ------------------------ | -------------------------------------------------------------------------- |
+| `meta`                   | key/value (world seed, counters)                                           |
+| `snapshots`              | JSON state snapshot plus the `last_seq` of the inputs it already has       |
+| `inputs`                 | append-only order log `{seq, at_ms, actor_id, order_json}`                 |
+| `events`, `event_actors` | sim events (unique by sim id) and the per-player index for the feed        |
+| `accounts`, `sessions`   | scrypt password hashes; session tokens stored as SHA-256 hashes            |
+| `bots`                   | bot roster: personality, crew name, next check-in, retired time            |
+| `seasons`                | one frozen row per finished season: standings, names, stats (hall of fame) |
 
 Boot: load the latest snapshot, replay later inputs with `step`, then catch the clock up to
 `Date.now()` in one `step`. A snapshot is written every `SNAPSHOT_MS` (5 min) and on shutdown. Orders
@@ -37,7 +38,8 @@ Errors are `{ok:false, error, ...}` with a typed code (the sim's order codes plu
 
 `TICK_MS` (2000), `SNAPSHOT_MS`, `WORLD_SEED`, `COOKIE_SECURE` (set true behind HTTPS),
 `TRUST_PROXY` (honour `X-Forwarded-For` for rate limits), `BACKUP_HOUR_UTC`, `BACKUP_KEEP`,
-`BOTS_ENABLED` (true), `BOT_COUNT` (6) and `BOT_MIN` (2); see Bots.
+`BOTS_ENABLED` (true), `BOT_COUNT` (6) and `BOT_MIN` (2); see Bots. `SEASON_DAYS` (7), `SEASON_BREAK_HOURS` (0) and
+`TICK_LOG_MINUTES` (15, 0 turns the summary off); see Seasons and Ops.
 
 ## Bots (`bots/`)
 
@@ -74,7 +76,55 @@ hub deliver them to everyone (the audience list itself is never sent). Joins car
 kestrel_9 founded Kestrel Yard on the east frontier". The sim keeps the frontier stocked on
 `addPlayer`.
 
+## Seasons (`seasons.ts`)
+
+A season is `SEASON_DAYS` long (default 7) with a 48 h finale. Registration closes in the finale
+(`world_full`) and during the break (`season_over`). When the clock passes the end the engine freezes
+at `endMs` and refuses orders and joins (`season_over`). `SeasonManager.check()`, run after every tick,
+then:
+
+1. archives the final standings once into `seasons` (`INSERT OR IGNORE`, so it is idempotent),
+2. after `SEASON_BREAK_HOURS` (default 0) starts the next season in one transaction: clears the world
+   tables, a new seed from `seasonSeed(WORLD_SEED, n)`, every account re-added to the new world, bots
+   recreated per the config, and a fresh snapshot.
+
+Accounts, sessions and the `seasons` archive carry over. An account that finds no free plot gets a
+`pending:<id>` player id and no crew. All state needed to resume is in the database, so a restart in
+the middle of a break carries on. `GET /api/seasons` lists the archive (the client's "Hall of fame").
+
+## Snapshot versions and old inputs
+
+Two numbers are stored with every snapshot:
+
+- `SNAPSHOT_VERSION` is the JSON shape. `upgradeSnapshot` walks the `UPGRADES` chain, so an old
+  snapshot still loads. Add a step whenever `GameState` gains or changes a field.
+- `RULES_VERSION` is the sim's behaviour. Bump it whenever the same inputs would play out differently.
+
+Policy: **inputs are only replayed on a snapshot written under the same rules version.** If the stored
+rules version differs (or is missing, as in rows from before versioning), the old state is loaded and
+shape-upgraded only to archive its standings (reason `rules_change`), and a new season starts at once.
+A state too old to archive is logged and skipped. We never replay old inputs under new rules.
+
+## Ops
+
+- `GET /api/health`: `ok`, uptime, `tickLagMs`, snapshot age, player and account counts, season
+  number and phase, `tickErrors`. No secrets or names. Returns 503 if the tick lag passes
+  `max(30 s, 10 ticks)`.
+- Logs are one JSON object per line on stdout. A `tick summary` line every `TICK_LOG_MINUTES`; an
+  `error` line (`tick failed`) for any exception in the tick loop, which carries on afterwards.
+- `npm run backup` writes `DATA_DIR/backups/nexum-manual-<time>.db`. In Docker:
+  `docker compose exec app node apps/server/dist/backup-cli.js`.
+- Compose: `restart: unless-stopped`, a healthcheck on `/api/health`, json-file logs capped at 5 x 10 MB,
+  `mem_limit: 256m` (about 22 MiB used with a small world).
+
+### Restore
+
+Stop the app, replace `DATA_DIR/nexum.db` with a backup file (delete `nexum.db-wal` and
+`nexum.db-shm` next to it), and start the app. It boots from the latest snapshot in that file.
+
 ## Known gaps
+
+Registration is closed during the finale and the break. A rules-version change ends the running season immediately. The first boot of this version archives and resets a legacy database.
 
 SSE has no per-process connection cap. Start-district choice is
 simply the neutral district farthest from owned ones.
