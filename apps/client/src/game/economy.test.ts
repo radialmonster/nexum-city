@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ATOMS_PER_UNIT } from '@nexum/sim';
-import type { MarketHistoryResponse } from '@nexum/contracts';
+import type { MarketHistoryResponse, PlayerView } from '@nexum/contracts';
 import {
   bestHauls,
   chargeHappened,
@@ -206,25 +206,27 @@ describe('city tax', () => {
     });
   };
 
-  it('charges 40% over 300 after upkeep, and counts down to the next day', () => {
+  it('charges upkeep only: the nightly levy is off, and the next charge counts down', () => {
     const c = charges(rich(800, 1));
     expect(c.upkeepCredits).toBe(20);
-    // (800 - 20 - 300) x 40% = 192
-    expect(c.levyCredits).toBe(192);
+    expect(c.levyCredits).toBe(0);
+    expect(c.levyPercent).toBe(0);
     expect(c.nextMs).toBe(24 * 3_600_000);
   });
 
-  it('is free for a single district under the line', () => {
-    const c = charges(rich(100));
-    expect(c.upkeepCredits).toBe(0);
-    expect(c.levyCredits).toBe(0);
-    expect(taxNotice(rich(100))).toContain('You are under the line.');
+  it('is free for a single district, whatever you hold', () => {
+    for (const held of [100, 5_000]) {
+      const c = charges(rich(held));
+      expect(c.upkeepCredits).toBe(0);
+      expect(c.levyCredits).toBe(0);
+    }
+    expect(taxNotice(rich(5_000))).toContain('first district is free');
   });
 
-  it('warns plainly when credits are over the line', () => {
-    expect(taxNotice(rich(800))).toBe(
-      "Tonight's city tax (in 14h) takes 40% of credits over 300: about 200 cr. Spend or invest before then.",
-    );
+  it('says what upkeep costs for extra districts, and never mentions a tax', () => {
+    const text = taxNotice(rich(800, 2));
+    expect(text).toBe('Upkeep for your extra districts is 40 cr a day, next due in 14h.');
+    expect(text).not.toContain('tax');
   });
 
   it('spots a charge from the sink totals', () => {
@@ -259,12 +261,16 @@ describe('trendPoints', () => {
 });
 
 describe('chargeNotice', () => {
-  const at = (ms: number, levy: number, credits = 1000) =>
+  const at = (ms: number, levy: number, credits = 1000, upkeep = 0) =>
     makeView({
       nowMs: ms,
       season: { startMs: 0, endMs: 10_000_000_000, finaleStartMs: 9_000_000_000, finale: false },
       self: { ...makeView().self, credits: credits * ATOMS_PER_UNIT },
-      sink: { feesAtoms: 0, upkeepAtoms: 0, levyAtoms: levy * ATOMS_PER_UNIT },
+      sink: {
+        feesAtoms: 0,
+        upkeepAtoms: upkeep * ATOMS_PER_UNIT,
+        levyAtoms: levy * ATOMS_PER_UNIT,
+      },
     });
 
   it('stays silent until the shared totals rise', () => {
@@ -272,17 +278,25 @@ describe('chargeNotice', () => {
     expect(chargeNotice(at(1000, 0), at(2000, 0))).toBeNull();
   });
 
-  it('reports what the tax took, estimated from the view before it', () => {
-    const n = chargeNotice(at(86_000_000, 0, 1000), at(87_000_000, 280, 720));
-    expect(n?.levyCredits).toBe(280);
+  it('reports the upkeep taken, estimated from the view before it', () => {
+    const base = makeView();
+    const districts = {
+      ...base.districts,
+      x0: { ...(Object.values(base.districts)[0] as object), id: 'x0' } as never,
+    };
+    const withExtra = (v: PlayerView) => ({ ...v, districts });
+    const n = chargeNotice(
+      withExtra(at(86_000_000, 0, 1000)),
+      withExtra(at(87_000_000, 0, 980, 20)),
+    );
+    expect(n?.upkeepCredits).toBe(20);
+    expect(n?.levyCredits).toBe(0);
     expect(n?.atMs).toBe(86_400_000);
-    expect(n?.text).toContain('City tax took about 280 cr');
+    expect(n?.text).toBe('Upkeep for your extra districts cost 20 cr.');
   });
 
-  it('says so when you were under the line', () => {
-    const n = chargeNotice(at(86_000_000, 0, 100), at(87_000_000, 50, 100));
-    expect(n?.levyCredits).toBe(0);
-    expect(n?.text).toContain('took nothing from you');
+  it('stays silent when a charge ran but took nothing from you', () => {
+    expect(chargeNotice(at(86_000_000, 0, 100), at(87_000_000, 50, 100))).toBeNull();
   });
 });
 

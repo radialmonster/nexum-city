@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ATOMS_PER_UNIT, MS_PER_HOUR, balance, toAtoms } from './balance.js';
+import { MS_PER_HOUR, balance, toAtoms } from './balance.js';
 import { clone, scenario } from './fixtures.js';
 import { checkInvariants } from './invariants.js';
 import { step } from './step.js';
@@ -23,24 +23,15 @@ describe('credit sinks', () => {
     expect(checkInvariants(r.state)).toEqual([]);
   });
 
-  it('takes the levy only from credits above the free amount', () => {
+  it('has the levy switched off: rich players pay upkeep only', () => {
+    expect(balance.sink.levyPercent).toBe(0);
     const s = clone(scenario());
-    const p = s.players['p1'];
-    if (!p) throw new Error('no p1');
-    const free = balance.sink.levyFreeCredits;
-    for (const o of Object.values(s.players)) o.credits = toAtoms(free);
+    for (const o of Object.values(s.players))
+      o.credits = toAtoms(balance.sink.levyFreeCredits + 5_000);
     const r = step(s, [], s.nowMs + DAY + 1);
     expect(r.state.sink.levyAtoms).toBe(0);
-    const poor = clone(scenario());
-    const q = poor.players['p1'];
-    if (!q) throw new Error('no p1');
-    for (const o of Object.values(poor.players)) o.credits = 0;
-    q.credits = toAtoms(free + 1_000);
-    const r2 = step(poor, [], poor.nowMs + DAY + 1);
-    const expected = Math.floor((1_000 * ATOMS_PER_UNIT * balance.sink.levyPercent) / 100);
-    // Upkeep is paid first, so the levy sees a little less than the full 1,000 above the line.
-    expect(r2.state.sink.levyAtoms).toBeGreaterThan(0);
-    expect(r2.state.sink.levyAtoms).toBeLessThanOrEqual(expected);
+    expect(r.state.sink.upkeepAtoms).toBeGreaterThan(0);
+    expect(checkInvariants(r.state)).toEqual([]);
   });
 
   it('charges upkeep for districts beyond the free ones and never more than the player holds', () => {

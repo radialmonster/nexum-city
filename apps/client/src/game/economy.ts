@@ -11,7 +11,7 @@ import { GOOD_KEYS } from './derive';
 import { credits } from './market';
 
 /**
- * Plain-language helpers for the economy screens (price board, haul card, shortages, tax notice).
+ * Plain-language helpers for the economy screens (price board, haul card, shortages, upkeep notice).
  * Everything reads the player's view, so nothing here asks the server anything.
  */
 
@@ -266,18 +266,16 @@ export function charges(view: PlayerView): Charges {
   };
 }
 
-/** The one-line tax notice: what is coming tonight, and what to do about it. */
+/** The one-line upkeep notice: what tonight's upkeep costs, if anything. */
 export function taxNotice(view: PlayerView): string {
   const c = charges(view);
   const when = timeLeft(c.nextMs - view.nowMs);
   const upkeep =
     c.upkeepCredits > 0
-      ? ` Upkeep for your extra districts is ${String(c.upkeepCredits)} cr a day.`
-      : '';
-  if (c.levyCredits <= 0) {
-    return `The city takes ${String(c.levyPercent)}% of credits over ${String(c.freeCredits)} each night, in ${when}. You are under the line.${upkeep}`;
-  }
-  return `Tonight's city tax (in ${when}) takes ${String(c.levyPercent)}% of credits over ${String(c.freeCredits)}: about ${String(c.levyCredits)} cr. Spend or invest before then.${upkeep}`;
+      ? `Upkeep for your extra districts is ${String(c.upkeepCredits)} cr a day, next due in ${when}.`
+      : `Your first district is free to keep. Each extra district costs ${String(balance.sink.upkeepCreditsPerDay)} cr a day.`;
+  if (c.levyCredits <= 0) return upkeep;
+  return `Tonight's city tax (in ${when}) takes ${String(c.levyPercent)}% of credits over ${String(c.freeCredits)}: about ${String(c.levyCredits)} cr. ${upkeep}`;
 }
 
 /** Totals the sinks had taken, in whole credits, from a view. */
@@ -334,10 +332,8 @@ export function chargeNotice(prev: PlayerView | null, next: PlayerView): ChargeN
   if (c.upkeepCredits > 0) {
     bits.push(`upkeep for your extra districts cost ${String(c.upkeepCredits)} cr`);
   }
-  const text =
-    bits.length > 0
-      ? `${bits.join('; ')}.`.replace(/^./, (m) => m.toUpperCase())
-      : `The daily city tax ran. You were under ${String(c.freeCredits)} cr, so it took nothing from you.`;
+  if (bits.length === 0) return null;
+  const text = `${bits.join('; ')}.`.replace(/^./, (m) => m.toUpperCase());
   return {
     atMs,
     upkeepCredits: c.upkeepCredits,

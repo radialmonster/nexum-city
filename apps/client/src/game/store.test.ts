@@ -85,15 +85,30 @@ describe('store and clock', () => {
 });
 
 describe('city charge notices', () => {
-  const day = (levy: number) =>
-    makeView({ sink: { feesAtoms: 0, upkeepAtoms: 0, levyAtoms: levy * 360_000_000 } });
+  const base = makeView();
+  const districts = {
+    ...base.districts,
+    x0: { ...(Object.values(base.districts)[0] as object), id: 'x0' } as never,
+  };
+  const day = (upkeep: number) =>
+    makeView({
+      districts,
+      sink: { feesAtoms: 0, upkeepAtoms: upkeep * 360_000_000, levyAtoms: 0 },
+    });
 
-  it('adds one notice when the shared tax total rises, and not again for the same night', () => {
+  it('adds one notice when the shared upkeep total rises, and not again for the same night', () => {
     let s = reduce(initialState, { type: 'view', view: day(0), at: 0 });
     expect(s.charges).toHaveLength(0);
     s = reduce(s, { type: 'view', view: { ...day(50), nowMs: 1_000_100 }, at: 1 });
     expect(s.charges).toHaveLength(1);
     s = reduce(s, { type: 'view', view: { ...day(50), nowMs: 1_000_200 }, at: 2 });
     expect(s.charges).toHaveLength(1);
+  });
+
+  it('adds nothing when only a levy total rises, since the levy is off', () => {
+    let s = reduce(initialState, { type: 'view', view: makeView(), at: 0 });
+    const v = makeView({ sink: { feesAtoms: 0, upkeepAtoms: 0, levyAtoms: 5 } });
+    s = reduce(s, { type: 'view', view: { ...v, nowMs: 1_000_100 }, at: 1 });
+    expect(s.charges).toHaveLength(0);
   });
 });

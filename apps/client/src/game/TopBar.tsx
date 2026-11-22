@@ -100,9 +100,9 @@ export function TopBar({
         title={`Credits are global. Goods are the totals sitting in your district warehouses. ${taxNotice(view)}`}
       >
         <Chip icon="$" label="CR" value={formatUnits(toUnits(view.self.credits))} />
-        {tax.levyCredits > 0 && (
+        {tax.levyCredits + tax.upkeepCredits > 0 && (
           <Chip
-            label="TAX"
+            label={tax.levyCredits > 0 ? 'TAX' : 'UPKEEP'}
             value={`-${String(tax.levyCredits + tax.upkeepCredits)}`}
             faction="raider"
           />

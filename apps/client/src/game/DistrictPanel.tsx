@@ -600,7 +600,7 @@ function Empire({
           )}
         </div>
         <div className={styles['block']}>
-          <span className={styles['cap']}>CITY TAX AND UPKEEP</span>
+          <span className={styles['cap']}>UPKEEP</span>
           <span className={styles['line']} data-testid="tax-notice">
             {taxNotice(view)}
           </span>

@@ -26,7 +26,7 @@ export interface FeedPanelProps {
   readonly onBreakUp?: ((ambushId: string) => void) | undefined;
   /** Opens a prefilled haul that sells a full plot's surplus at the nearest hub. */
   readonly onHaulSurplus?: ((draft: OrderDraft) => void) | undefined;
-  /** Daily city charges (tax and upkeep) to list above the events, oldest first. */
+  /** Daily city charges (upkeep, and the tax when it is on) to list above the events, oldest first. */
   readonly notices?: readonly ChargeNotice[] | undefined;
   /** Entries to show, newest first. */
   readonly limit?: number;
@@ -88,7 +88,7 @@ export function FeedPanel({
                 </span>
                 <span className={styles['body']}>
                   <span className={styles['kind']}>
-                    CITY TAX <small>{ago(nowMs, n.atMs)}</small>
+                    {n.levyCredits > 0 ? 'CITY TAX' : 'UPKEEP'} <small>{ago(nowMs, n.atMs)}</small>
                   </span>
                   <span className={styles['text']}>{n.text}</span>
                 </span>

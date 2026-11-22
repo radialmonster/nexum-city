@@ -143,8 +143,12 @@ export const balance = {
     freeDistricts: 1,
     /** Credits a day for each district beyond the free ones. */
     upkeepCreditsPerDay: 20,
-    /** Percent of the credits held above `levyFreeCredits` that the city takes each day. */
-    levyPercent: 40,
+    /**
+     * Percent of the credits held above `levyFreeCredits` that the city takes each day. Off: the
+     * owner removed the nightly city tax on 2026-11-22 (it felt like a punishment, and it hit
+     * newcomers on their first night). Kept at 0 so older snapshots and `sink.levyAtoms` still read.
+     */
+    levyPercent: 0,
     levyFreeCredits: 300,
   },
 

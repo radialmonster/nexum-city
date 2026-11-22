@@ -4,12 +4,13 @@ import type { System } from './systems.js';
 import type { GameState } from './types.js';
 
 /**
- * Credit sinks (economy plan, credit sink; docs/rewrite/sim-spec.md "Credit sinks"). Two ways
+ * Credit sinks (economy plan, credit sink; docs/rewrite/sim-spec.md "Credit sinks"). The ways
  * money leaves the game, both counted in `state.sink` so the books balance:
  *
  * - the hub fee: the hub keeps a small share of what a seller is paid (see `market.ts`);
  * - upkeep: once a day every player pays for the districts they hold beyond the first;
- * - the city levy: once a day a share of the credits held above a free amount is taken.
+ * - the city levy: once a day a share of the credits held above a free amount (switched off,
+ *   `levyPercent` 0, since the owner removed the nightly tax).
  */
 
 /** The hub's cut of a sale, in atoms, rounded down. */
