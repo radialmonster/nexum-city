@@ -245,6 +245,7 @@ How the server runs them (tasks 51 to 53): bots are real players with a row in `
 
 - A haul for a contract warns on the card when the trip outlasts the deadline, naming the deposit only when there is one.
 - The first-steps checklist is sticky and saved per player; a step seen done never returns to TODO.
+- Until the player first selects their district it glows: a soft pulsing halo and swelling ring in the faction colour (timings and alphas are `palette.map.homeBeacon*`), then a fainter steady ring (`ownRingAlpha`) on owned plots. The camera centres on the home once on first load, or once when it first appears in the scene, clear of the HUD card, and never again after the player has moved it (a newcomer's home sits on the frontier edge, so the centring uses the camera's overscroll). The first step reads "Your district is Sector 7-4, the pulsing plot. Click it, or press RECENTRE." and its text button flies to the home.
 - A full warehouse offers a prefilled haul to the nearest hub, and the district panel shows how long until it is full.
 - The clock shows the season day with the time (`D3 23:46`). The order bar and the order card share one siege estimate.
 - The radial menu closes once an order is launched; clicking the plot again reopens it.
