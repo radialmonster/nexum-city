@@ -78,4 +78,13 @@ describe('orderMenu', () => {
     const ids = orderMenu({ ...home, details: true }).map((i) => i.id);
     expect(ids.slice(-2)).toEqual(['details', 'close']);
   });
+  it('offers SETTLE on a remembered plot that is open', () => {
+    const gone = { mine: false, isHub: false, remembered: true };
+    expect(orderMenu(gone).map((i) => i.id)).toEqual(['scout', 'close']);
+    expect(orderMenu({ ...gone, open: true }).map((i) => i.id)).toEqual([
+      'settle',
+      'scout',
+      'close',
+    ]);
+  });
 });

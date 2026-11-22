@@ -453,6 +453,8 @@ export function layoutWorld(view: MapView, t: MapTokens): Scene {
       open = dv.open && !dv.settling;
       if (dv.settling) settling = { role: roles.get(dv.settling.owner) ?? 'rival' };
     }
+    // A remembered plot may carry an announced-open flag (the frontier feed); read it if the view has it.
+    if (dv.relation === 'remembered' && (dv as { open?: boolean }).open === true) open = true;
     const siege = dv.relation === 'remembered' ? null : (dv.siege?.progress ?? null);
     const sd: SceneDistrict = {
       id,

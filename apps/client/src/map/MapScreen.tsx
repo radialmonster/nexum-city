@@ -65,7 +65,9 @@ export function orderMenu(d: {
     : d.isHub
       ? ['move', 'haul', 'raid']
       : d.remembered
-        ? ['scout']
+        ? d.open
+          ? ['settle', 'scout']
+          : ['scout']
         : d.open
           ? ['settle', 'siege', 'scout', 'raid']
           : ['siege', 'scout', 'raid'];
@@ -188,6 +190,8 @@ export function MapScreen({
     setLocalSelected(id);
     embedRef.current?.onSelect(id);
   }, []);
+  /** The plot whose radial an order launch just closed. */
+  const [menuDismissed, setMenuDismissed] = useState<Id | null>(null);
   const [panel, setPanel] = useState<'inspect' | 'route' | null>(null);
   const [scale, setScale] = useState(1);
   /** Phone layout: the districts list and the minimap sit behind buttons. */
@@ -266,6 +270,7 @@ export function MapScreen({
             if (v) setVp((o) => (o.w === v.w && o.h === v.h ? o : { w: v.w, h: v.h }));
           },
           onPick: (id) => {
+            setMenuDismissed(null);
             setSelected(id);
             setPanel(null);
           },
@@ -409,7 +414,11 @@ export function MapScreen({
     if (embed && sel) {
       if (id === 'close') setSelected(null);
       else if (id === 'details') embed.onDetails?.(sel.id);
-      else embed.onOrder(id as MapOrderKind, sel.id);
+      else {
+        // launching an order closes the menu; clicking the plot again brings it back
+        setMenuDismissed(sel.id);
+        embed.onOrder(id as MapOrderKind, sel.id);
+      }
       return;
     }
     if (id === 'close') {
@@ -442,15 +451,22 @@ export function MapScreen({
   const across = vp.w / cam.zoom / palette.map.pitchX;
   const [menuEl, setMenuEl] = useState<HTMLDivElement | null>(null);
   // measured after layout: the menu's half-size and the HUD card's corner, in screen pixels
-  const [menuBox, setMenuBox] = useState({ half: 0, x: 0, y: 0 });
-  const wantMenu = sel !== null && ready && !embed?.menuHidden;
+  const [menuBox, setMenuBox] = useState({ half: 0, x: 0, y: 0, bottom: 0 });
+  const wantMenu = sel !== null && ready && !embed?.menuHidden && menuDismissed !== sel?.id;
   useEffect(() => {
     if (!wantMenu || !menuEl) return;
     const measure = (): void => {
       const half = menuEl.offsetWidth / 2;
       const inset = hudInset();
+      // phone: the dock of map buttons along the bottom edge is off limits to the menu
+      const dock = screenRef.current?.querySelector<HTMLElement>('[class*="dock"]');
+      const host = hostRef.current?.getBoundingClientRect();
+      const dockRect = dock?.getBoundingClientRect();
+      const bottom = host && dockRect && dockRect.height > 0 ? host.bottom - dockRect.top : 0;
       setMenuBox((m) =>
-        m.half === half && m.x === inset.x && m.y === inset.y ? m : { half, ...inset },
+        m.half === half && m.x === inset.x && m.y === inset.y && m.bottom === bottom
+          ? m
+          : { half, ...inset, bottom },
       );
     };
     // the observer fires once on observe and again whenever the menu or the map resizes
@@ -513,7 +529,14 @@ export function MapScreen({
     c.animateTo(target, nowFn(), readMotionMs('--duration-slow'), true);
   }, [sel, wantMenu, menuBox.half, cam, hudRects]);
   const menuAt =
-    sel && wantMenu ? clampMenu(worldToHud(sel, cam, vp), vp, menuBox.half, menuBox) : null;
+    sel && wantMenu
+      ? clampMenu(
+          worldToHud(sel, cam, vp),
+          { w: vp.w, h: vp.h - menuBox.bottom },
+          menuBox.half,
+          menuBox,
+        )
+      : null;
   const menuId = menuAt && sel ? sel.id : null;
   useEffect(() => {
     rendererRef.current?.setMenuFor(menuId);

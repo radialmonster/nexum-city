@@ -73,6 +73,9 @@ export function RadialMenu({
         const x = CENTRE + RING * Math.cos(angle);
         const y = CENTRE + RING * Math.sin(angle);
         const on = item.id === selected;
+        // labels of the upper items sit above their button, so they never run into a lower neighbour
+        const above = Math.sin(angle) < -0.25;
+        const labelY = above ? y - BUTTON - LABEL_GAP : y + BUTTON + LABEL_GAP;
         return (
           <g
             key={item.id}
@@ -95,11 +98,11 @@ export function RadialMenu({
             <rect
               className={styles['label-bg']}
               x={x - (item.label.length * LABEL_CHAR + LABEL_PAD) / 2}
-              y={y + BUTTON + LABEL_GAP - LABEL_H / 2}
+              y={labelY - LABEL_H / 2}
               width={item.label.length * LABEL_CHAR + LABEL_PAD}
               height={LABEL_H}
             />
-            <text className={styles['label']} x={x} y={y + BUTTON + LABEL_GAP} dy="0.35em">
+            <text className={styles['label']} x={x} y={labelY} dy="0.35em">
               {item.label}
             </text>
           </g>
