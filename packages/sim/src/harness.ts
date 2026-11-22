@@ -44,6 +44,10 @@ export interface SeasonResult {
   districts: number;
   /** Each player's credits (whole units) 48 game hours in, for the early-income check. */
   creditsAt48h: Record<Id, number>;
+  /** Contracts per taker: taken, finished and failed. */
+  contractsBy: Record<Id, { taken: number; done: number; failed: number }>;
+  contractsPosted: { civic: number; player: number };
+  contractsExpired: number;
   players: { id: Id; bot: BotKind }[];
   standings: Standing[];
   /** Broken invariants found at any decision time (empty is good). */
@@ -98,6 +102,16 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
   const taken = new Map<string, number>();
   const problems: string[] = [];
   const creditsAt48h: Record<Id, number> = {};
+  const contractsBy: SeasonResult['contractsBy'] = {};
+  const contractsPosted = { civic: 0, player: 0 };
+  let contractsExpired = 0;
+  // Per contract: the escrowed reward, to prove each one pays out or refunds exactly that.
+  const rewards = new Map<string, number>();
+  // Per tagged haul: units the contract accepted plus excess, to match what arrived.
+  const delivered = new Map<string, number>();
+  const near = (a: number, b: number): boolean => Math.abs(a - b) < 1e-3;
+  const by = (id: unknown): { taken: number; done: number; failed: number } =>
+    (contractsBy[String(id)] ??= { taken: 0, done: 0, failed: 0 });
   const sumUnits = (v: unknown): number =>
     v && typeof v === 'object'
       ? Object.values(v as Record<string, unknown>).reduce<number>(
@@ -131,6 +145,46 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
         destroyedUnits += destroyed;
         const haul = String(e.data['haulId']);
         taken.set(haul, (taken.get(haul) ?? 0) + stolen + destroyed);
+      } else if (e.kind === 'contract.posted') {
+        rewards.set(String(e.data['contractId']), Number(e.data['reward']));
+        if (e.data['civic']) contractsPosted.civic += 1;
+        else contractsPosted.player += 1;
+      } else if (e.kind === 'contract.taken') by(e.data['taker']).taken += 1;
+      else if (e.kind === 'contract.progress' || e.kind === 'contract.done') {
+        const mv = String(e.data['movementId']);
+        delivered.set(
+          mv,
+          (delivered.get(mv) ?? 0) + Number(e.data['accepted']) + Number(e.data['excess']),
+        );
+        if (e.kind === 'contract.done') {
+          const id = String(e.data['contractId']);
+          by(e.data['taker']).done += 1;
+          if (!near(Number(e.data['paid']), rewards.get(id) ?? NaN)) {
+            problems.push(
+              `contract ${id}: paid ${String(e.data['paid'])} of ${String(rewards.get(id))}`,
+            );
+          }
+          rewards.delete(id);
+        }
+      } else if (e.kind === 'contract.failed') {
+        by(e.data['taker']).failed += 1;
+        const id = String(e.data['contractId']);
+        if (!e.data['civic']) {
+          const sum = Number(e.data['paid']) + Number(e.data['refunded']);
+          if (!near(sum, rewards.get(id) ?? NaN)) {
+            problems.push(`contract ${id}: paid+refunded ${sum} of ${String(rewards.get(id))}`);
+          }
+        }
+        rewards.delete(id);
+      } else if (e.kind === 'contract.expired') {
+        contractsExpired += 1;
+        const id = String(e.data['contractId']);
+        if (!e.data['civic'] && !near(Number(e.data['refunded']), rewards.get(id) ?? NaN)) {
+          problems.push(
+            `contract ${id}: refunded ${String(e.data['refunded'])} of ${String(rewards.get(id))}`,
+          );
+        }
+        rewards.delete(id);
       } else if (
         e.kind === 'arrived' &&
         (e.data['movement'] === 'haul' || e.data['movement'] === 'settle')
@@ -144,6 +198,17 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
           );
         }
         taken.delete(String(e.data['movementId']));
+        if (e.data['contractId'] && e.data['recalled'] !== true) {
+          const got = delivered.get(String(e.data['movementId'])) ?? 0;
+          // A contract that already ended (late, cancelled) leaves the cargo to be deposited.
+          const gone = got === 0 && !rewards.has(String(e.data['contractId']));
+          if (!gone && !near(got, left)) {
+            problems.push(
+              `haul ${String(e.data['movementId'])}: ${left} arrived but the contract took ${got}`,
+            );
+          }
+        }
+        delivered.delete(String(e.data['movementId']));
       }
     }
   };
@@ -202,6 +267,9 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
     destroyedUnits,
     districts: Object.keys(state.districts).length,
     creditsAt48h,
+    contractsBy,
+    contractsPosted,
+    contractsExpired,
     players,
     standings: standings(state),
     problems,

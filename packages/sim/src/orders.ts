@@ -1,4 +1,13 @@
 import { MS_PER_HOUR, MS_PER_MINUTE, balance, toAtoms } from './balance.js';
+import {
+  cancelContract,
+  postContract,
+  takeContract,
+  validateCancel,
+  validateContractHaul,
+  validatePost,
+  validateTake,
+} from './contracts.js';
 import { buildCost, startConstruction } from './construction.js';
 import { emit, type Ctx } from './ctx.js';
 import { cancelOrder, findOrder, placeOrder, validatePlace } from './market.js';
@@ -37,13 +46,17 @@ type Plan =
       route: Route;
       durationMs: number;
       raid?: RaidInfo;
+      contractId?: Id;
     }
   | { type: 'build'; district: District; building: BuildingType }
   | { type: 'stance'; district: District; stance: 'hold' | 'pullback' }
   | { type: 'recall'; movement: Movement }
   | { type: 'recruit'; district: District }
   | { type: 'place'; order: Extract<Order, { type: 'market.place' }> }
-  | { type: 'cancel'; orderId: Id };
+  | { type: 'cancel'; orderId: Id }
+  | { type: 'post'; order: Extract<Order, { type: 'contract.post' }> }
+  | { type: 'take'; contractId: Id }
+  | { type: 'withdraw'; contractId: Id };
 
 type Resolved = { plan: Plan } | { error: OrderError };
 
@@ -62,6 +75,8 @@ interface TravelRequest {
   cargo?: Partial<Record<string, number>>;
   /** Raids only: the street to lie in wait on, and for how many hours. */
   edge?: { a: Id; b: Id; hours: number };
+  /** Hauls only: deliver to this contract. */
+  contractId?: Id;
 }
 
 function resolveTravel(state: GameState, req: TravelRequest): Resolved {
@@ -172,6 +187,10 @@ function resolveTravel(state: GameState, req: TravelRequest): Resolved {
       total += qty;
     }
     if (total === 0) return fail('empty_cargo');
+    if (req.contractId !== undefined) {
+      const error = validateContractHaul(state, req.actorId, req.contractId, to, req.cargo ?? {});
+      if (error) return fail(error);
+    }
     if (total > spec.cargo) return fail('over_capacity');
     const source = sourceStore(state, req.actorId, from);
     if (!source) return fail('invalid_target');
@@ -191,6 +210,7 @@ function resolveTravel(state: GameState, req: TravelRequest): Resolved {
       route,
       durationMs: travelMs(route.lengthM, kind),
       ...(raid ? { raid } : {}),
+      ...(req.contractId !== undefined ? { contractId: req.contractId } : {}),
     },
   };
 }
@@ -225,6 +245,7 @@ function resolve(state: GameState, input: Input): Resolved {
         crewIds: order.crewIds,
         to: order.to,
         cargo: order.cargo,
+        ...(order.contractId !== undefined ? { contractId: order.contractId } : {}),
       });
     case 'settle':
       return resolveTravel(state, {
@@ -305,6 +326,18 @@ function resolve(state: GameState, input: Input): Resolved {
       if (found.order.owner !== actorId) return fail('not_owner');
       return { plan: { type: 'cancel', orderId: order.orderId } };
     }
+    case 'contract.post': {
+      const error = validatePost(state, actorId, order);
+      return error ? fail(error) : { plan: { type: 'post', order } };
+    }
+    case 'contract.take': {
+      const error = validateTake(state, actorId, order.contractId);
+      return error ? fail(error) : { plan: { type: 'take', contractId: order.contractId } };
+    }
+    case 'contract.cancel': {
+      const error = validateCancel(state, actorId, order.contractId);
+      return error ? fail(error) : { plan: { type: 'withdraw', contractId: order.contractId } };
+    }
     case 'recruit': {
       const district = state.districts[order.districtId];
       if (!district) return fail('unknown_district');
@@ -371,6 +404,15 @@ export function applyOrder(ctx: Ctx, input: Input): Validation {
       if (found) cancelOrder(ctx, found.order, found.book);
       break;
     }
+    case 'post':
+      postContract(ctx, input.actorId, plan.order);
+      break;
+    case 'take':
+      takeContract(ctx, input.actorId, plan.contractId);
+      break;
+    case 'withdraw':
+      cancelContract(ctx, plan.contractId);
+      break;
     case 'recruit': {
       const { district } = plan;
       const player = state.players[input.actorId] as { credits: number };

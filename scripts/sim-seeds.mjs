@@ -13,6 +13,8 @@ let stolen = 0;
 let destroyed = 0;
 let problems = 0;
 let n = 0;
+const posted = { civic: 0, player: 0 };
+let expired = 0;
 for (let seed = first; seed <= last; seed++) {
   const r = runSeason({ seed });
   n += 1;
@@ -22,9 +24,27 @@ for (let seed = first; seed <= last; seed++) {
   stolen += r.stolenUnits;
   destroyed += r.destroyedUnits;
   problems += r.problems.length;
+  posted.civic += r.contractsPosted.civic;
+  posted.player += r.contractsPosted.player;
+  expired += r.contractsExpired;
   for (const s of r.standings) {
     const bot = r.players.find((p) => p.id === s.playerId)?.bot ?? '?';
-    const t = (types[bot] ??= { players: 0, districts: 0, trade: 0, score: 0, credits48: 0 });
+    const t = (types[bot] ??= {
+      players: 0,
+      districts: 0,
+      trade: 0,
+      score: 0,
+      credits48: 0,
+      taken: 0,
+      done: 0,
+      failed: 0,
+    });
+    const c = r.contractsBy[s.playerId];
+    if (c) {
+      t.taken += c.taken;
+      t.done += c.done;
+      t.failed += c.failed;
+    }
     t.credits48 += r.creditsAt48h?.[s.playerId] ?? 0;
     t.players += 1;
     t.districts += s.districts;
@@ -35,7 +55,7 @@ for (let seed = first; seed <= last; seed++) {
 console.log(`seeds ${first}-${last}`);
 for (const [bot, t] of Object.entries(types)) {
   console.log(
-    `${bot.padEnd(9)} districts/player=${(t.districts / t.players).toFixed(2)} trade/player=${(t.trade / t.players).toFixed(1)} credits@48h=${(t.credits48 / t.players).toFixed(0)} score/player=${(t.score / t.players).toFixed(1)}`,
+    `${bot.padEnd(9)} districts/player=${(t.districts / t.players).toFixed(2)} trade/player=${(t.trade / t.players).toFixed(1)} credits@48h=${(t.credits48 / t.players).toFixed(0)} score/player=${(t.score / t.players).toFixed(1)} contracts/player taken=${(t.taken / t.players).toFixed(2)} done=${(t.done / t.players).toFixed(2)} failed=${(t.failed / t.players).toFixed(2)}`,
   );
 }
 const scores = Object.values(types)
@@ -49,6 +69,9 @@ const others = Object.entries(types)
 console.log(`raider lead over best other type: ${(raiderScore / Math.max(...others)).toFixed(2)}x`);
 console.log(
   `raids/season=${(raids / n).toFixed(1)} hits/season=${(hits / n).toFixed(1)} repelled/season=${(repelled / n).toFixed(1)} success=${raids ? ((hits / Math.max(1, hits + repelled)) * 100).toFixed(0) : 0}% stolen/season=${(stolen / n).toFixed(0)} destroyed/season=${(destroyed / n).toFixed(0)}`,
+);
+console.log(
+  `contracts/season posted civic=${(posted.civic / n).toFixed(1)} player=${(posted.player / n).toFixed(1)} expired untaken/cancelled=${(expired / n).toFixed(1)}`,
 );
 console.log(`invariant problems=${problems}`);
 if (problems > 0) process.exitCode = 1;

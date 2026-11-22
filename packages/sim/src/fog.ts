@@ -6,6 +6,7 @@ import { progressAt } from './siege.js';
 import type {
   Building,
   Carrier,
+  Contract,
   Construction,
   Crew,
   Edge,
@@ -204,6 +205,15 @@ export interface MarketBookView {
   lastCents: number | null;
 }
 
+/**
+ * A contract on a public board. Everyone sees who posted and who took it; how far the job has got
+ * (`delivered`, `paid`) is shown only to its poster and its taker, and is `null` for others.
+ */
+export type ContractView = Omit<Contract, 'delivered' | 'paid'> & {
+  delivered: number | null;
+  paid: number | null;
+};
+
 export interface PlayerView {
   playerId: Id;
   nowMs: number;
@@ -225,6 +235,8 @@ export interface PlayerView {
   markets: Record<Id, Record<Good, MarketBookView>>;
   /** Your own open orders. */
   orders: MarketOrder[];
+  /** Every hub's contracts board: open offers and taken jobs, all public. */
+  contracts: Record<Id, ContractView>;
   /** The street graph is public: every node and street, and which nodes are hubs. */
   graph: { nodes: Record<Id, GraphNode>; edges: Edge[]; hubs: Id[] };
 }
@@ -362,6 +374,12 @@ export function viewFor(state: GameState, playerId: Id): PlayerView {
   }
   orders.sort((a, b) => a.seq - b.seq);
 
+  const contracts: Record<Id, ContractView> = {};
+  for (const c of Object.values(state.contracts)) {
+    const mine = c.poster === playerId || c.taker === playerId;
+    contracts[c.id] = { ...c, delivered: mine ? c.delivered : null, paid: mine ? c.paid : null };
+  }
+
   const board = Object.values(state.players)
     .map((p) => ({ playerId: p.id, score: p.score / 3_600_000 }))
     .sort((a, b) => b.score - a.score || (a.playerId < b.playerId ? -1 : 1))
@@ -387,6 +405,7 @@ export function viewFor(state: GameState, playerId: Id): PlayerView {
     reveals,
     markets,
     orders,
+    contracts,
     graph: {
       nodes: JSON.parse(JSON.stringify(state.graph.nodes)),
       edges: state.graph.edges.map((e) => ({ ...e })),

@@ -111,6 +111,12 @@ export interface Player {
   tradeDay: number;
   /** Trade score earned on `tradeDay`, in district-milliseconds (capped per day). */
   tradeDayMs: number;
+  /** Part of `score` that came from completed contracts, in district-milliseconds. */
+  contractMs: number;
+  /** Season day (0-based) the daily contract counter below belongs to. */
+  contractDay: number;
+  /** Contract score earned on `contractDay`, in district-milliseconds (capped per day). */
+  contractDayMs: number;
 }
 
 export type UnitLocation = { at: Id } | { movement: Id };
@@ -186,6 +192,8 @@ export interface Movement {
   raid?: RaidInfo;
   /** Hauls only: the cargo it set out with, in atoms (for conservation checks and reports). */
   sent?: number;
+  /** Hauls only: the contract this haul delivers to (contracts board, M2). */
+  contractId?: Id;
 }
 
 export type QueuedEvent = { at: number; seq: number } & (
@@ -199,6 +207,8 @@ export type QueuedEvent = { at: number; seq: number } & (
   | { kind: 'settle.done'; districtId: Id }
   | { kind: 'raid.end'; movementId: Id }
   | { kind: 'raid.strike'; movementId: Id; targetId: Id }
+  | { kind: 'contract.civic' }
+  | { kind: 'contract.due'; contractId: Id }
 );
 export type QueuedKind = QueuedEvent['kind'];
 
@@ -264,6 +274,39 @@ export interface Book {
   lastCents: number | null;
 }
 
+/**
+ * A delivery job on a hub's board (contracts board, M2). Only live contracts are kept: a contract
+ * that is done, failed, expired or cancelled is removed and reported as an event.
+ */
+export interface Contract {
+  id: Id;
+  /** The hub the goods must be delivered to; it is also the board the contract sits on. */
+  hub: Id;
+  good: Good;
+  /** Whole units wanted. */
+  qty: number;
+  /** Credits in atoms, paid pro rata as goods arrive. For a player poster they are held in escrow. */
+  reward: number;
+  /** Who posted it: a player, or `civic` (the city pays, and consumes the goods). */
+  poster: Id | 'civic';
+  /** Hours the taker has to deliver, counted from the moment of taking. */
+  hours: number;
+  postedMs: number;
+  /** An offer nobody has taken lapses at this time. */
+  offerEndsMs: number;
+  status: 'open' | 'taken';
+  taker: Id | null;
+  takenMs: number;
+  /** The delivery deadline (0 until taken). */
+  dueMs: number;
+  /** The taker's deposit in atoms, held until the contract ends. */
+  deposit: number;
+  /** Goods delivered so far in atoms. */
+  delivered: number;
+  /** Credits paid out so far in atoms. */
+  paid: number;
+}
+
 export interface Season {
   startMs: number;
   endMs: number;
@@ -292,6 +335,8 @@ export interface Counters {
   seq: number;
   /** Last market order number issued. */
   order: number;
+  /** Last contract number issued. */
+  contract: number;
 }
 
 export interface GameState {
@@ -315,6 +360,8 @@ export interface GameState {
   season: Season;
   /** Order books by hub id, then good. */
   markets: Record<Id, Record<Good, Book>>;
+  /** Live contracts by id (open offers and taken jobs). */
+  contracts: Record<Id, Contract>;
   /** What each player last saw of each district's owner (fog memory). */
   memory: Record<Id, Record<Id, Owner>>;
   /** Pending scheduled events, sorted by (at, seq). */
@@ -327,7 +374,15 @@ export type CargoRequest = Partial<Record<Good, number>>;
 
 export type Order =
   | { type: 'move'; carrierId: Id | null; crewIds: Id[]; to: Id }
-  | { type: 'haul'; carrierId: Id | null; crewIds: Id[]; to: Id; cargo: CargoRequest }
+  | {
+      type: 'haul';
+      carrierId: Id | null;
+      crewIds: Id[];
+      to: Id;
+      cargo: CargoRequest;
+      /** Deliver this haul to a contract you have taken (`to` must be its hub). */
+      contractId?: Id;
+    }
   | { type: 'build'; districtId: Id; building: BuildingType }
   | { type: 'siege'; carrierId: Id | null; crewIds: Id[]; target: Id }
   | { type: 'reinforce'; carrierId: Id | null; crewIds: Id[]; to: Id }
@@ -338,7 +393,12 @@ export type Order =
   | { type: 'recall'; movementId: Id }
   | { type: 'recruit'; districtId: Id }
   | { type: 'market.place'; hub: Id; side: Side; good: Good; price: number; qty: number }
-  | { type: 'market.cancel'; orderId: Id };
+  | { type: 'market.cancel'; orderId: Id }
+  /** Post a delivery job at a hub, escrowing `reward` whole credits. */
+  | { type: 'contract.post'; hub: Id; good: Good; qty: number; reward: number; hours: number }
+  | { type: 'contract.take'; contractId: Id }
+  /** Withdraw your own contract while nobody has taken it. */
+  | { type: 'contract.cancel'; contractId: Id };
 
 export type OrderType = Order['type'];
 
@@ -390,6 +450,15 @@ export const ORDER_ERRORS = [
   'bad_window',
   'too_many_raids',
   'protected_no_raid',
+  'unknown_contract',
+  'contract_taken',
+  'contract_closed',
+  'not_taker',
+  'own_contract',
+  'board_full',
+  'too_many_contracts',
+  'bad_reward',
+  'wrong_cargo',
 ] as const;
 export type OrderError = (typeof ORDER_ERRORS)[number];
 
@@ -416,6 +485,12 @@ export type SimEventKind =
   | 'raid.hit'
   | 'raid.repelled'
   | 'raid.ended'
+  | 'contract.posted'
+  | 'contract.taken'
+  | 'contract.progress'
+  | 'contract.done'
+  | 'contract.failed'
+  | 'contract.expired'
   | 'protection.ended'
   | 'score.tick'
   | 'order.rejected';

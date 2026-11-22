@@ -73,6 +73,8 @@ describe('district-hours', () => {
         districts: 2,
         tradeScore: 0,
         tradeMs: 0,
+        contractScore: 0,
+        contractMs: 0,
       },
       {
         rank: 2,
@@ -82,6 +84,8 @@ describe('district-hours', () => {
         districts: 1,
         tradeScore: 0,
         tradeMs: 0,
+        contractScore: 0,
+        contractMs: 0,
       },
     ]);
   });

@@ -1,4 +1,5 @@
 import type { Ctx } from './ctx.js';
+import { contractSystem } from './contracts.js';
 import { constructionSystem } from './construction.js';
 import { observe } from './fog.js';
 import { frontierSystem } from './frontier.js';
@@ -41,6 +42,7 @@ export const systems: readonly System[] = [
   siegeSystem,
   scoreSystem,
   marketSystem,
+  contractSystem,
   frontierSystem,
   settleSystem,
   fogSystem,

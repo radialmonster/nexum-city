@@ -65,8 +65,11 @@ describe('balance pass', () => {
   });
 
   it('gives every bot type at least 3 districts on average, raiders ahead by less than 2x', () => {
+    // Seeds 1 to 8, the same set the docs report: five seeds are too noisy to rank the types now
+    // that contracts add a second income stream.
+    const eight = [...seeds, ...[6, 7, 8].map((seed) => runSeason({ seed }))];
     const agg: Record<string, { n: number; d: number; score: number }> = {};
-    for (const r of seeds) {
+    for (const r of eight) {
       for (const s of r.standings) {
         const bot = r.players.find((p) => p.id === s.playerId)?.bot ?? '?';
         const a = (agg[bot] ??= { n: 0, d: 0, score: 0 });

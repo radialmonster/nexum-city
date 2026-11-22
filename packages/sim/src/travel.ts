@@ -1,5 +1,6 @@
 import { MS_PER_HOUR, balance, toUnits } from './balance.js';
 import { emit, schedule, unschedule, type Ctx } from './ctx.js';
+import { deliverToContract } from './contracts.js';
 import { deposit } from './production.js';
 import { beginAmbush, scheduleStrikes } from './raid.js';
 import type { Route } from './routing.js';
@@ -41,6 +42,8 @@ export interface MovementSpec {
   durationMs: number;
   /** Raids only. */
   raid?: RaidInfo;
+  /** Hauls only: the contract this haul delivers to. */
+  contractId?: Id;
 }
 
 /** Moves units out of their location and into a new movement. Units are never in two places. */
@@ -66,6 +69,7 @@ export function startMovement(ctx: Ctx, spec: MovementSpec): Movement {
     arriveMs: state.nowMs + spec.durationMs,
   };
   if (spec.raid) movement.raid = spec.raid;
+  if (spec.contractId) movement.contractId = spec.contractId;
   if (spec.kind === 'haul' || spec.kind === 'settle')
     movement.sent = GOODS.reduce((n, g) => n + spec.cargo[g], 0);
   for (const crew of spec.crews) {
@@ -114,7 +118,8 @@ export const travelSystem: System = {
       if (carrier) carrier.loc = { at: m.to };
       const recalled = m.recalledAtMs !== undefined;
       // Settlers spend their supplies on arrival; a recalled trip brings them home.
-      if (m.kind !== 'settle' || recalled) deposit(ctx, m.owner, m.to, m.cargo);
+      if (m.contractId && !recalled) deliverToContract(ctx, m);
+      else if (m.kind !== 'settle' || recalled) deposit(ctx, m.owner, m.to, m.cargo);
       if (m.kind === 'settle' && !recalled) {
         beginSettle(
           ctx,
@@ -138,6 +143,7 @@ export const travelSystem: System = {
         carrier: m.carrierKind,
         crewIds: m.crewIds,
         recalled,
+        contractId: m.contractId ?? null,
         cargo: GOODS.reduce((n, g) => n + toUnits(m.cargo[g]), 0),
         sent: m.sent === undefined ? 0 : toUnits(m.sent),
       });

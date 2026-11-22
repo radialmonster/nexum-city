@@ -1,4 +1,4 @@
-import { MS_PER_HOUR, balance } from './balance.js';
+import { ATOMS_PER_UNIT, MS_PER_HOUR, balance } from './balance.js';
 import { emit, schedule, type Ctx } from './ctx.js';
 import { refreshSiege } from './siege.js';
 import type { System } from './systems.js';
@@ -16,6 +16,10 @@ export interface Standing {
   tradeScore: number;
   /** The exact integer behind `tradeScore`. */
   tradeMs: number;
+  /** Part of `score` earned from completed contracts, in district-hours. */
+  contractScore: number;
+  /** The exact integer behind `contractScore`. */
+  contractMs: number;
 }
 
 /**
@@ -56,6 +60,32 @@ export function addTradeScore(ctx: Ctx, playerId: Id, cents: number): void {
   p.score += gain;
 }
 
+/**
+ * Credits a player's contract score for a completed contract that paid `rewardAtoms`: 1 point per
+ * `creditsPerPoint` credits, capped per season day. Returns the milliseconds gained.
+ */
+export function addContractScore(ctx: Ctx, playerId: Id, rewardAtoms: number): number {
+  const { state } = ctx;
+  const p = state.players[playerId];
+  if (!p || state.nowMs >= state.season.endMs) return 0;
+  const T = balance.contractScore;
+  const day = Math.floor((state.nowMs - state.season.startMs) / (24 * MS_PER_HOUR));
+  if (p.contractDay !== day) {
+    p.contractDay = day;
+    p.contractDayMs = 0;
+  }
+  const earned = Number(
+    (BigInt(Math.trunc(rewardAtoms)) * BigInt(MS_PER_HOUR)) /
+      (BigInt(ATOMS_PER_UNIT) * BigInt(T.creditsPerPoint)),
+  );
+  const gain = Math.min(earned, T.dailyCapPoints * MS_PER_HOUR - p.contractDayMs);
+  if (gain <= 0) return 0;
+  p.contractDayMs += gain;
+  p.contractMs += gain;
+  p.score += gain;
+  return gain;
+}
+
 /** Players ranked by score (ties broken by id), with their district counts. */
 export function standings(state: GameState): Standing[] {
   const held = new Map<Id, number>();
@@ -67,6 +97,7 @@ export function standings(state: GameState): Standing[] {
       playerId: p.id,
       scoreMs: p.score,
       tradeMs: p.tradeMs,
+      contractMs: p.contractMs,
       districts: held.get(p.id) ?? 0,
     }))
     .sort((a, b) => b.scoreMs - a.scoreMs || (a.playerId < b.playerId ? -1 : 1));
@@ -78,6 +109,8 @@ export function standings(state: GameState): Standing[] {
     districts: r.districts,
     tradeScore: r.tradeMs / MS_PER_HOUR,
     tradeMs: r.tradeMs,
+    contractScore: r.contractMs / MS_PER_HOUR,
+    contractMs: r.contractMs,
   }));
 }
 

@@ -173,6 +173,48 @@ export const balance = {
     dailyCapPoints: 24,
   },
 
+  /** The contracts board (milestone 2, docs/rewrite/sim-spec.md). */
+  contracts: {
+    /** Live contracts (open or taken) one hub's board holds. */
+    boardCap: 4,
+    /** Of those, at most this many are civic, so a slot is always free for players. */
+    civicCap: 3,
+    /** The city considers posting one contract per hub this often. */
+    civicEveryHours: 3,
+    /** An offer nobody takes lapses after this many hours. */
+    offerHours: 24,
+    /** The delivery window, in hours from taking. */
+    minHours: 6,
+    maxHours: 18,
+    /** Civic contract sizes in units, in steps. A van carries 40. */
+    civicMinQty: 10,
+    civicMaxQty: 40,
+    qtyStep: 5,
+    /** Player contract size limits, in units. */
+    minQty: 5,
+    maxQty: 150,
+    /** Civic reward is the goods' reference value plus this percent. */
+    civicPremiumPercent: 30,
+    /** A player's reward must be within this band of the goods' reference value, in percent. */
+    minRewardPercent: 50,
+    maxRewardPercent: 300,
+    /** The taker's deposit, in percent of the reward; refunded on success, lost when late. */
+    depositPercent: 10,
+    /** Contracts one player may hold taken at once, and may have posted and open at once. */
+    maxTaken: 2,
+    maxPosted: 2,
+    /** A posting is news (a public event) from this reward, in credits; civic ones are rarely notable. */
+    notableCredits: 1000,
+  },
+
+  /** Completed contracts earn score too, but only a little: a bonus on top of the pay. */
+  contractScore: {
+    /** Credits of reward per score point (1 point = 1 district-hour). */
+    creditsPerPoint: 50,
+    /** The most points a player can earn from contracts in one season day. */
+    dailyCapPoints: 12,
+  },
+
   market: {
     /** Prices are integers in 1/100 credit. */
     priceScale: 100,

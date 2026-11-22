@@ -1,3 +1,4 @@
+import { balance, toAtoms } from './balance.js';
 import { totalGoods, warehouseCapacity } from './production.js';
 import { GOODS, type GameState } from './types.js';
 
@@ -70,6 +71,29 @@ export function checkInvariants(s: GameState): string[] {
       for (const g of GOODS)
         if (goods[g] < 0) problems.push(`${p.id} stash at ${hub} negative ${g}`);
     }
+  }
+  for (const c of Object.values(s.contracts)) {
+    const tag = `contract ${c.id}`;
+    const hub = s.districts[c.hub];
+    if (!hub || hub.kind !== 'hub') problems.push(`${tag} is not at a hub`);
+    if (c.poster !== 'civic' && !s.players[c.poster]) problems.push(`${tag} has no poster`);
+    if (c.status === 'open') {
+      if (c.taker !== null || c.deposit !== 0 || c.delivered !== 0 || c.paid !== 0) {
+        problems.push(`${tag} is open but has a taker, deposit or progress`);
+      }
+    } else if (!c.taker || !s.players[c.taker] || c.taker === c.poster) {
+      problems.push(`${tag} is taken by an invalid taker`);
+    }
+    if (c.delivered < 0 || c.delivered > toAtoms(c.qty))
+      problems.push(`${tag} delivered out of range`);
+    if (c.paid < 0 || c.paid > c.reward) problems.push(`${tag} paid out of range`);
+    if (c.deposit < 0) problems.push(`${tag} has a negative deposit`);
+    const due = s.queue.filter((e) => e.kind === 'contract.due' && e.contractId === c.id).length;
+    if (due !== 1) problems.push(`${tag} has ${due} deadline events`);
+  }
+  for (const hub of Object.keys(s.markets)) {
+    const n = Object.values(s.contracts).filter((c) => c.hub === hub).length;
+    if (n > balance.contracts.boardCap) problems.push(`${hub} board holds ${n} contracts`);
   }
   const orderIds = new Set<string>();
   for (const [hub, books] of Object.entries(s.markets)) {

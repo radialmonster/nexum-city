@@ -1,7 +1,8 @@
 import { MS_PER_HOUR, balance, toAtoms, toUnits } from './balance.js';
 import { buildCost } from './construction.js';
 import { civicAsk, civicBid } from './market.js';
-import { shortestRoute } from './routing.js';
+import { depositFor, referenceValue } from './contracts.js';
+import { shortestRoute, travelMs } from './routing.js';
 import { isPlayerProtected } from './raid.js';
 import { isProtected } from './siege.js';
 import {
@@ -180,7 +181,7 @@ export function ambushOrders(s: GameState, me: Id): Order[] {
     const crews = idleCrews(s, base.id, me);
     const van = vanAt(s, base.id, me);
     if (crews.length < 2 || !van) continue;
-    const edges: { a: Id; b: Id; len: number }[] = [];
+    const edges: { a: Id; b: Id; len: number; hot: boolean }[] = [];
     for (const d of Object.values(s.districts)) {
       if (d.kind === 'hub' || d.owner === me || d.owner === 'neutral') continue;
       // Protected players' convoys cannot be struck, and that flag is public, so skip them.
@@ -190,11 +191,16 @@ export function ambushOrders(s: GameState, me: Id): Order[] {
       if (!route || route.route.length < 2) continue;
       const a = route.route[route.route.length - 2] as Id;
       const b = route.route[route.route.length - 1] as Id;
-      edges.push({ a, b, len: Math.min(length(s, base.id, a), length(s, base.id, b)) });
+      // The board is public and shows who took what: a rival with a job open at this hub has a
+      // load on the way, so that street is the better bet.
+      const hot = Object.values(s.contracts).some(
+        (c) => c.status === 'taken' && c.hub === hub.id && c.taker === d.owner,
+      );
+      edges.push({ a, b, len: Math.min(length(s, base.id, a), length(s, base.id, b)), hot });
     }
     const edge = edges
       .filter((e) => Number.isFinite(e.len))
-      .sort((x, y) => x.len - y.len || (x.a < y.a ? -1 : 1))[0];
+      .sort((x, y) => Number(y.hot) - Number(x.hot) || x.len - y.len || (x.a < y.a ? -1 : 1))[0];
     if (!edge) continue;
     return [
       {
@@ -402,6 +408,108 @@ function nearestHubTo(s: GameState, from: Id): District | undefined {
     .sort((x, y) => length(s, from, x.id) - length(s, from, y.id))[0];
 }
 
+interface ContractPlan {
+  /** Largest contract (units) the bot will take. */
+  maxQty: number;
+  /** Only take a job whose trip fits in this share of its window, in percent. */
+  tripPercent: number;
+  /** How to rank open contracts: by pay for the size, or by the shortest trip. */
+  prefer: 'pay' | 'near';
+  escort: boolean;
+}
+
+const spareUnits = (base: District, good: (typeof GOODS)[number]): number =>
+  Math.floor(toUnits(base.warehouse[good])) -
+  (good === 'supplies' ? balance.settle.supplies + 25 : 0);
+
+/**
+ * The contract side of a bot's turn, through the normal order path. Hauls the goods for a
+ * contract it holds (partial loads count, so a raided or short load is topped up next time), or,
+ * when it holds none, takes the best open one it can fill from a home warehouse in time. Reads
+ * only the public board and its own stores. Returns no orders when the bot has nothing to do,
+ * so the caller can fall back to its usual hauling (a take order also keeps the crew free for
+ * the haul next check-in).
+ */
+export function contractOrders(s: GameState, me: Id, budget: Budget, plan: ContractPlan): Order[] {
+  const held = Object.values(s.contracts)
+    .filter((c) => c.taker === me)
+    .sort((a, b) => a.dueMs - b.dueMs || (a.id < b.id ? -1 : 1));
+  const sending = new Set(
+    Object.values(s.movements)
+      .filter((m) => m.owner === me && m.contractId)
+      .map((m) => m.contractId),
+  );
+  for (const c of held) {
+    if (sending.has(c.id)) continue;
+    const missing = Math.ceil(c.qty - toUnits(c.delivered));
+    for (const base of mine(s, me)) {
+      const idle = idleCrews(s, base.id, me);
+      const van = vanAt(s, base.id, me);
+      const qty = Math.min(missing, VAN_CARGO, spareUnits(base, c.good));
+      if (!idle[0] || !van || qty < 1) continue;
+      if (!Number.isFinite(length(s, base.id, c.hub))) continue;
+      const guards =
+        plan.escort && qty >= ESCORT_FROM_UNITS && idle[1]
+          ? [idle[0].id, idle[1].id]
+          : [idle[0].id];
+      return [
+        {
+          type: 'haul',
+          carrierId: van,
+          crewIds: guards,
+          to: c.hub,
+          cargo: { [c.good]: qty },
+          contractId: c.id,
+        },
+      ];
+    }
+  }
+  if (held.length > 0) return [];
+  let best: { id: Id; score: number } | null = null;
+  for (const c of Object.values(s.contracts)) {
+    if (c.status !== 'open' || c.poster === me || c.qty > plan.maxQty) continue;
+    if (budget.credits < depositFor(c.reward)) continue;
+    for (const base of mine(s, me)) {
+      if (idleCrews(s, base.id, me).length === 0 || !vanAt(s, base.id, me)) continue;
+      if (spareUnits(base, c.good) < c.qty) continue;
+      const len = length(s, base.id, c.hub);
+      if (!Number.isFinite(len)) continue;
+      const tripMs = travelMs(len, 'van');
+      if (tripMs * 100 > c.hours * MS_PER_HOUR * plan.tripPercent) continue;
+      const score = plan.prefer === 'near' ? -len : c.reward / c.qty;
+      if (!best || score > best.score) best = { id: c.id, score };
+    }
+  }
+  return best ? [{ type: 'contract.take', contractId: best.id }] : [];
+}
+
+/**
+ * A merchant who needs supplies posts a job for them at the nearest hub instead of buying from
+ * the civic ask (it pays a little over the reference price, so takers earn a fair premium).
+ */
+function postSupplyContract(s: GameState, me: Id, budget: Budget): Order[] {
+  const home = mine(s, me)[0];
+  const hub = home && nearestHubTo(s, home.id);
+  if (!home || !hub) return [];
+  if (Object.values(s.contracts).some((c) => c.poster === me)) return [];
+  if (toUnits(home.warehouse.supplies) >= balance.settle.supplies + SETTLE_RESERVE) return [];
+  const wantsPlot = Object.values(s.districts).some(
+    (d) => d.kind !== 'hub' && d.owner === 'neutral' && d.frontier === 'open',
+  );
+  if (
+    !wantsPlot ||
+    Object.values(s.players[me]?.stash ?? {}).some((g) => toUnits(g.supplies) >= 1)
+  ) {
+    return [];
+  }
+  const qty = 20;
+  const reward = Math.ceil(toUnits(referenceValue(s, hub.id, 'supplies', qty)) * 1.1);
+  // Only when flush: the escrow is idle money, and a merchant short of cash should not lock it up.
+  if (budget.credits < toAtoms(reward) * 4) return [];
+  budget.credits -= toAtoms(reward);
+  return [{ type: 'contract.post', hub: hub.id, good: 'supplies', qty, reward, hours: 12 }];
+}
+
 /** Never attacks: recruits, walls and workshops everywhere, and keeps every district on hold. */
 export const turtle: Bot = (s, me) => {
   const budget = budgetFor(s, me);
@@ -413,13 +521,21 @@ export const turtle: Bot = (s, me) => {
     Object.values(s.districts).some(
       (d) => d.kind !== 'hub' && d.owner === 'neutral' && d.frontier === 'open',
     );
+  // Small, nearby jobs: the early income a new player can reach with one van-load.
+  const jobs = contractOrders(s, me, budget, {
+    maxQty: 20,
+    tripPercent: 50,
+    prefer: 'near',
+    escort: false,
+  });
   return [
     ...(saving ? [] : economy(s, me, budget, 6, ['walls', 'workshop', 'depot'])),
     ...settleOrders(s, me, budget, SETTLE_RESERVE, 1),
-    ...fetchOrders(s, me),
+    ...jobs,
+    ...(jobs.length > 0 ? [] : fetchOrders(s, me)),
     ...sellStash(s, me),
     // Out of supplies and credits: sell a pile of what the district makes, as a player would.
-    ...(starved(s, me, SETTLE_RESERVE) ? haulToHub(s, me) : []),
+    ...(jobs.length === 0 && starved(s, me, SETTLE_RESERVE) ? haulToHub(s, me) : []),
     ...resupply(s, me, budget, SETTLE_RESERVE),
     ...mine(s, me).map((d): Order => ({ type: 'stance', districtId: d.id, stance: 'hold' })),
   ];
@@ -435,7 +551,19 @@ export const merchant: Bot = (s, me) => {
     ...economy(s, me, budget, 3, ['workshop']),
     ...settleOrders(s, me, budget, SETTLE_RESERVE, 1),
   ];
-  orders.push(...sellStash(s, me), ...haulToHub(s, me, true), ...resupply(s, me, budget));
+  const jobs = contractOrders(s, me, budget, {
+    maxQty: VAN_CARGO,
+    tripPercent: 60,
+    prefer: 'pay',
+    escort: true,
+  });
+  orders.push(
+    ...sellStash(s, me),
+    ...jobs,
+    ...(jobs.length > 0 ? [] : haulToHub(s, me, true)),
+    ...postSupplyContract(s, me, budget),
+    ...resupply(s, me, budget),
+  );
   return orders;
 };
 

@@ -102,7 +102,7 @@ export function createWorld(seed: number, options: WorldOptions = {}): GameState
     seed,
     nowMs: startMs,
     rng,
-    counters: { crew: 0, carrier: 0, movement: 0, event: 0, seq: 2, order: 0 },
+    counters: { crew: 0, carrier: 0, movement: 0, event: 0, seq: 3, order: 0, contract: 0 },
     world: { cols, rows, soundY: rows },
     graph: { nodes, edges },
     districts,
@@ -121,11 +121,17 @@ export function createWorld(seed: number, options: WorldOptions = {}): GameState
       belowMedian: [],
     },
     markets: { hubW: newHubBooks(), hubE: newHubBooks() },
+    contracts: {},
     memory: {},
     // The first hourly score and market ticks; each tick schedules the next.
     queue: [
       { at: startMs + MS_PER_HOUR, seq: 1, kind: 'score.tick' },
       { at: startMs + MS_PER_HOUR, seq: 2, kind: 'market.tick' },
+      {
+        at: startMs + balance.contracts.civicEveryHours * MS_PER_HOUR,
+        seq: 3,
+        kind: 'contract.civic',
+      },
     ],
   };
   // The first open plots along the edge. Their events are not part of the game's history.
@@ -176,6 +182,9 @@ export function addPlayerWithEvents(
     tradeMs: 0,
     tradeDay: 0,
     tradeDayMs: 0,
+    contractMs: 0,
+    contractDay: 0,
+    contractDayMs: 0,
   };
   d.owner = opts.id;
   d.frontier = 'built';

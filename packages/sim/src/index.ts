@@ -3,6 +3,7 @@ export { buildCost, buildDurationMs } from './construction.js';
 export { observe, sightOf, viewFor } from './fog.js';
 export type {
   BookLevel,
+  ContractView,
   DistrictView,
   MarketBookView,
   OwnDistrictView,
@@ -15,11 +16,12 @@ export type {
   SettlingView,
 } from './fog.js';
 export { hashState, canonicalJson } from './hash.js';
-export { addTradeScore, inFinale, settleScore, standings } from './score.js';
+export { addContractScore, addTradeScore, inFinale, settleScore, standings } from './score.js';
 export type { Standing } from './score.js';
 export { isProtected, progressAt, siegeFraction } from './siege.js';
 export { crossingTime } from './raid.js';
 export { applyOrder, validateOrder } from './orders.js';
+export { boardOf, depositFor, referenceValue } from './contracts.js';
 export { ATOMS_PER_CENT, civicAsk, civicBid } from './market.js';
 export { BOTS, merchant, raider, turtle } from './bots.js';
 export type { Bot, BotKind } from './bots.js';
