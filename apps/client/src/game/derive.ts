@@ -97,6 +97,31 @@ export function seasonClock(view: PlayerView, nowMs: number): SeasonClock {
   return { day, days, hhmm: `${p(h)}:${p(m)}` };
 }
 
+export type SeasonPhase = 'running' | 'finale' | 'over';
+
+export interface FinaleClock {
+  readonly phase: SeasonPhase;
+  /** Time until the season ends; 0 once it is over. */
+  readonly msLeft: number;
+  /** `HH:MM:SS` (hours can pass 24 during the finale). */
+  readonly text: string;
+}
+
+/** Where the season is: running, in the finale (with a countdown), or over. */
+export function finaleClock(view: PlayerView, nowMs: number): FinaleClock {
+  const { endMs, finaleStartMs } = view.season;
+  const msLeft = Math.max(0, endMs - nowMs);
+  const phase: SeasonPhase =
+    nowMs >= endMs ? 'over' : nowMs >= finaleStartMs ? 'finale' : 'running';
+  const s = Math.floor(msLeft / 1000);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return {
+    phase,
+    msLeft,
+    text: `${p(Math.floor(s / 3600))}:${p(Math.floor((s % 3600) / 60))}:${p(s % 60)}`,
+  };
+}
+
 export function crewsAt(view: PlayerView, nodeId: string) {
   return Object.values(view.crews).filter(
     (c) => c.owner === view.playerId && 'at' in c.loc && c.loc.at === nodeId,

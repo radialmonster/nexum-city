@@ -3,7 +3,7 @@ import { toUnits } from '@nexum/sim';
 import { Button, Chip } from '../ui';
 import { cx, factionColor, vars, type Faction } from '../ui/util';
 import type { CrewNames } from './derive';
-import { crewName, raceOf, seasonClock, warehouseTotals } from './derive';
+import { crewName, finaleClock, raceOf, seasonClock, warehouseTotals } from './derive';
 import { formatUnits } from './feed';
 import styles from './TopBar.module.css';
 
@@ -41,6 +41,7 @@ export function TopBar({
 }: TopBarProps) {
   const race = raceOf(view);
   const clock = seasonClock(view, nowMs);
+  const finale = finaleClock(view, nowMs);
   const goods = warehouseTotals(view);
   const sorted = [...race.shares].sort((a, b) => b.share - a.share);
   return (
@@ -48,11 +49,19 @@ export function TopBar({
       <div className={styles['logo']}>
         NEXUM<span>//</span>CITY
       </div>
-      {!compact && (
+      {finale.phase === 'running' ? (
+        !compact && (
+          <Chip
+            label="SEASON"
+            value={`DAY ${String(clock.day).padStart(2, '0')}/${String(clock.days)}`}
+            className={styles['season']}
+          />
+        )
+      ) : (
         <Chip
-          label="SEASON"
-          value={`DAY ${String(clock.day).padStart(2, '0')}/${String(clock.days)}`}
-          className={styles['season']}
+          label={finale.phase === 'finale' ? 'FINALE ENDS IN' : 'SEASON'}
+          value={finale.phase === 'finale' ? finale.text : 'ENDED'}
+          className={cx(styles['season'], styles['finale'])}
         />
       )}
       <div

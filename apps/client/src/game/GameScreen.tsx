@@ -16,7 +16,8 @@ import { useCompact, useSession, useWallClock } from './sessionContext';
 import { gameNow, useGame, useStore } from './store';
 import { Timeline } from './Timeline';
 import { TopBar } from './TopBar';
-import { isOwn } from './derive';
+import { finaleClock, isOwn } from './derive';
+import { SeasonEnd } from './SeasonEnd';
 
 type Drawer = 'map' | 'feed' | 'orders' | 'district';
 
@@ -35,6 +36,7 @@ export function GameScreen() {
     | { kind: 'dossier'; playerId: string }
     | null
   >(null);
+  const [endSeen, setEndSeen] = useState<number | null>(null);
   const { view, account } = state;
 
   useEffect(() => {
@@ -152,6 +154,17 @@ export function GameScreen() {
             route,
           }}
         />
+        {finaleClock(view, nowMs).phase === 'over' && endSeen !== view.season.endMs && (
+          <div className={styles['modal']}>
+            <SeasonEnd
+              view={view}
+              names={state.names}
+              onClose={() => {
+                setEndSeen(view.season.endMs);
+              }}
+            />
+          </div>
+        )}
         {panel && !state.draft && (
           <div className={styles['modal']}>
             {panel.kind === 'market' && (

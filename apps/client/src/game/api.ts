@@ -6,12 +6,14 @@ import {
   meResponseSchema,
   okResponseSchema,
   placeOrderResponseSchema,
+  seasonsResponseSchema,
   standingsResponseSchema,
   type AuthResponse,
   type EtaResponse,
   type FeedResponse,
   type MeResponse,
   type OrderBody,
+  type SeasonsResponse,
   type StandingsResponse,
 } from '@nexum/contracts';
 
@@ -88,6 +90,7 @@ export const api = {
     await call('/auth/logout', okResponseSchema, { method: 'POST' });
   },
   me: (): Promise<MeResponse> => call('/me', meResponseSchema),
+  seasons: (): Promise<SeasonsResponse> => call('/seasons', seasonsResponseSchema),
   standings: (): Promise<StandingsResponse> => call('/standings', standingsResponseSchema),
   placeOrder: (order: OrderBody) =>
     call('/orders', placeOrderResponseSchema, { method: 'POST', body: { order } }),
