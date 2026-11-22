@@ -1,7 +1,7 @@
-import type { PlayerView } from '@nexum/contracts';
+import type { GoodName, PlayerView } from '@nexum/contracts';
 import { toUnits } from '@nexum/sim';
 import { Button, Chip } from '../ui';
-import { cx, factionColor, vars } from '../ui/util';
+import { cx, factionColor, vars, type Faction } from '../ui/util';
 import { raceOf, seasonClock, shortName, warehouseTotals } from './derive';
 import { formatUnits } from './feed';
 import styles from './TopBar.module.css';
@@ -15,9 +15,14 @@ export interface TopBarProps {
   readonly link: 'off' | 'live' | 'polling';
   readonly onAlerts: () => void;
   readonly onLogout: () => void;
+  /** Opens the market for a good; the chips become buttons when set. */
+  readonly onMarket?: ((good: GoodName) => void) | undefined;
   /** Narrow screens: the bar shows only the logo, the race, credits, alerts and the clock. */
   readonly compact?: boolean;
 }
+
+/** Rival segments cycle through these so each player reads as a distinct colour. */
+const SEGMENT_ROLES: readonly Faction[] = ['merchant', 'raider', 'turtle', 'rival', 'hunter'];
 
 /** The top bar: logo, season, race bar, resource chips, alerts, clock. */
 export function TopBar({
@@ -28,6 +33,7 @@ export function TopBar({
   link,
   onAlerts,
   onLogout,
+  onMarket,
   compact = false,
 }: TopBarProps) {
   const race = raceOf(view);
@@ -51,12 +57,14 @@ export function TopBar({
         title="Share of the season score. Each segment is a player; yours is bright."
       >
         <div className={styles['racebar']} role="img" aria-label="Season race">
-          {sorted.map((s) => (
+          {sorted.map((s, i) => (
             <i
               key={s.id}
               className={cx(s.me && styles['me'])}
               style={vars({
-                '--k': factionColor(s.me ? 'self' : 'rival'),
+                '--k': factionColor(
+                  s.me ? 'self' : (SEGMENT_ROLES[i % SEGMENT_ROLES.length] ?? 'rival'),
+                ),
                 '--share': Math.max(s.share, 0.01),
               })}
               title={s.me ? 'You' : shortName(s.id)}
@@ -76,10 +84,38 @@ export function TopBar({
         <Chip icon="$" label="CR" value={formatUnits(toUnits(view.self.credits))} />
         {!compact && (
           <>
-            <Chip icon="P" label="PARTS" value={formatUnits(goods.parts)} faction="turtle" />
-            <Chip icon="W" label="POWER" value={formatUnits(goods.power)} faction="merchant" />
-            <Chip icon="D" label="DATA" value={formatUnits(goods.data)} faction="raider" />
-            <Chip icon="S" label="SUPPLIES" value={formatUnits(goods.supplies)} faction="hunter" />
+            {(
+              [
+                ['parts', 'P', 'PARTS', 'turtle'],
+                ['power', 'W', 'POWER', 'merchant'],
+                ['data', 'D', 'DATA', 'raider'],
+                ['supplies', 'S', 'SUPPLIES', 'hunter'],
+              ] as const
+            ).map(([good, icon, label, faction]) => {
+              const chip = (
+                <Chip
+                  icon={icon}
+                  label={label}
+                  value={formatUnits(goods[good])}
+                  faction={faction}
+                />
+              );
+              return onMarket ? (
+                <button
+                  key={good}
+                  type="button"
+                  className={styles['chip-button']}
+                  title={`Open the ${good} market`}
+                  onClick={() => {
+                    onMarket(good);
+                  }}
+                >
+                  {chip}
+                </button>
+              ) : (
+                <span key={good}>{chip}</span>
+              );
+            })}
           </>
         )}
       </div>

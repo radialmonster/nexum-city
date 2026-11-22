@@ -12,6 +12,8 @@ export interface FeedEntry {
   readonly text: string;
   /** The district to fly the map to when the entry is clicked. */
   readonly districtId: string | null;
+  /** The sim event kind, so the column can open a battle report for siege events. */
+  readonly eventKind: string;
 }
 
 type Data = FeedItem['event']['data'];
@@ -46,7 +48,7 @@ export function describeEvent(item: FeedItem, view: PlayerView): FeedEntry | nul
     return view.districts[id]?.name ?? id;
   };
   const who = (id: string | undefined): string => (id === me ? 'You' : (id ?? 'Someone'));
-  const base = { seq: item.seq, at: event.at, districtId: placeId };
+  const base = { seq: item.seq, at: event.at, districtId: placeId, eventKind: event.kind };
 
   switch (event.kind) {
     case 'siege.started': {

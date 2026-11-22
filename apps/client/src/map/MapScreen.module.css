@@ -268,3 +268,12 @@
 .screen[data-compact='true'] .info {
   min-width: 0;
 }
+
+/* embedded in the game HUD: a slim readout that leaves the map clear */
+.screen[data-embedded='true'] .readout {
+  min-width: 0;
+}
+
+.screen[data-embedded='true'] .coords {
+  font-size: var(--font-size-xl);
+}

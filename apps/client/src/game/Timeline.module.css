@@ -1,0 +1,53 @@
+.timeline {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(var(--size-row) * 8);
+}
+
+.timeline > div:last-child {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-xs) var(--space-md);
+}
+
+/* Same columns as the kit's TimelineRow, so the ticks sit over the tracks. */
+.axis {
+  display: grid;
+  grid-template-columns: minmax(var(--size-toggle), 20%) minmax(0, 1fr);
+  gap: var(--space-lg);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-dim);
+}
+
+.ticks {
+  display: flex;
+  justify-content: space-between;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-md);
+  align-items: center;
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-xs);
+  min-width: calc(var(--size-toggle) * 2);
+  justify-content: flex-end;
+}
+
+.empty {
+  margin: 0;
+  padding: var(--space-md) 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-dim);
+}

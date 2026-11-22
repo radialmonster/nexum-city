@@ -34,6 +34,10 @@ export interface DistrictPanelProps {
   readonly onStance: (districtId: string, stance: 'hold' | 'pullback') => void;
   readonly onBuild: (districtId: string) => void;
   readonly onFly: (districtId: string) => void;
+  /** Opens the market for a hub district. */
+  readonly onMarket?: ((hubId: string) => void) | undefined;
+  /** Opens the dossier of a rival. */
+  readonly onRival?: ((playerId: string) => void) | undefined;
 }
 
 const relationLabel = (d: DistrictView, me: string): string => {
@@ -51,6 +55,8 @@ export function DistrictPanel({
   onStance,
   onBuild,
   onFly,
+  onMarket,
+  onRival,
 }: DistrictPanelProps) {
   const d = districtId ? view.districts[districtId] : undefined;
   if (!d) {
@@ -70,11 +76,18 @@ export function DistrictPanel({
         <Own d={d} view={view} nowMs={nowMs} onStance={onStance} onBuild={onBuild} />
       ) : d.relation === 'remembered' ? (
         <p className={styles['empty']}>
-          Last seen under {d.lastKnownOwner ? shortName(d.lastKnownOwner) : 'nobody'}. Send a scout
-          to see it now.
+          Last seen under{' '}
+          {d.lastKnownOwner && onRival ? (
+            <RivalLink id={d.lastKnownOwner} me={view.playerId} onRival={onRival} />
+          ) : d.lastKnownOwner ? (
+            shortName(d.lastKnownOwner)
+          ) : (
+            'nobody'
+          )}
+          . Send a scout to see it now.
         </p>
       ) : (
-        <Seen d={d} />
+        <Seen d={d} me={view.playerId} onMarket={onMarket} onRival={onRival} />
       )}
       <Nearby view={view} id={d.id} onFly={onFly} />
     </Panel>
@@ -205,12 +218,64 @@ function Own({
   );
 }
 
-function Seen({ d }: { d: Exclude<DistrictView, { relation: 'own' | 'remembered' }> }) {
+/** A rival's name that opens their dossier; your own id is plain text. */
+function RivalLink({
+  id,
+  me,
+  onRival,
+}: {
+  id: string;
+  me: string;
+  onRival: (playerId: string) => void;
+}) {
+  if (id === me) return <>you</>;
+  return (
+    <button
+      type="button"
+      className={styles['rival']}
+      onClick={() => {
+        onRival(id);
+      }}
+    >
+      {shortName(id)}
+    </button>
+  );
+}
+
+function Seen({
+  d,
+  me,
+  onMarket,
+  onRival,
+}: {
+  d: Exclude<DistrictView, { relation: 'own' | 'remembered' }>;
+  me: string;
+  onMarket: DistrictPanelProps['onMarket'];
+  onRival: DistrictPanelProps['onRival'];
+}) {
   const presence = Object.entries(d.presence);
   return (
     <div className={styles['stack']}>
       <div className={styles['chips']}>
-        <Tag faction="rival">{d.owner ? shortName(d.owner) : 'NO OWNER'}</Tag>
+        <Tag faction="rival">
+          {d.owner && onRival ? (
+            <RivalLink id={d.owner} me={me} onRival={onRival} />
+          ) : d.owner ? (
+            shortName(d.owner)
+          ) : (
+            'NO OWNER'
+          )}
+        </Tag>
+        {d.relation === 'hub' && onMarket && (
+          <Button
+            variant="primary"
+            onClick={() => {
+              onMarket(d.id);
+            }}
+          >
+            OPEN MARKET
+          </Button>
+        )}
         {d.protected && (
           <span className={styles['status']} data-tone="ok">
             PROTECTED

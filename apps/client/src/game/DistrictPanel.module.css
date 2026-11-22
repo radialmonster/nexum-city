@@ -140,3 +140,14 @@
   margin: 0;
   color: var(--color-text-dim);
 }
+
+.rival {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}

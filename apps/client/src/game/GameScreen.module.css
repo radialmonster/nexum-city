@@ -1,5 +1,8 @@
 .feed {
   display: flex;
+  align-self: stretch;
+  border-right: var(--border-thin) solid var(--color-line);
+  background: var(--color-panel-solid);
   flex-direction: column;
   grid-area: feed;
   min-height: 0;
@@ -8,6 +11,9 @@
 
 .side {
   display: flex;
+  align-self: stretch;
+  border-left: var(--border-thin) solid var(--color-line);
+  background: var(--color-panel-solid);
   flex-direction: column;
   grid-area: side;
   min-height: 0;
@@ -55,7 +61,7 @@
   display: grid;
   grid-template:
     'top top top' auto
-    'feed map side' 1fr
+    'feed map side' minmax(0, 1fr)
     'timeline timeline timeline' auto / var(--size-column) 1fr var(--size-column);
   background: var(--color-bg);
 }

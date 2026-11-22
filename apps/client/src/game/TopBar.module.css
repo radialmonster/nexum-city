@@ -39,12 +39,12 @@
 .racebar i {
   min-width: var(--space-2xs);
   flex: var(--share) 1 0;
-  background: var(--k);
-  opacity: 0.55;
+  background: color-mix(in srgb, var(--k) 55%, transparent);
+  border-top: var(--border-thick) solid var(--k);
 }
 
 .racebar i.me {
-  opacity: 1;
+  background: var(--k);
   box-shadow: 0 0 var(--space-md) var(--k);
 }
 
@@ -106,4 +106,12 @@
 .top[data-compact='true'] .race {
   order: 9;
   flex: 1 1 100%;
+}
+
+.chip-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
 }

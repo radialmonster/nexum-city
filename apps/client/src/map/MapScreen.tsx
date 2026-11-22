@@ -459,7 +459,7 @@ export function MapScreen({
               </div>
             )}
 
-            {!compact && (
+            {!compact && embed === undefined && (
               <Panel
                 className={cx(styles['jump'])}
                 title="MY DISTRICTS"

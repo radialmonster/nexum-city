@@ -1,13 +1,20 @@
 import { useEffect, useState } from 'react';
+import type { GoodName } from '@nexum/contracts';
 import type { PlayerView as SimView } from '@nexum/sim';
 import { Tabs } from '../ui';
 import { MapScreen } from '../map/MapScreen';
+import { BattleReport } from './BattleReport';
+import { buildDossier } from './rivalDossier';
+import { buildReport } from './report';
+import { Dossier } from './Dossier';
+import { MarketPanel } from './MarketPanel';
 import { DistrictPanel } from './DistrictPanel';
 import { FeedPanel } from './FeedPanel';
 import styles from './GameScreen.module.css';
 import { OrderCard } from './OrderCard';
 import { useCompact, useSession, useWallClock } from './sessionContext';
 import { gameNow, useGame, useStore } from './store';
+import { Timeline } from './Timeline';
 import { TopBar } from './TopBar';
 import { isOwn } from './derive';
 
@@ -22,6 +29,12 @@ export function GameScreen() {
   const compact = useCompact();
   const [drawer, setDrawer] = useState<Drawer>('map');
   const [route, setRoute] = useState<readonly string[] | null>(null);
+  const [panel, setPanel] = useState<
+    | { kind: 'market'; hub: string; good?: GoodName }
+    | { kind: 'report'; seq: number }
+    | { kind: 'dossier'; playerId: string }
+    | null
+  >(null);
   const { view, account } = state;
 
   useEffect(() => {
@@ -46,6 +59,16 @@ export function GameScreen() {
     setDrawer('map');
   };
 
+  /** The first hub you can see: the resource chips open its market. */
+  const firstHub = Object.values(view.districts).find((d) => d.relation === 'hub')?.id;
+  const openMarket = (hub: string, good?: GoodName) => {
+    setPanel({ kind: 'market', hub, ...(good ? { good } : {}) });
+  };
+  const closePanel = () => {
+    setPanel(null);
+  };
+  const report = panel?.kind === 'report' ? buildReport(state.feed, view, panel.seq) : null;
+
   const feed = (
     <FeedPanel
       view={view}
@@ -53,6 +76,9 @@ export function GameScreen() {
       lastSeenMs={state.lastSeenMs}
       nowMs={nowMs}
       onFly={fly}
+      onReport={(seq) => {
+        setPanel({ kind: 'report', seq });
+      }}
     />
   );
   const side = (
@@ -67,6 +93,12 @@ export function GameScreen() {
         session.openDraft({ kind: 'build', districtId });
       }}
       onFly={fly}
+      onMarket={(hub) => {
+        openMarket(hub);
+      }}
+      onRival={(playerId) => {
+        setPanel({ kind: 'dossier', playerId });
+      }}
     />
   );
 
@@ -83,6 +115,18 @@ export function GameScreen() {
           const hit = Object.values(view.districts).find((d) => isOwn(d) && d.siege !== null);
           if (hit) fly(hit.id);
         }}
+        onMarket={
+          firstHub
+            ? (good) => {
+                openMarket(
+                  state.selected && view.districts[state.selected]?.relation === 'hub'
+                    ? state.selected
+                    : firstHub,
+                  good,
+                );
+              }
+            : undefined
+        }
         onLogout={() => {
           void session.logout();
         }}
@@ -102,6 +146,49 @@ export function GameScreen() {
             route,
           }}
         />
+        {panel && !state.draft && (
+          <div className={styles['modal']}>
+            {panel.kind === 'market' && (
+              <MarketPanel
+                view={view}
+                feed={state.feed}
+                hub={panel.hub}
+                good={panel.good}
+                onPlace={(order) => session.placeOrder(order)}
+                onCancel={(orderId) => {
+                  void session.placeOrder({ type: 'market.cancel', orderId });
+                }}
+                onClose={closePanel}
+              />
+            )}
+            {report && (
+              <BattleReport
+                report={report}
+                me={view.playerId}
+                nowMs={nowMs}
+                onRival={(playerId) => {
+                  setPanel({ kind: 'dossier', playerId });
+                }}
+                onFly={(id) => {
+                  closePanel();
+                  fly(id);
+                }}
+                onClose={closePanel}
+              />
+            )}
+            {panel.kind === 'dossier' && (
+              <Dossier
+                dossier={buildDossier(view, state.feed, panel.playerId)}
+                nowMs={nowMs}
+                onFly={(id) => {
+                  closePanel();
+                  fly(id);
+                }}
+                onClose={closePanel}
+              />
+            )}
+          </div>
+        )}
         {state.draft && (
           <div className={styles['modal']}>
             <OrderCard
@@ -126,7 +213,17 @@ export function GameScreen() {
         )}
       </div>
       {(!compact || drawer === 'district') && <div className={styles['side']}>{side}</div>}
-      <div className={styles['timeline']} aria-hidden="true" />
+      <div className={styles['timeline']}>
+        <Timeline
+          view={view}
+          feed={state.feed}
+          nowMs={nowMs}
+          onFly={fly}
+          onRecall={(movementId) => {
+            void session.placeOrder({ type: 'recall', movementId });
+          }}
+        />
+      </div>
       {compact && (
         <Tabs
           className={styles['tabs']}

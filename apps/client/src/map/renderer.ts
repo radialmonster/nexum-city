@@ -20,7 +20,14 @@ import {
 } from './camera';
 import { readHudScale } from './hudScale';
 import { glowRings, insetPoints, kindDetail, lodFor, type Lod } from './detail';
-import { moverPose, pickDistrict, territories, type Scene, type SceneDistrict } from './scene';
+import {
+  moverPose,
+  panBounds,
+  pickDistrict,
+  territories,
+  type Scene,
+  type SceneDistrict,
+} from './scene';
 
 export interface RendererCallbacks {
   /** The camera or its level changed (called at most once per frame). */
@@ -126,7 +133,7 @@ export class MapRenderer {
     this.baseNow = nowMs;
     this.cb = cb;
     const vp = { w: host.clientWidth || 1, h: host.clientHeight || 1 };
-    this.controller = new CameraController(pal.map, scene.bounds, vp);
+    this.controller = new CameraController(pal.map, panBounds(scene, pal.map), vp);
     this.observer = new ResizeObserver(() => {
       this.resize();
     });
@@ -171,7 +178,7 @@ export class MapRenderer {
     this.scene = scene;
     this.baseNow = nowMs;
     this.t0 = performance.now();
-    this.controller.setBounds(scene.bounds);
+    this.controller.setBounds(panBounds(scene, this.pal.map));
     this.baseDirty = true;
     this.dirty = true;
   }
@@ -797,21 +804,21 @@ export class MapRenderer {
       // hubs are octagons, so their text has less room than the box suggests
       const room = d.w * cam.zoom * (d.isHub ? 0.72 : 1) * m.labelFit;
       const nameY = d.isHub ? -d.h * 0.27 : -d.h * 0.1;
-      const name = this.label(
-        `n:${d.id}`,
-        dim ? '?' : d.name.toUpperCase(),
-        nameSize,
-        colour,
-        true,
-      );
+      const name = this.label(`n:${d.id}`, d.name.toUpperCase(), nameSize, colour, true);
       this.place(name, s.x, s.y + nameY * cam.zoom, room, dim ? 0.7 : 1);
-      if (dim || !lod.sub) continue;
-      const text = d.isHub ? 'PUBLIC MARKET' : `${d.ownerLabel} · ${d.kind.toUpperCase()}`;
-      const subColour = d.isHub
-        ? pal.color.textDim
-        : d.owner === 'neutral'
+      if (!lod.sub) continue;
+      // fog hides who holds a plot, never what it is: remembered plots show only their kind
+      const text = d.isHub
+        ? 'PUBLIC MARKET'
+        : dim
+          ? d.kind.toUpperCase()
+          : `${d.ownerLabel} · ${d.kind.toUpperCase()}`;
+      const subColour =
+        d.isHub || dim
           ? pal.color.textDim
-          : pal.faction[d.role];
+          : d.owner === 'neutral'
+            ? pal.color.textDim
+            : pal.faction[d.role];
       const sub = this.label(`k:${d.id}`, text, subSize, subColour, true);
       this.place(sub, s.x, s.y + (d.isHub ? -d.h * 0.12 : d.h * 0.07) * cam.zoom, room);
     }

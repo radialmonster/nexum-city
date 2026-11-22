@@ -3,6 +3,7 @@ import { Panel } from '../ui';
 import { cx, toneColor, vars } from '../ui/util';
 import { ago, describeEvent, type FeedEntry } from './feed';
 import styles from './FeedPanel.module.css';
+import { hasReport } from './report';
 
 export interface FeedPanelProps {
   readonly view: PlayerView;
@@ -11,6 +12,8 @@ export interface FeedPanelProps {
   readonly lastSeenMs: number;
   readonly nowMs: number;
   readonly onFly: (districtId: string) => void;
+  /** Opens the battle report for a siege event (by feed seq). */
+  readonly onReport?: ((seq: number) => void) | undefined;
   /** Entries to show, newest first. */
   readonly limit?: number;
 }
@@ -32,7 +35,15 @@ export function feedEntries(
 }
 
 /** "While you were away": events since the last visit, newest first; a click flies the map there. */
-export function FeedPanel({ view, feed, lastSeenMs, nowMs, onFly, limit = 40 }: FeedPanelProps) {
+export function FeedPanel({
+  view,
+  feed,
+  lastSeenMs,
+  nowMs,
+  onFly,
+  onReport,
+  limit = 40,
+}: FeedPanelProps) {
   const entries = feedEntries(view, feed, limit);
   const away = lastSeenMs > 0 ? ago(nowMs, lastSeenMs) : null;
   const fresh = entries.filter((e) => e.at > lastSeenMs).length;
@@ -52,9 +63,10 @@ export function FeedPanel({ view, feed, lastSeenMs, nowMs, onFly, limit = 40 }: 
                 type="button"
                 className={cx(styles['entry'], e.at > lastSeenMs && styles['fresh'])}
                 style={vars({ '--k': toneColor(e.tone) })}
-                disabled={e.districtId === null}
+                disabled={e.districtId === null && !(onReport && hasReport(e.eventKind))}
                 onClick={() => {
-                  if (e.districtId !== null) onFly(e.districtId);
+                  if (onReport && hasReport(e.eventKind)) onReport(e.seq);
+                  else if (e.districtId !== null) onFly(e.districtId);
                 }}
               >
                 <span className={styles['glyph']} aria-hidden="true">

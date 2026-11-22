@@ -93,14 +93,14 @@ describe('CameraController', () => {
 
   it('animates to a target and stops', () => {
     const c = new CameraController(t, bounds, vp, { x: 1500, y: 1000, zoom: 0.5 });
-    c.animateCentre(900, 700, 0, 0.8);
+    c.animateCentre(1400, 900, 0, 0.8);
     let now = 0;
     for (let i = 0; i < 200 && c.moving; i++) {
       now += 16;
       c.update(now);
     }
     expect(c.moving).toBe(false);
-    expect(c.cam.x).toBeCloseTo(900, 0);
+    expect(c.cam.x).toBeCloseTo(1400, 0);
     expect(c.cam.zoom).toBeCloseTo(0.8, 2);
   });
 

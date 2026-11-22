@@ -329,6 +329,11 @@ export function cityBounds(scene: Scene, t: MapTokens): Bounds {
   return { ...scene.bounds, maxY: scene.waterTop + t.pitchY * 1.2 };
 }
 
+/** What the camera may pan over: the plots plus only a strip of the Sound below them. */
+export function panBounds(scene: Scene, t: MapTokens): Bounds {
+  return { ...scene.bounds, maxY: scene.waterTop + t.pitchY * 0.5 };
+}
+
 /** Streets from the graph, or derived from plot positions when the view has no graph. */
 function layoutStreets(view: MapView, t: MapTokens, by: Record<Id, SceneDistrict>): SceneStreet[] {
   const streets: SceneStreet[] = [];

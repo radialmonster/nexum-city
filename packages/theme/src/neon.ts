@@ -333,7 +333,7 @@ export const neonMap = {
   minPlotPxCity: 30,
   minPlotPxTactical: 120,
   minPlotPxDistrict: 150,
-  panMarginPlots: 2,
+  panMarginPlots: 0.4,
   inertiaFriction: 0.92,
   inertiaStop: 0.02,
   wheelSensitivity: 0.0015,

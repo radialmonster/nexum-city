@@ -144,6 +144,7 @@ The city is bigger than one screen (see "The world"), so the map is a window you
 - **District types:** each district produces one main good and has its own character, for example the Docks make parts, the Grid makes power and the Archive makes data. Holding a type gives you that production and a reason to trade.
 - **Hubs:** 2–3 public market hubs nobody owns. Prices differ between them.
 - **Neutral districts:** held by a weak faction garrison (for example the Helix Combine). New players expand into them first.
+- **Public geography under fog (as built):** the name and kind of every plot you have ever seen stay visible, dimmed. Ownership, garrison, stock and units outside your sight stay hidden. This is client-only, from the remembered districts.
 - **Fog of war:** you see your districts, your crews, and what they can see. Public hubs are always visible. Rival convoys are visible while inside your sight range. Outside it you see only a district's last known owner. Scouting reveals the rest for a while.
 
 ## Districts
@@ -315,3 +316,5 @@ Bots announce their intentions in readable language ("Rival 4 is moving on the c
 3. Should trade volume count toward season score, or only territory?
 4. Do the bot names and personalities need flavour (real rival gang names and faces)?
 5. ~~Should this live in this repo or a new one?~~ Decided 2026-11-22: this repo (ADR 0030).
+
+- **As built (tasks 45 to 47):** the bottom band lists active orders on a 4 h axis with recall. The market panel opens from a hub or a resource chip. Clicking a `siege.captured` or `siege.broken` feed entry opens a battle report, and a rival's name in the district panel opens a dossier. For local testing, the server routes `POST /api/dev/seed` and `POST /api/dev/advance {hours}` exist only when `DEV_SEED=true` (never in production).
