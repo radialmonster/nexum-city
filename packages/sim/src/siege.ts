@@ -3,6 +3,7 @@ import { emit, schedule, unschedule, type Ctx } from './ctx.js';
 import { afterWarehouseChange, buildingLevel, emptyGoods } from './production.js';
 import { nextFloat } from './rng.js';
 import { shortestRoute, travelMs } from './routing.js';
+import { wearOf } from './wear.js';
 import type { System } from './systems.js';
 import { startMovement } from './travel.js';
 import {
@@ -342,7 +343,7 @@ function loot(ctx: Ctx, d: District, attacker: Id): Goods {
       crews: [],
       cargo,
       route,
-      durationMs: travelMs(route.lengthM, carrier.kind),
+      durationMs: travelMs(route.lengthM, carrier.kind, wearOf(carrier)),
     });
   }
   return taken;

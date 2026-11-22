@@ -1,8 +1,10 @@
 import { MS_PER_HOUR, balance, toAtoms, toUnits } from './balance.js';
 import { emit, schedule, unschedule, type Ctx } from './ctx.js';
+import { towerSight } from './fog.js';
 import { nudgeRef } from './market.js';
 import { nextFloat } from './rng.js';
 import { shortestRoute, travelMs } from './routing.js';
+import { wearCarrier } from './wear.js';
 import { applyLoss, isProtected } from './siege.js';
 import type { System } from './systems.js';
 import { GOODS, type Crew, type GameState, type Goods, type Id, type Movement } from './types.js';
@@ -123,6 +125,20 @@ export function beginAmbush(ctx: Ctx, m: Movement): void {
     untilMs: r.untilMs,
     crewIds: m.crewIds,
   });
+  // Watchtower owners whose towers see either end of the street are told (fog stays honest: only
+  // the street is revealed, not the raider's crews).
+  for (const pid of Object.keys(state.players).sort()) {
+    if (pid === m.owner) continue;
+    const seen = towerSight(state, pid);
+    if (seen.has(r.a) || seen.has(r.b)) {
+      emit(ctx, 'raid.spotted', [pid], [r.a, r.b], {
+        movementId: m.id,
+        edge: [r.a, r.b],
+        untilMs: r.untilMs,
+        owner: m.owner,
+      });
+    }
+  }
   for (const id of Object.keys(state.movements).sort()) {
     const other = state.movements[id] as Movement;
     if (carriesGoods(other)) maybeStrike(ctx, m, other);
@@ -214,6 +230,8 @@ function strike(ctx: Ctx, ambush: Movement, haul: Movement): void {
       return;
     }
   }
+  // Being struck, hit or repelled, wears the carrier (a Runner that slips away does not).
+  if (haul.carrierId) wearCarrier(ctx, state.carriers[haul.carrierId], balance.wear.perStrike);
   const raiders = crewsOf(ctx, ambush);
   const escort = crewsOf(ctx, haul);
   const raiderStrength = raiders.reduce((n, c) => n + c.strength, 0);

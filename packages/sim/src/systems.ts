@@ -12,6 +12,7 @@ import { scoreSystem } from './score.js';
 import { settleSystem } from './settle.js';
 import { siegeSystem } from './siege.js';
 import { travelSystem } from './travel.js';
+import { wearSystem } from './wear.js';
 import type { QueuedEvent, QueuedKind } from './types.js';
 
 export type Handlers = {
@@ -39,6 +40,7 @@ const fogSystem: System = { name: 'fog', after: observe };
 export const systems: readonly System[] = [
   travelSystem,
   raidSystem,
+  wearSystem,
   productionSystem,
   constructionSystem,
   siegeSystem,

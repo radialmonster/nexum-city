@@ -36,6 +36,8 @@ export interface BuildingSpec {
   readonly cost: Readonly<Partial<Record<Good, number>>>;
   /** Hours to build level 1; level n takes n times this. */
   readonly hours: number;
+  /** Highest level, when it is lower than `buildings.maxLevel`. */
+  readonly maxLevel?: number;
 }
 
 export const balance = {
@@ -77,7 +79,30 @@ export const balance = {
       workshop: { cost: { parts: 30, power: 10 }, hours: 2 },
       depot: { cost: { parts: 40, data: 10 }, hours: 3 },
       walls: { cost: { parts: 50, power: 10 }, hours: 4 },
+      // Watchtower: sight 1 + level hops, and the owner is told of ambushes in view (sim-spec, "Watchtower and Garage").
+      watchtower: { cost: { parts: 40 }, hours: 3, maxLevel: 2 },
+      // Garage: faster carrier repair and a Runner discount at its district.
+      garage: { cost: { parts: 50 }, hours: 3, maxLevel: 2 },
     } satisfies Record<BuildingType, BuildingSpec>,
+  },
+
+  /** Carrier wear: a gentle upkeep loop that the Garage speeds up (sim-spec, "Watchtower and Garage"). */
+  wear: {
+    /** Wear added when a carrier finishes a haul or settle trip. */
+    perTrip: 2,
+    /** Extra wear when a carrier is struck in an ambush (a hit or a repel, not a Runner evade). */
+    perStrike: 6,
+    max: 100,
+    /** Below this wear a carrier runs at full speed. */
+    slowFrom: 40,
+    /** Percent slower at max wear; the slowdown rises in a straight line from `slowFrom`. */
+    slowPercentAtMax: 20,
+    /** Minutes to repair one wear point while the carrier is parked at any district. */
+    repairMinutes: 90,
+    /** Same, with a Garage of level 1 and 2 at that district. */
+    garageRepairMinutes: [25, 12],
+    /** Percent off the Runner price per Garage level at the district where it is bought. */
+    garageRunnerDiscountPercent: 15,
   },
 
   recruit: {
@@ -299,4 +324,10 @@ export function toAtoms(units: number): number {
 
 export function toUnits(atoms: number): number {
   return atoms / ATOMS_PER_UNIT;
+}
+
+/** Highest level a building type can reach (Watchtower and Garage stop below the global cap). */
+export function maxLevelOf(type: BuildingType): number {
+  const spec: BuildingSpec = balance.buildings.specs[type];
+  return spec.maxLevel ?? balance.buildings.maxLevel;
 }

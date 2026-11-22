@@ -1,4 +1,5 @@
-import { MS_PER_HOUR, MS_PER_MINUTE, balance, toAtoms } from './balance.js';
+import { MS_PER_HOUR, MS_PER_MINUTE, balance, maxLevelOf, toAtoms } from './balance.js';
+import { runnerPrice, wearOf } from './wear.js';
 import {
   cancelContract,
   postContract,
@@ -223,7 +224,8 @@ function resolveTravel(state: GameState, req: TravelRequest): Resolved {
       crews,
       cargo,
       route,
-      durationMs: jobRun?.durationMs ?? travelMs(route.lengthM, kind),
+      durationMs:
+        jobRun?.durationMs ?? travelMs(route.lengthM, kind, carrier ? wearOf(carrier) : 0),
       ...(raid ? { raid } : {}),
       ...(req.contractId !== undefined ? { contractId: req.contractId } : {}),
       ...(req.job ? { job: req.job } : {}),
@@ -325,7 +327,7 @@ function resolve(state: GameState, input: Input): Resolved {
       if (district.kind === 'hub' || district.owner !== actorId) return fail('not_owner');
       if (district.construction) return fail('already_building');
       const level = buildingLevel(district, order.building) + 1;
-      if (level > balance.buildings.maxLevel) return fail('max_level');
+      if (level > maxLevelOf(order.building)) return fail('max_level');
       if (level === 1 && district.buildings.length >= district.slots)
         return fail('slot_unavailable');
       const cost = buildCost(order.building, level);
@@ -379,7 +381,7 @@ function resolve(state: GameState, input: Input): Resolved {
       ).length;
       if (owned >= balance.runner.maxOwned) return fail('too_many_carriers');
       const player = state.players[actorId];
-      if (!player || player.credits < toAtoms(balance.runner.credits)) {
+      if (!player || player.credits < toAtoms(runnerPrice(district))) {
         return fail('insufficient_credits');
       }
       return { plan: { type: 'buyCarrier', district } };
@@ -463,7 +465,7 @@ export function applyOrder(ctx: Ctx, input: Input): Validation {
     case 'buyCarrier': {
       const { district } = plan;
       const player = state.players[input.actorId] as { credits: number };
-      player.credits -= toAtoms(balance.runner.credits);
+      player.credits -= toAtoms(runnerPrice(district));
       state.counters.carrier += 1;
       const carrier: Carrier = {
         id: `v${state.counters.carrier}`,
@@ -475,7 +477,7 @@ export function applyOrder(ctx: Ctx, input: Input): Validation {
       emit(ctx, 'carrier.bought', [input.actorId], [district.id], {
         carrierId: carrier.id,
         kind: 'runner',
-        credits: balance.runner.credits,
+        credits: runnerPrice(district),
       });
       break;
     }

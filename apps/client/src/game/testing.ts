@@ -40,6 +40,7 @@ export function makeView(over: Partial<PlayerView> = {}): PlayerView {
         protected: false,
         open: false,
         settling: null,
+        watchtower: 0,
         presence: { rival: 2 },
         siege: null,
       },

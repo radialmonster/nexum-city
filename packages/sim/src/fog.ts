@@ -9,6 +9,7 @@ import type {
   Contract,
   Construction,
   Crew,
+  District,
   Edge,
   GraphNode,
   FrontierState,
@@ -25,7 +26,7 @@ import type {
   Stance,
 } from './types.js';
 
-/** Extra street hops of sight per level of a Watchtower, once that building exists. */
+/** Extra street hops of sight per level of a Watchtower. */
 const WATCHTOWER = 'watchtower';
 
 function neighbours(edges: readonly Edge[]): Map<Id, Id[]> {
@@ -44,7 +45,40 @@ function endsOf(state: GameState, m: Movement): Id[] {
 }
 
 function watchtowerLevel(buildings: readonly Building[]): number {
-  return buildings.find((b) => (b.type as string) === WATCHTOWER)?.level ?? 0;
+  return buildings.find((b) => b.type === WATCHTOWER)?.level ?? 0;
+}
+
+/**
+ * The districts a player's Watchtowers cover: each tower sees `1 + level` hops around it. A pure
+ * function of the state, used to tell tower owners about ambushes (`raid.spotted`).
+ */
+export function towerSight(state: GameState, playerId: Id): Set<Id> {
+  return towerReach(state, (d) => d.owner === playerId);
+}
+
+/** Same as `towerSight`, for any set of tower districts chosen by `keep` (bots use it on visible rivals). */
+export function towerReach(state: GameState, keep: (d: District) => boolean): Set<Id> {
+  const adj = neighbours(state.graph.edges);
+  const seen = new Set<Id>();
+  for (const d of Object.values(state.districts)) {
+    const level = d.kind !== 'hub' && keep(d) ? watchtowerLevel(d.buildings) : 0;
+    if (level === 0) continue;
+    let frontier = [d.id];
+    seen.add(d.id);
+    for (let i = 0; i <= level; i++) {
+      const next: Id[] = [];
+      for (const id of frontier) {
+        for (const n of adj.get(id) ?? []) {
+          if (!seen.has(n)) {
+            seen.add(n);
+            next.push(n);
+          }
+        }
+      }
+      frontier = next;
+    }
+  }
+  return seen;
 }
 
 /**
@@ -147,6 +181,8 @@ export interface SeenDistrictView {
   open: boolean;
   /** A settlement under way here, and who is making it (public inside your sight). */
   settling: SettlingView | null;
+  /** Watchtower level (0 for none): a public landmark, so rivals can see it and plan around it. */
+  watchtower: number;
 }
 
 export interface SettlingView {
@@ -310,6 +346,7 @@ export function viewFor(state: GameState, playerId: Id): PlayerView {
         settling: d.settling
           ? { owner: d.settling.owner, completesAtMs: d.settling.completesAtMs }
           : null,
+        watchtower: watchtowerLevel(d.buildings),
       };
     } else {
       districts[d.id] = { relation: 'remembered', ...base, lastKnownOwner: memory[d.id] ?? null };

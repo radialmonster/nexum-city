@@ -1,5 +1,7 @@
 import { MS_PER_HOUR, balance, toAtoms, toUnits } from './balance.js';
 import { buildCost } from './construction.js';
+import { sightOf, towerReach } from './fog.js';
+import { buildingLevel } from './production.js';
 import { civicAsk, civicBid } from './market.js';
 import { depositFor, referenceValue } from './contracts.js';
 import { shortestRoute, travelMs } from './routing.js';
@@ -8,6 +10,7 @@ import { isPlayerProtected } from './raid.js';
 import { isProtected } from './siege.js';
 import {
   GOODS,
+  type BuildingType,
   type Crew,
   type District,
   type GameState,
@@ -69,13 +72,39 @@ function spend(budget: Budget, at: Id, cost: Partial<Goods>): boolean {
   return true;
 }
 
+/**
+ * A bot with a Watchtower keeps its hauls off streets where it can see an ambush (the tower is what
+ * lets it see that far). It holds the order and tries again next check-in; an ambush only lasts a
+ * few hours. Reads only its own sight, so it is as fog-honest as a player.
+ */
+function avoidAmbushes(s: GameState, me: Id, orders: Order[]): Order[] {
+  if (!mine(s, me).some((d) => buildingLevel(d, 'watchtower') > 0)) return orders;
+  const sight = sightOf(s, me);
+  const key = (a: Id, b: Id): string => (a < b ? `${a}|${b}` : `${b}|${a}`);
+  const hot = new Set<string>();
+  for (const m of Object.values(s.movements)) {
+    const r = m.raid;
+    if (m.kind === 'ambush' && r && m.owner !== me && (sight.has(r.a) || sight.has(r.b))) {
+      hot.add(key(r.a, r.b));
+    }
+  }
+  if (hot.size === 0) return orders;
+  return orders.filter((o) => {
+    if (o.type !== 'haul' || !o.carrierId) return true;
+    const loc = s.carriers[o.carrierId]?.loc;
+    const route = loc && 'at' in loc ? shortestRoute(s.graph, loc.at, o.to) : null;
+    if (!route) return true;
+    return !route.route.some((n, i) => i > 0 && hot.has(key(route.route[i - 1] as Id, n)));
+  });
+}
+
 /** Growth every bot shares: recruit when it can pay, and put up one building per district. */
 function economy(
   s: GameState,
   me: Id,
   budget: Budget,
   maxCrews: number,
-  buildings: ('workshop' | 'depot' | 'walls')[],
+  buildings: BuildingType[] | ((d: District, index: number) => BuildingType[]),
 ): Order[] {
   const orders: Order[] = [];
   const crews = Object.values(s.crews).filter((c) => c.owner === me).length;
@@ -91,13 +120,18 @@ function economy(
     budget.credits -= recruitCredits;
     orders.push({ type: 'recruit', districtId: home.id });
   }
-  for (const d of districts) {
+  for (const [index, d] of districts.entries()) {
     // One build at a time per district, and never into a full set of slots.
     if (d.construction || d.buildings.length >= d.slots) continue;
-    const building = buildings.find((b) => !d.buildings.some((x) => x.type === b));
-    if (building && spend(budget, d.id, buildCost(building, 1))) {
-      orders.push({ type: 'build', districtId: d.id, building });
-    }
+    const wanted = typeof buildings === 'function' ? buildings(d, index) : buildings;
+    // The older buildings keep their strict order (the first missing one or nothing). Watchtowers
+    // and Garages are opportunistic: built when the district can pay, skipped otherwise.
+    const missing = wanted.filter((b) => !d.buildings.some((x) => x.type === b));
+    const isOptional = (b: BuildingType): boolean => b === 'watchtower' || b === 'garage';
+    const strict = missing.find((b) => !isOptional(b));
+    const options = [...(strict ? [strict] : []), ...missing.filter(isOptional)];
+    const pick = options.find((b) => spend(budget, d.id, buildCost(b, 1)));
+    if (pick) orders.push({ type: 'build', districtId: d.id, building: pick });
   }
   return orders;
 }
@@ -208,6 +242,10 @@ export function ambushOrders(s: GameState, me: Id): Order[] {
   ) {
     return [];
   }
+  // Rival Watchtowers that are in view cover the streets around them: an ambush there would be
+  // seen at once, so the raider looks elsewhere.
+  const sight = sightOf(s, me);
+  const shadow = towerReach(s, (d) => d.owner !== me && sight.has(d.id));
   for (const base of mine(s, me)) {
     const crews = idleCrews(s, base.id, me).sort(
       (x, y) => y.strength - x.strength || (x.id < y.id ? -1 : 1),
@@ -233,7 +271,7 @@ export function ambushOrders(s: GameState, me: Id): Order[] {
       edges.push({ a, b, len: Math.min(length(s, base.id, a), length(s, base.id, b)), hot });
     }
     const edge = edges
-      .filter((e) => Number.isFinite(e.len))
+      .filter((e) => Number.isFinite(e.len) && !shadow.has(e.a) && !shadow.has(e.b))
       .sort((x, y) => Number(y.hot) - Number(x.hot) || x.len - y.len || (x.a < y.a ? -1 : 1))[0];
     if (!edge) continue;
     return [
@@ -385,6 +423,47 @@ function sellStash(s: GameState, me: Id): Order[] {
     }
   }
   return orders;
+}
+
+/**
+ * Brings the parts for a Watchtower or Garage to a district that wants one but cannot pay. Parts
+ * only pile up at docks, so a bot with a docks district and an idle van and crew carries one
+ * building's worth over (one trip at a time). The next check-in builds it. Own warehouses only.
+ */
+function stageParts(
+  s: GameState,
+  me: Id,
+  building: BuildingType,
+  targets: (d: District, index: number) => boolean,
+): Order[] {
+  if (Object.values(s.movements).some((m) => m.owner === me && m.kind === 'haul')) return [];
+  const need = buildCost(building, 1).parts;
+  const owned = mine(s, me);
+  const target = owned.find(
+    (d, i) =>
+      targets(d, i) &&
+      !d.construction &&
+      d.buildings.length < d.slots &&
+      !d.buildings.some((b) => b.type === building) &&
+      d.warehouse.parts < need,
+  );
+  if (!target) return [];
+  for (const base of owned) {
+    if (base.id === target.id || base.warehouse.parts < need) continue;
+    const crew = idleCrews(s, base.id, me)[0];
+    const van = vanAt(s, base.id, me);
+    if (!crew || !van) continue;
+    return [
+      {
+        type: 'haul',
+        carrierId: van,
+        crewIds: [crew.id],
+        to: target.id,
+        cargo: { parts: Math.ceil(toUnits(need)) },
+      },
+    ];
+  }
+  return [];
 }
 
 /** Hauls the biggest spare pile from a home warehouse to the nearest hub. */
@@ -571,8 +650,12 @@ export const turtle: Bot = (s, me) => {
     prefer: 'near',
     escort: false,
   });
-  return [
-    ...(saving ? [] : economy(s, me, budget, 6, ['walls', 'workshop', 'depot'])),
+  // A Watchtower goes up in the outer districts (the home keeps walls, a workshop and a depot).
+  const turtleBuildings = (_d: District, index: number): BuildingType[] =>
+    index === 0 ? ['walls', 'workshop', 'depot'] : ['walls', 'watchtower', 'workshop', 'depot'];
+  const plan = [
+    ...(saving ? [] : economy(s, me, budget, 6, turtleBuildings)),
+    ...stageParts(s, me, 'watchtower', (_d, i) => i > 0),
     ...settleOrders(s, me, budget, SETTLE_RESERVE, 1),
     ...jobs,
     ...runnerOrders(s, me, budget, TURTLE_RUNNER_SPARE),
@@ -583,6 +666,7 @@ export const turtle: Bot = (s, me) => {
     ...resupply(s, me, budget, SETTLE_RESERVE),
     ...mine(s, me).map((d): Order => ({ type: 'stance', districtId: d.id, stance: 'hold' })),
   ];
+  return avoidAmbushes(s, me, plan);
 };
 
 /**
@@ -591,8 +675,13 @@ export const turtle: Bot = (s, me) => {
  */
 export const merchant: Bot = (s, me) => {
   const budget = budgetFor(s, me);
+  // A Garage at the home district once the merchant runs more than one carrier.
+  const carriers = Object.values(s.carriers).filter((c) => c.owner === me).length;
+  const merchantBuildings = (_d: District, index: number): BuildingType[] =>
+    index === 0 && carriers >= 2 ? ['workshop', 'garage'] : ['workshop'];
   const orders = [
-    ...economy(s, me, budget, 3, ['workshop']),
+    ...economy(s, me, budget, 3, merchantBuildings),
+    ...(carriers >= 2 ? stageParts(s, me, 'garage', (_d, i) => i === 0) : []),
     ...settleOrders(s, me, budget, SETTLE_RESERVE, 1),
   ];
   const jobs = contractOrders(s, me, budget, {

@@ -1,6 +1,6 @@
 export * from './balance.js';
 export { buildCost, buildDurationMs } from './construction.js';
-export { observe, sightOf, viewFor } from './fog.js';
+export { observe, sightOf, towerReach, towerSight, viewFor } from './fog.js';
 export type {
   BookLevel,
   ContractView,
@@ -41,6 +41,7 @@ export { createRng, nextFloat, nextInt, nextRange, nextU32, shuffle } from './rn
 export { eta, movementPosition, movementProgress, shortestRoute, travelMs } from './routing.js';
 export type { Eta, Route } from './routing.js';
 export { step } from './step.js';
+export { runnerPrice, slowPercentAt, wearOf } from './wear.js';
 export { dispatch, systems } from './systems.js';
 export type { Handlers, System } from './systems.js';
 export {

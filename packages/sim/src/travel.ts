@@ -3,6 +3,7 @@ import { emit, schedule, unschedule, type Ctx } from './ctx.js';
 import { deliverToContract } from './contracts.js';
 import { finishJob } from './jobs.js';
 import { deposit } from './production.js';
+import { wearCarrier } from './wear.js';
 import { beginAmbush, scheduleStrikes } from './raid.js';
 import type { Route } from './routing.js';
 import { beginSettle } from './settle.js';
@@ -126,6 +127,9 @@ export const travelSystem: System = {
       const carrier = m.carrierId ? state.carriers[m.carrierId] : undefined;
       if (carrier) carrier.loc = { at: m.to };
       const recalled = m.recalledAtMs !== undefined;
+      if (carrier && !recalled && (m.kind === 'haul' || m.kind === 'settle')) {
+        wearCarrier(ctx, carrier, balance.wear.perTrip);
+      }
       // Settlers spend their supplies on arrival; a recalled trip brings them home.
       if (m.contractId && !recalled) deliverToContract(ctx, m);
       else if (m.kind !== 'settle' || recalled) deposit(ctx, m.owner, m.to, m.cargo);

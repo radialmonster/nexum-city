@@ -53,6 +53,8 @@ export interface SeasonResult {
   /** Diagnostic: per raider player, ambushes set, hits, repels and strength lost. */
   raidsBy: Record<string, { set: number; hit: number; repelled: number; lost: number }>;
   runnersBought: number;
+  /** Diagnostic (task 75): per player, ambush warnings from Watchtowers, carriers worn past the slow line, and carriers healed back. */
+  wearBy: Record<Id, { spotted: number; worn: number; repaired: number }>;
   stolenUnits: number;
   destroyedUnits: number;
   districts: number;
@@ -162,6 +164,9 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
         )
       : 0;
 
+  const wearBy: SeasonResult['wearBy'] = {};
+  const wearOf = (id: unknown): SeasonResult['wearBy'][string] =>
+    (wearBy[String(id)] ??= { spotted: 0, worn: 0, repaired: 0 });
   const count = (list: SimEvent[]): void => {
     events += list.length;
     for (const e of list) {
@@ -188,6 +193,9 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
         raidsEvaded += 1;
         tally(e, 'evaded');
       } else if (e.kind === 'carrier.bought') runnersBought += 1;
+      else if (e.kind === 'raid.spotted') wearOf(e.actors[0]).spotted += 1;
+      else if (e.kind === 'carrier.worn') wearOf(e.actors[0]).worn += 1;
+      else if (e.kind === 'carrier.repaired') wearOf(e.actors[0]).repaired += 1;
       else if (e.kind === 'raid.ended') lootReturned += sumUnits(e.data['loot']);
       else if (e.kind === 'raid.hit') {
         raidHits += 1;
@@ -346,6 +354,7 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
     raidFights,
     raidsBy,
     runnersBought,
+    wearBy,
     stolenUnits,
     destroyedUnits,
     districts: Object.keys(state.districts).length,

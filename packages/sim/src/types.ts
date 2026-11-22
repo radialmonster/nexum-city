@@ -19,7 +19,7 @@ export const DISTRICT_KINDS = [
 ] as const;
 export type DistrictKind = (typeof DISTRICT_KINDS)[number];
 
-export const BUILDING_TYPES = ['workshop', 'depot', 'walls'] as const;
+export const BUILDING_TYPES = ['workshop', 'depot', 'walls', 'watchtower', 'garage'] as const;
 export type BuildingType = (typeof BUILDING_TYPES)[number];
 
 export const CARRIER_KINDS = ['foot', 'van', 'hauler', 'runner'] as const;
@@ -160,6 +160,8 @@ export interface Carrier {
   owner: Id;
   kind: Exclude<CarrierKind, 'foot'>;
   loc: UnitLocation;
+  /** Road wear, an integer 0 to 100. Absent means 0 (so older snapshots need no upgrade). See `wear.ts`. */
+  wear?: number;
 }
 
 export type MovementKind =
@@ -241,6 +243,7 @@ export type QueuedEvent = { at: number; seq: number } & (
   | { kind: 'job.refill'; playerId: Id }
   | { kind: 'rush.end'; playerId: Id }
   | { kind: 'crew.mend'; crewId: Id }
+  | { kind: 'carrier.repair'; carrierId: Id }
 );
 export type QueuedKind = QueuedEvent['kind'];
 
@@ -531,6 +534,9 @@ export type SimEventKind =
   | 'raid.repelled'
   | 'raid.evaded'
   | 'carrier.bought'
+  | 'carrier.worn'
+  | 'carrier.repaired'
+  | 'raid.spotted'
   | 'raid.ended'
   | 'contract.posted'
   | 'contract.taken'

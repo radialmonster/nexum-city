@@ -7,7 +7,7 @@ import { z } from 'zod';
  */
 
 export const GOODS = ['parts', 'power', 'data', 'supplies'] as const;
-export const BUILDING_TYPES = ['workshop', 'depot', 'walls'] as const;
+export const BUILDING_TYPES = ['workshop', 'depot', 'walls', 'watchtower', 'garage'] as const;
 export const CARRIER_KINDS = ['foot', 'van', 'hauler', 'runner'] as const;
 export const STANCES = ['hold', 'pullback'] as const;
 

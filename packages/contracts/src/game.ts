@@ -70,6 +70,8 @@ export const carrierSchema = z.object({
   owner: idSchema,
   kind: z.enum(['van', 'hauler', 'runner']),
   loc: unitLocationSchema,
+  /** Road wear, 0 to 100. Absent means 0. Above 40 the carrier is slower (task 75). */
+  wear: z.number().int().min(0).max(100).optional(),
 });
 
 /** One street job on offer (task 77). Credits and parts are atoms; `good` and `qty` are courier jobs only. */
@@ -152,6 +154,9 @@ export const SIM_EVENT_KINDS = [
   'raid.repelled',
   'raid.evaded',
   'carrier.bought',
+  'carrier.worn',
+  'carrier.repaired',
+  'raid.spotted',
   'raid.ended',
   'contract.posted',
   'contract.taken',
@@ -246,6 +251,8 @@ export const districtViewSchema = z.discriminatedUnion('relation', [
     open: z.boolean(),
     /** A settlement under way: who, and when it completes. */
     settling: z.object({ owner: idSchema, completesAtMs: z.number() }).nullable(),
+    /** Watchtower level (0 for none), a public landmark. */
+    watchtower: z.number().int().min(0).default(0),
   }),
   z.object({
     relation: z.literal('remembered'),

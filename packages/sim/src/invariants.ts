@@ -16,6 +16,12 @@ export function checkInvariants(s: GameState): string[] {
   };
   for (const c of Object.values(s.crews)) seat(c.id, c.loc);
   for (const c of Object.values(s.carriers)) seat(c.id, c.loc);
+  for (const c of Object.values(s.carriers)) {
+    const wear = c.wear ?? 0;
+    if (!Number.isInteger(wear) || wear < 0 || wear > balance.wear.max) {
+      problems.push(`${c.id} has wear ${wear} out of range`);
+    }
+  }
 
   // A unit listed in a movement must say it is in that movement, and nowhere else.
   const claimed = new Map<string, string>();

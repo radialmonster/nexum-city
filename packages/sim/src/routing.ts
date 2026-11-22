@@ -1,4 +1,5 @@
 import { MS_PER_MINUTE, balance } from './balance.js';
+import { wornMs } from './wear.js';
 import type { CarrierKind, Graph, Id, Movement, Pos } from './types.js';
 
 export interface Route {
@@ -64,8 +65,8 @@ export function shortestRoute(graph: Graph, from: Id, to: Id): Route | null {
   return { route: route.reverse(), lengthM: dist.get(to) as number };
 }
 
-export function travelMs(lengthM: number, carrier: CarrierKind): number {
-  return Math.ceil((lengthM / balance.carriers[carrier].speed) * MS_PER_MINUTE);
+export function travelMs(lengthM: number, carrier: CarrierKind, wear = 0): number {
+  return wornMs(Math.ceil((lengthM / balance.carriers[carrier].speed) * MS_PER_MINUTE), wear);
 }
 
 /**
