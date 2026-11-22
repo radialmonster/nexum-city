@@ -18,6 +18,11 @@ export type { Standing } from './score.js';
 export { isProtected, progressAt, siegeFraction } from './siege.js';
 export { applyOrder, validateOrder } from './orders.js';
 export { civicAsk, civicBid } from './market.js';
+export { BOTS, merchant, raider, turtle } from './bots.js';
+export type { Bot, BotKind } from './bots.js';
+export { replay, runSeason, seasonStart } from './harness.js';
+export type { SeasonOptions, SeasonResult } from './harness.js';
+export { checkInvariants } from './invariants.js';
 export {
   buildingLevel,
   deposit,

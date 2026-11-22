@@ -212,3 +212,18 @@ Where the spec was silent, these simple choices were made. Code: `packages/sim`.
 - `addPlayer` with no `districtId` claims an open plot next to at least 2 neutral districts, as far as possible from other players' districts. If none is open, one is opened at once. `addPlayerWithEvents` also returns the events (`player.joined`, reason `new`). The explicit-id path is kept for tests.
 - A player who loses their last district gets a protected frontier plot chosen the same way (`relocatePlayer`), with `player.joined` reason `relocated`.
 - `PlayerView.graph` carries the public street graph (nodes, edges with lengths, hub ids) so the client can preview routes and ETAs.
+
+### Season harness and balance findings (task 1B)
+
+`runSeason` (`harness.ts`) plays a season with three scripted bots from `bots.ts`: the **raider** sieges the nearest unprotected district it does not own, one campaign at a time; the **turtle** builds walls, a workshop and a depot and holds; the **merchant** hauls its biggest pile to the nearest hub and sells it to the civic bid. Every bot also recruits and builds one building per district. Bots decide on an hourly beat; the harness keeps only orders that pass `validateOrder`, steps the state, counts `siege.captured` and `trade.filled` events, and runs `checkInvariants` after every beat. `npm run sim:season [-- seed [days]]` (after `npm run build`) prints the summary; timing lives in the script because the sim may not read a clock.
+
+Why the full-week check uses 60 s ticks and one jump, with 2 s ticks only for the first 6 hours: `step` has no per-tick state (it advances to the next scheduled event), so any slicing of time must give the same hash. A 2 s replay of 7 days is about 302,000 steps (about 20 s), which is too slow for the check; 60 s ticks are 10,080 steps (about 0.7 s) and still cut across every hourly beat and every travel, siege and survey event. The 2 s slicing is proven on the busiest part, the first 6 hours (opening orders and first marches), and is the same code path.
+
+Reference run (seed 1, 7 days, 2 raiders, 2 turtles, 2 merchants): 38 districts, 695 orders (0 rejected), 12 captures, 84 civic fills (3,270 units), 0 invariant problems, hash identical as one jump, hourly, and in 60 s ticks; the run takes about 170 ms.
+
+Balance findings, not yet acted on:
+
+- **Raiders dominate.** They finish with 8 and 6 districts, while turtles and merchants stay at 1. Most captures are of neutral frontier plots, which are unprotected once the 48 h newcomer protection has passed.
+- **Non-raiders have no way to grow without attacking.** Frontier plots cannot be claimed peacefully, so a turtle or merchant can only stay put. Consider a peaceful claim (survey and settle) or merchant income that buys expansion.
+- **Merchants earn credits but not an edge.** They sold 3,270 units on the civic bid, yet their score equals a turtle's; selling does not convert to districts or score yet.
+- **Neutral plots are the cheapest target.** Raids on neutral plots should probably cost more or give less, so that attacking players is the better prize.
