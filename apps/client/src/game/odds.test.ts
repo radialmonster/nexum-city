@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { balance } from '@nexum/sim';
 import { siegeOdds } from './odds';
 
 describe('siegeOdds', () => {
@@ -30,12 +31,17 @@ describe('siegeOdds', () => {
     expect(lead.hoursToCapture).toBeLessThan(plain.hoursToCapture);
   });
 
-  it('faces the neutral guard of 20 on an unowned plot, not the militia', () => {
-    // one crew of 10: 10 against 20 is a third of the fight, about 12 h
+  it('faces the neutral guard on an unowned plot, not the militia', () => {
+    // one crew of 10 against the guard, and two crews of 10 against it
+    const guard = balance.siege.neutralGuard;
     const o = siegeOdds({ attackers: [10], defenderCount: 0, neutral: true });
-    expect(o.edge).toBeCloseTo(1 / 3, 2);
-    expect(o.hoursToCapture).toBeGreaterThan(11);
-    expect(o.hoursToCapture).toBeLessThan(13);
-    expect(siegeOdds({ attackers: [10, 10], neutral: true }).edge).toBeCloseTo(0.5, 2);
+    expect(o.edge).toBeCloseTo(10 / (10 + guard), 2);
+    expect(o.hoursToCapture).toBeGreaterThan(
+      siegeOdds({ attackers: [10], defenderCount: 0 }).hoursToCapture,
+    );
+    expect(siegeOdds({ attackers: [10, 10], neutral: true }).edge).toBeCloseTo(
+      20 / (20 + guard),
+      2,
+    );
   });
 });

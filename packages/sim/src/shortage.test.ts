@@ -53,7 +53,6 @@ describe('shortages', () => {
     let s = scenario(7);
     let during: { hub: string; good: string } | null = null;
     let priceDuring = 0;
-    let priceBefore = 0;
     for (let h = 1; h <= 24 && !during; h++) {
       s = step(s, [], s.nowMs + MS_PER_HOUR).state;
       const sh = s.shortages[0];
@@ -73,7 +72,7 @@ describe('shortages', () => {
       s = step(s, [], s.nowMs + MS_PER_HOUR).state;
     }
     const after = s.markets[during.hub]?.[during.good as 'parts'];
-    priceBefore = after?.baseCents ?? 0;
+    const priceBefore = after?.baseCents ?? 0;
     if (!isShort(s, during.hub, during.good as 'parts')) {
       expect(after?.why.shortage).toBe(0);
       expect(priceBefore).toBeLessThan(priceDuring);
