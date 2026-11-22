@@ -1,0 +1,32 @@
+.minimap {
+  display: block;
+  width: calc(var(--size-gauge) * 2);
+  max-width: 100%;
+  height: auto;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.water {
+  fill: var(--color-water);
+}
+
+.district {
+  opacity: 0.85;
+}
+
+.hub {
+  fill: var(--color-accent);
+}
+
+.fog {
+  fill: var(--color-fog-static);
+}
+
+.view {
+  fill: var(--color-accent);
+  fill-opacity: 0.08;
+  stroke: var(--color-accent);
+  stroke-width: var(--border-medium);
+  vector-effect: non-scaling-stroke;
+}

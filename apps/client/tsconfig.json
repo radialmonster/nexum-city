@@ -13,5 +13,5 @@
     "emitDeclarationOnly": true
   },
   "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"],
-  "references": [{ "path": "../../packages/theme" }]
+  "references": [{ "path": "../../packages/theme" }, { "path": "../../packages/sim" }]
 }

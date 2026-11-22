@@ -11,7 +11,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@nexum/sim": "0.0.0",
     "@nexum/theme": "*",
+    "pixi.js": "8.23.0",
     "react": "19.3.1",
     "react-dom": "19.3.1"
   },
