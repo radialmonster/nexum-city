@@ -17,8 +17,17 @@ services:
       BOTS_ENABLED: '${BOTS_ENABLED:-true}'
       BOT_COUNT: '${BOT_COUNT:-6}'
       BOT_MIN: '${BOT_MIN:-2}'
+      SEASON_DAYS: '${SEASON_DAYS:-7}'
+      SEASON_BREAK_HOURS: '${SEASON_BREAK_HOURS:-0}'
+      TICK_LOG_MINUTES: '${TICK_LOG_MINUTES:-15}'
     volumes:
       - nexum-data:/app/data
+    # Logs are JSON lines on stdout; rotate them so they cannot fill the disk.
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '5'
     mem_limit: 256m
     deploy:
       resources:

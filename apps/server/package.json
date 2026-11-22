@@ -9,7 +9,8 @@
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "build": "tsc -b",
-    "start": "node dist/main.js"
+    "start": "node dist/main.js",
+    "backup": "tsx src/backup-cli.ts"
   },
   "devDependencies": {
     "tsx": "4.23.15"

@@ -38,3 +38,16 @@ export function backupIfDue(o: BackupOptions): string | undefined {
   for (const f of files.slice(0, Math.max(0, files.length - o.keep))) rmSync(join(o.dir, f));
   return target;
 }
+
+/**
+ * An on-demand backup: a consistent `VACUUM INTO` copy named by the second, never pruned and
+ * never overwriting. Used by `npm run backup`.
+ */
+export function backupNow(db: DatabaseSync, dir: string, nowMs: number): string {
+  mkdirSync(dir, { recursive: true });
+  const stamp = new Date(nowMs).toISOString().replace(/[-:]/g, '').slice(0, 15);
+  const target = join(dir, `nexum-manual-${stamp}.db`);
+  if (existsSync(target)) throw new Error(`backup already exists: ${target}`);
+  db.prepare('VACUUM INTO ?').run(target);
+  return target;
+}
