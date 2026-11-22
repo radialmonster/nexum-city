@@ -527,3 +527,49 @@ Hub reference price change per good, percent (mean / p95 / max):
 | supplies | 0.19 / 0.95 / 5.10 | 0.49 / 0.89 / 8.50 | 0.96 / 2.82 / 11.06 |
 
 Hub-to-hub civic arbitrage needs a price ratio of 1.174 (bid and ask are 8 percent either side). The best ratio between hubs was 1.030 on average (p95 1.106, max 1.231); a window was open in 2.5 percent of samples, in 13 runs, the longest 420 min. So within one 15-minute session a price window almost never opens by itself; trade profit comes from contracts and player orders, not from chasing civic spreads. Scripts: `scripts/market-movement.mjs`, `scripts/sim-seeds.mjs`, `scripts/first-session.mjs`.
+
+## Watchtower and Garage (M2)
+
+Two new district buildings (task 75, sim only; the UI is task 75b). `RULES_VERSION` stays 3 (nothing deployed under 3 needs to replay). `SNAPSHOT_VERSION` stays 3: a carrier's `wear` is optional (missing means 0) and the seen-district view's `watchtower` is derived, so no upgrade step is needed.
+
+### Rules
+
+- **Watchtower** (40 parts, 3 hours, max level 2). Sight from the district reaches `1 + level` street hops instead of 1, including the streets between districts. It is fog-honest: it shows what is in range and nothing more.
+  - **Warning.** When an enemy ambush is set and either end of its street is inside the owner's tower reach, the owner gets `raid.spotted` (`{movementId, edge, untilMs, owner}`). The view then lists the ambush like any other seen movement, so players and bots can route around it.
+  - **No convoy rule.** Convoys are not rerouted by the sim. The client warns and the player re-plans; bots hold hauls that cross a seen ambush and retry next check-in.
+  - The seen-district view carries `watchtower` (level, 0 when none) so the map can draw it.
+- **Wear** (all carriers). Each finished `haul` or `settle` trip adds `wear.perTrip` (2). An ambush strike adds `wear.perStrike` (6). Wear is an integer 0..100 (invariant). Up to `slowFrom` (40) there is no effect; above it the carrier is slower, in a straight line to 20 percent slower at 100 (`wornMs`, whole milliseconds, rounded up). The owner gets `carrier.worn` once, when wear first passes 40.
+- **Repair.** A parked carrier (at any district) heals 1 point every `repairMinutes` (90 min). With the owner's Garage in that district it is `garageRepairMinutes` (25 min at level 1, 12 at level 2). `carrier.repaired` fires when wear falls back to 40 or below. Repair never runs on the road.
+- **Garage** (50 parts, 3 hours, max level 2). Faster repair as above, and Runners bought in that district cost 15 percent less per level (255 credits at level 1, 210 at level 2; `runnerPrice`).
+- **Orders and events.** `build` accepts `watchtower` and `garage`; `carrier.buy` charges `runnerPrice(district)`. Events: `carrier.worn`, `carrier.repaired`, `raid.spotted`. Carrier views carry optional `wear`.
+
+### Why a bonus and not a penalty
+
+The Garage is a bonus on top of a baseline that already heals (wear is slow, gentle and self-repairing), so skipping the building never traps a player and a newcomer is never punished for not knowing about it. The only cost of wear is up to 20 percent slower trips, which makes the Garage an optional speed-up for players who run many hauls, not a tax.
+
+### Plain-language pros and cons
+
+- Watchtower: you see ambushes and raids coming and can route around them, and you see further. But it costs 40 parts and a slot, it only helps the district it stands in, and it does not stop an ambush; it only shows it.
+- Garage: your carriers heal fast and Runners are cheaper. But it costs 50 parts and a slot, and without it carriers still heal, only slowly.
+- Wear: a carrier that works hard slows down, a gentle reminder to rotate or repair. But a convoy that is struck wears more, so a raided haul route gets slower to run.
+
+### Bots
+
+- **Turtle:** puts a Watchtower in each outer district when it can pay (parts only pile up in docks districts), and holds hauls that cross an ambush it can see.
+- **Merchant:** builds a Garage at home once it runs at least two carriers.
+- **Raider:** unchanged, and still fog-honest. It skips streets that sit inside a rival's tower reach (the tower owner would see the ambush).
+- Bots build rarely at all (two-good costs are not payable from single-good district warehouses), so the new buildings show up in about one turtle in ten and one merchant in sixteen.
+
+### Results (seeds 1 to 16, invariants 0 throughout)
+
+| Seeds 1-16 | Districts, before | after | Credits at 48 h, before | after | Score, before | after | Contracts, before | after |
+| ---------- | ----------------- | ----- | ----------------------- | ----- | ------------- | ----- | ----------------- | ----- |
+| Merchant   | 2.44              | 2.47  | 1602                    | 1602  | 493           | 486   | 7.19              | 7.22  |
+| Raider     | 4.81              | 5.03  | 427                     | 427   | 628           | 640   | 0                 | 0     |
+| Turtle     | 3.63              | 3.75  | 223                     | 223   | 566           | 561   | 3.38              | 2.94  |
+
+Raider lead 1.14x (1.11x before), limit 1.4x. Raid success 58 percent (411 of 713) against 58 percent (428 of 739) before; per seed min 26, max 91, sd 21 (before 21, 88, 19). 393 raids (391 before). Wear per player: about 0.9 `carrier.worn` and 0.1 to 0.2 `carrier.repaired`; carriers end at an average wear of 43 (turtle) and 38 (merchant), so the slowdown matters at the margin only. Towers built per turtle 0.09, garages per merchant 0.06; `raid.spotted` did not fire in the harness (an ambush rarely lands inside a tower owner's reach), so the warning is covered by unit tests only. First tuning (perTrip 3, repair 120 min) cost the merchant and turtle about 2 percent of score and was softened to the numbers above.
+
+### For the UI (task 75b)
+
+The client still reads the global `maxLevel` of 3 and shows the Runner price from `balance.runner.credits`; both must use the per-building `maxLevel` and `runnerPrice(district)`. Show `watchtower` on seen districts, `wear` on carriers (a bar, with the slowdown from `slowPercentAt`) and toast the three new events.

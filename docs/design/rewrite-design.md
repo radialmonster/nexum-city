@@ -162,8 +162,8 @@ Each district you own has:
   - Workshop: more production.
   - Walls: siege progress against this district is slower.
   - Depot: bigger warehouse, and hauls from here load faster.
-  - Watchtower: wider sight, and incoming convoys are spotted earlier.
-  - Garage: build and repair carriers here.
+  - Watchtower: sees 2 or 3 street hops instead of 1 and warns when an enemy ambush is set within range, so you and your bots can route around it.
+  - Garage: carriers wear a little on every trip (a struck convoy wears more) and slow down past a threshold; a Garage repairs parked carriers much faster and makes Runners bought there cheaper. Without one, carriers still heal slowly.
     Each takes 1–8 hours and costs goods that must be in that district's warehouse.
 - **Garrison:** crews stationed there defend automatically.
 - **Stance:** an instant setting.
