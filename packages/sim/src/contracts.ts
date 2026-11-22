@@ -304,6 +304,7 @@ function fail(ctx: Ctx, c: Contract): void {
   end(ctx, c);
   const unpaid = c.reward - c.paid;
   refund(ctx, c.poster, unpaid + c.deposit);
+  const again = reofferStarter(ctx, c);
   emit(ctx, 'contract.failed', participants(c), [c.hub], {
     contractId: c.id,
     taker: c.taker,
@@ -312,28 +313,52 @@ function fail(ctx: Ctx, c: Contract): void {
     delivered: toUnits(c.delivered),
     paid: credits(c.paid),
     refunded: credits(c.poster === 'civic' ? 0 : unpaid),
+    deposit: credits(c.deposit),
+    starter: c.reservedFor !== undefined,
     forfeited: credits(c.deposit),
     forfeitedTo: c.poster === 'civic' ? null : c.poster,
     civic: c.poster === 'civic',
     reason: 'late',
+    reoffered: again,
   });
+}
+
+/**
+ * A starter contract that failed or lapsed is offered once more (same hub, goods, reward and
+ * window), open for a full rush length from now, so a newcomer who missed the first one is not
+ * left without it. Returns true when a second offer was posted.
+ */
+function reofferStarter(ctx: Ctx, c: Contract): boolean {
+  const { state } = ctx;
+  if (!c.reservedFor || (c.starterOffer ?? 1) >= 2 || !state.players[c.reservedFor]) return false;
+  const again = newContract(ctx, c.hub, c.good, c.qty, c.reward, 'civic', c.hours);
+  again.reservedFor = c.reservedFor;
+  if (c.windowMs !== undefined) again.windowMs = c.windowMs;
+  again.starterOffer = 2;
+  again.offerEndsMs = state.nowMs + balance.rush.hours * MS_PER_HOUR;
+  unschedule(state, (e) => e.kind === 'contract.due' && e.contractId === again.id);
+  schedule(ctx, again.offerEndsMs, { kind: 'contract.due', contractId: again.id });
+  return true;
 }
 
 function expire(ctx: Ctx, c: Contract): void {
   end(ctx, c);
   refund(ctx, c.poster, c.reward);
+  const again = reofferStarter(ctx, c);
   emit(ctx, 'contract.expired', participants(c), [c.hub], {
     contractId: c.id,
     reason: 'untaken',
     refunded: credits(c.poster === 'civic' ? 0 : c.reward),
     civic: c.poster === 'civic',
+    starter: c.reservedFor !== undefined,
+    reoffered: again,
   });
 }
 
 /**
  * A newcomer's starter contract (newcomer rush, docs/rewrite/sim-spec.md): a small civic delivery
  * at the hub nearest `from`, reserved for that player, with no deposit. The delivery window is
- * the van's trip to the hub plus a grace period, so it is always doable. Uses no RNG. Does
+ * the van's trip to the hub plus a generous grace (`graceMinutes`, 3 h), so a normal check-in gap does not fail it. A failed or lapsed one is offered once more. Uses no RNG. Does
  * nothing when no hub can be reached.
  */
 export function postStarterContract(ctx: Ctx, playerId: Id, from: Id): Contract | null {

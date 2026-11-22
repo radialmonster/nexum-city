@@ -391,6 +391,8 @@ export interface Contract {
   reservedFor?: Id;
   /** Overrides `hours` as the delivery window, in ms (starter contracts only). */
   windowMs?: number;
+  /** 2 on the one repeat offer of a failed or lapsed starter contract; absent on the first. */
+  starterOffer?: number;
 }
 
 export interface Season {

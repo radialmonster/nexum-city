@@ -1,5 +1,5 @@
 import type { ContractView } from '@nexum/contracts';
-import { ATOMS_PER_UNIT } from '@nexum/sim';
+import { ATOMS_PER_UNIT, balance } from '@nexum/sim';
 import { describe, expect, it } from 'vitest';
 import { checkPost, contractSentence, lateWarning, remainingUnits, takeBlocker } from './contracts';
 import { buildFeedEntries } from './feed';
@@ -145,7 +145,10 @@ describe('in-transit deliveries', () => {
 describe('starter contract hook', () => {
   it('derives the trip from the window minus grace, or from the van on its way', async () => {
     const { starterHookCopy } = await import('./contracts');
-    const c = contract({ windowMs: 70 * 60_000, reservedFor: 'me' });
+    const c = contract({
+      windowMs: (50 + balance.rush.starter.graceMinutes) * 60_000,
+      reservedFor: 'me',
+    });
     expect(starterHookCopy(makeView(), c)).toBe(
       'Your van gets there in about 50 min. Come back to collect your pay.',
     );
