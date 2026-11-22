@@ -24,7 +24,7 @@ import {
 } from './derive';
 import { CarrierCompare } from './CarrierCompare';
 import { contractSentence, lateWarning } from './contracts';
-import { costOf, expectedSale, fuelCheck, nearestHub, signedCredits } from './economy';
+import { costOf, expectedSale, fuelCheck, nearestHub, powerText, signedCredits } from './economy';
 import { credits } from './market';
 import { formatUnits } from './feed';
 import { messageFor } from './messages';
@@ -369,7 +369,7 @@ export function OrderCard({
       blocker = 'The source warehouse does not hold that much.';
   }
   if (blocker === null && noFuel) {
-    blocker = `This trip burns ${formatUnits(fuel.units)} power and your warehouses do not hold it. Buy power first, or go on foot.`;
+    blocker = `This trip burns ${powerText(fuel.units)} power and your warehouses do not hold it. Buy power first, or go on foot.`;
   }
 
   const fogged = draft.kind === 'siege' && target?.relation === 'remembered';
@@ -574,7 +574,7 @@ export function OrderCard({
             )}
             {fuel && fuel.units > 0 && (
               <p className={styles['line']} data-testid="fuel-line">
-                Fuel: <b>{formatUnits(fuel.units)} power</b> from your warehouses.
+                Fuel: <b>{powerText(fuel.units)} power</b> from your warehouses.
               </p>
             )}
             {draft.kind === 'haul' && sale && hubDest && (

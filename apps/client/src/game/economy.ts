@@ -345,3 +345,8 @@ export function chargeNotice(prev: PlayerView | null, next: PlayerView): ChargeN
     text,
   };
 }
+
+/** Power in hundredths shown plainly: 0.28, 0.6, 12 (never rounded to a whole unit). */
+export function powerText(units: number): string {
+  return String(Number(units.toFixed(2)));
+}

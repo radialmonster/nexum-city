@@ -10,6 +10,7 @@ import {
   expectedSale,
   fuelCheck,
   nearestHub,
+  powerText,
   saleVerdict,
   shortageAt,
   taxNotice,
@@ -282,5 +283,13 @@ describe('chargeNotice', () => {
     const n = chargeNotice(at(86_000_000, 0, 100), at(87_000_000, 50, 100));
     expect(n?.levyCredits).toBe(0);
     expect(n?.text).toContain('took nothing from you');
+  });
+});
+
+describe('powerText', () => {
+  it('keeps the hundredths and drops trailing zeros', () => {
+    expect(powerText(0.28)).toBe('0.28');
+    expect(powerText(0.6)).toBe('0.6');
+    expect(powerText(12)).toBe('12');
   });
 });

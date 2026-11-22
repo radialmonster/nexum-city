@@ -58,6 +58,8 @@
 }
 
 .open {
+  grid-column: 1 / -1;
+  justify-self: end;
   font: inherit;
   font-size: var(--font-size-xs);
   letter-spacing: var(--letter-spacing-widest);
