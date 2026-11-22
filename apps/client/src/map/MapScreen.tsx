@@ -459,7 +459,11 @@ export function MapScreen({
   const pannedFor = useRef<Id | null>(null);
   useEffect(() => {
     if (!sel) {
-      pannedFor.current = null;
+      if (pannedFor.current !== null) {
+        pannedFor.current = null;
+        // slide back inside the normal pan limits if the fit had pushed past them
+        rendererRef.current?.controller.relax(nowFn(), readMotionMs('--duration-slow'));
+      }
       return;
     }
     const r = rendererRef.current;
@@ -471,9 +475,7 @@ export function MapScreen({
     const d = panToFit(at, menuBox.half, c.viewport, hudRects());
     if (!d || (d.dx === 0 && d.dy === 0)) return;
     const target = { ...c.cam, x: c.cam.x - d.dx / c.cam.zoom, y: c.cam.y - d.dy / c.cam.zoom };
-    const ms = readMotionMs('--duration-slow');
-    if (ms <= 0) c.set(target);
-    else c.animateTo(target, nowFn(), ms);
+    c.animateTo(target, nowFn(), readMotionMs('--duration-slow'), true);
   }, [sel, wantMenu, menuBox.half, cam, hudRects]);
   const menuAt =
     sel && wantMenu ? clampMenu(worldToHud(sel, cam, vp), vp, menuBox.half, menuBox) : null;

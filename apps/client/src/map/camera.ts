@@ -164,6 +164,8 @@ export class CameraController {
 
   private readonly tokens: MapTokens;
   private bounds: Bounds;
+  /** Extra room (world units) beyond the pan margin, granted so a selected plot can be fitted. */
+  private overscroll = 0;
 
   constructor(tokens: MapTokens, bounds: Bounds, vp: Viewport, initial?: Camera) {
     this.tokens = tokens;
@@ -177,6 +179,20 @@ export class CameraController {
     const zoom = this.cam.zoom * (vp.w / this.vp.w);
     this.vp = vp;
     this.cam = clampCamera({ ...this.cam, zoom }, vp, this.bounds, this.tokens);
+  }
+
+  private clamp(cam: Camera): Camera {
+    const o = this.overscroll;
+    const bounds =
+      o === 0
+        ? this.bounds
+        : {
+            minX: this.bounds.minX - o,
+            maxX: this.bounds.maxX + o,
+            minY: this.bounds.minY - o,
+            maxY: this.bounds.maxY + o,
+          };
+    return clampCamera(cam, this.vp, bounds, this.tokens);
   }
 
   setBounds(bounds: Bounds): void {
@@ -209,12 +225,11 @@ export class CameraController {
   dragMove(dxPx: number, dyPx: number, nowMs: number): void {
     const dt = Math.max(1, nowMs - this.lastMove);
     this.lastMove = nowMs;
-    this.cam = clampCamera(
-      { ...this.cam, x: this.cam.x - dxPx / this.cam.zoom, y: this.cam.y - dyPx / this.cam.zoom },
-      this.vp,
-      this.bounds,
-      this.tokens,
-    );
+    this.cam = this.clamp({
+      ...this.cam,
+      x: this.cam.x - dxPx / this.cam.zoom,
+      y: this.cam.y - dyPx / this.cam.zoom,
+    });
     // world units per ms, smoothed
     this.vx = 0.6 * (-dxPx / this.cam.zoom / dt) + 0.4 * this.vx;
     this.vy = 0.6 * (-dyPx / this.cam.zoom / dt) + 0.4 * this.vy;
@@ -233,35 +248,43 @@ export class CameraController {
   wheel(deltaY: number, sx: number, sy: number): void {
     this.tween = null;
     const factor = Math.exp(-deltaY * this.tokens.wheelSensitivity);
-    this.cam = clampCamera(
-      zoomAbout(this.cam, factor, sx, sy, this.vp, this.tokens),
-      this.vp,
-      this.bounds,
-      this.tokens,
-    );
+    this.cam = this.clamp(zoomAbout(this.cam, factor, sx, sy, this.vp, this.tokens));
   }
 
   pinch(factor: number, sx: number, sy: number): void {
     this.tween = null;
-    this.cam = clampCamera(
-      zoomAbout(this.cam, factor, sx, sy, this.vp, this.tokens),
-      this.vp,
-      this.bounds,
-      this.tokens,
-    );
+    this.cam = this.clamp(zoomAbout(this.cam, factor, sx, sy, this.vp, this.tokens));
   }
 
   /** Animate to a target camera over `duration` ms. */
-  animateTo(target: Camera, nowMs: number, duration = 380): void {
+  animateTo(target: Camera, nowMs: number, duration = 380, overscroll = false): void {
     this.vx = 0;
     this.vy = 0;
+    if (overscroll) {
+      // grow the pan limits just enough that the target is reachable
+      const inside = clampCamera(target, this.vp, this.bounds, this.tokens);
+      const need = Math.max(Math.abs(target.x - inside.x), Math.abs(target.y - inside.y));
+      this.overscroll = Math.max(this.overscroll, need);
+    }
+    if (duration <= 0) {
+      this.tween = null;
+      this.cam = this.clamp(target);
+      return;
+    }
     this.tween = {
       from: { ...this.cam },
-      to: clampCamera(target, this.vp, this.bounds, this.tokens),
+      to: this.clamp(target),
       start: nowMs,
       duration,
       anchor: null,
     };
+  }
+
+  /** Drop the extra pan room; if the view is outside the normal limits it slides back inside. */
+  relax(nowMs: number, duration = 380): void {
+    if (this.overscroll === 0) return;
+    this.overscroll = 0;
+    this.animateTo(this.cam, nowMs, duration);
   }
 
   /** Animate to a zoom level about the screen centre (or a screen point). */
@@ -289,7 +312,7 @@ export class CameraController {
     this.tween = null;
     this.vx = 0;
     this.vy = 0;
-    this.cam = clampCamera(cam, this.vp, this.bounds, this.tokens);
+    this.cam = this.clamp(cam);
   }
 
   /** Advance animation and inertia. Returns true if the camera changed. */
@@ -310,12 +333,11 @@ export class CameraController {
     const speed = Math.hypot(this.vx, this.vy);
     if (speed > this.tokens.inertiaStop / 20) {
       const before = this.cam;
-      this.cam = clampCamera(
-        { ...this.cam, x: this.cam.x + this.vx * dt, y: this.cam.y + this.vy * dt },
-        this.vp,
-        this.bounds,
-        this.tokens,
-      );
+      this.cam = this.clamp({
+        ...this.cam,
+        x: this.cam.x + this.vx * dt,
+        y: this.cam.y + this.vy * dt,
+      });
       const decay = this.tokens.inertiaFriction ** (dt / 16);
       this.vx *= decay;
       this.vy *= decay;
