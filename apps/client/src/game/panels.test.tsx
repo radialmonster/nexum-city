@@ -180,7 +180,16 @@ describe('Runner buy button', () => {
     render(
       <DistrictPanel
         {...props}
-        view={makeView({ self: { credits: 400 * ATOMS_PER_UNIT, stash: {}, score: 0 } })}
+        view={makeView({
+          self: {
+            credits: 400 * ATOMS_PER_UNIT,
+            stash: {},
+            score: 0,
+            rushUntilMs: 0,
+            jobs: [],
+            jobNextMs: 0,
+          },
+        })}
         onBuyRunner={onBuyRunner}
       />,
     );

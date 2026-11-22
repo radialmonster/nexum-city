@@ -58,6 +58,7 @@ export function stripNewcomerPerks(s: GameState, options: { jobs?: boolean } = {
   for (const id of Object.keys(s.contracts)) {
     if (s.contracts[id]?.reservedFor) {
       dropped.add(id);
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- a pure helper that edits a fixture in place
       delete s.contracts[id];
     }
   }
