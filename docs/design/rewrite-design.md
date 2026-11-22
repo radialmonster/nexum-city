@@ -182,12 +182,14 @@ You recruit them with credits and supplies.
 
 **Carriers** move crews and goods. They are visible on the map while moving.
 
-| Carrier | Speed  | Cargo  | Toughness | Notes                                         |
-| ------- | ------ | ------ | --------- | --------------------------------------------- |
-| On foot | Slow   | Tiny   | —         | Always available, very hard to spot           |
-| Van     | Medium | Medium | Medium    | All-rounder                                   |
-| Hauler  | Slow   | Large  | High      | The trade workhorse; a juicy raid target      |
-| Runner  | Fast   | Small  | Low       | Hard to catch; quick strikes and urgent goods |
+| Carrier | Speed  | Cargo  | Toughness | Notes                                                       |
+| ------- | ------ | ------ | --------- | ----------------------------------------------------------- |
+| On foot | Slow   | Tiny   | —         | Always available, very hard to spot                         |
+| Van     | Medium | Medium | Medium    | All-rounder                                                 |
+| Hauler  | Slow   | Large  | High      | The trade workhorse; a juicy raid target                    |
+| Runner  | Fast   | Small  | Low       | Hard to catch (about 1 ambush in 3 misses it); urgent goods |
+
+The Runner is bought with credits (300, up to 2 per player) and appears at once. It is about 1.6 times a van's speed with 40 percent of its cargo and low toughness. When an ambush strikes it, there is a 35 percent chance it slips away (`raid.evaded`) and the ambush stays set; if it is caught, the raiders win easily. See [sim-spec](../rewrite/sim-spec.md#runner-carrier-m2).
 
 Carriers take wear and need repair at a Garage. Upgrades come later, kept simple: one upgrade slot per carrier, such as armour or a bigger engine.
 
@@ -268,7 +270,7 @@ How the server runs them (tasks 51 to 53): bots are real players with a row in `
 **Milestone 2:**
 
 - Raids and escorts.
-- Runner carrier.
+- Runner carrier (sim done; UI to follow).
 - Contracts.
 - Watchtower and Garage.
 - The animated replay.

@@ -53,10 +53,10 @@ Every number here is a **tunable default**, kept in one `balance.ts` config obje
   | Carrier | Speed (m/min) | Cargo | Toughness | Crew seats |
   | ------- | ------------- | ----- | --------- | ---------- |
   | On foot | 40            | 5     | 0         | 1          |
-  | Van     | 100           | 40    | 10        | 2          |
+  | Van     | 100           | 40    | 12        | 2          |
   | Hauler  | 60            | 150   | 25        | 2          |
-  | Runner  | 180           | 15    | 3         | 1          |
-  - Runner is a milestone 2 unit; model it now but keep it locked.
+  | Runner  | 160           | 16    | 3         | 1          |
+  - The Runner is a milestone 2 unit, now unlocked and bought with credits (see "Runner carrier (M2)").
   - On foot is always available, as a pseudo-carrier with unlimited count.
 
 ## Orders
@@ -201,6 +201,36 @@ The harness test now evaluates seeds 1 to 8 (it used 5), because five seeds are 
 | turtle   | 3.25                         | 3.44  | 231                     | 272   | 485.7                    | 521.9 |
 
 Trade per player: merchant 47.7 (47.7 before), turtle 59.5 (62.5), raider 0. The raider lead over the best other type is 1.08x (1.12x before), under the 1.4x limit. Per player: merchants take 3.75 contracts, complete 3.38 and fail 0.31; turtles take 2.25, complete 1.81 and fail 0.44; raiders take none. Per season: 49.6 civic and 2.8 player contracts posted, 34.8 expired untaken or cancelled. Raids per season 21.3, success 59 percent (63 before), 14.5 hits and 10.1 repelled. Invariant problems are 0; the harness also checks that every reward is paid or refunded exactly, and that a contract haul's arrived cargo equals what was accepted plus the excess. Merchants hold double the credits at 48 h, which is the early income the design asked for. Numbers are in `balance.contracts`.
+
+## Runner carrier (M2)
+
+The Runner is the counter-play to raids: hard to catch rather than hard to beat. It is fast, small and fragile.
+
+**Numbers** (all in `balance.carriers.runner` and `balance.runner`): speed 160 m/min (1.6 times a van), cargo 16 units (40 percent of a van), toughness 3 (van 12), one crew seat, cost 300 credits, at most 2 owned per player, evasion 35 percent.
+
+**Buying.** Order `{ type: 'carrier.buy', districtId, kind: 'runner' }`. The district must be yours (not a hub). It costs 300 credits and nothing else. The Runner appears at once at that district, ready to carry. Errors: `unknown_district`, `not_owner`, `too_many_carriers` (the new code, at the cap of 2), `insufficient_credits`. Event `carrier.bought` (actors: the buyer; data `{ carrierId, kind, credits }`). Vans are still handed out at the start and not sold.
+
+**Evasion.** When an ambush strikes a convoy that is a Runner, the sim draws once from the seeded RNG (only for Runners, before the combat draws, so the number of draws never depends on how a fight goes). Below 35 percent the Runner slips away: event `raid.evaded` (actors: raider, then the Runner's owner; streets as for `raid.hit`; data `{ movementId, haulId, chancePercent }`). Nothing is stolen or lost, the ambush stays in place with the haul marked as struck, and the raiders may catch the next convoy. Otherwise the normal fight happens, and with toughness 3 the raiders nearly always win it, so a caught Runner is easy loot (it only holds 16 units, so the loot is small). We chose a separate event over a flag on `raid.repelled`: nobody repelled anything, and the feed and the UI can tell the three outcomes apart (hit, repelled, evaded).
+
+**Fog.** Others see the carrier kind on any convoy they can see (`carrier` on the foreign movement in the view), so a Runner shows as a Runner. No view change was needed.
+
+**Bots.** Merchants and turtles buy one Runner once they hold the cost plus a spare (merchants 500 credits, turtles 700) and use an idle Runner for contract deliveries of 16 units or less (one crew, no escort); bigger loads still go by van. Raiders could use a Runner to ambush (1 seat, loot room 16) but do not buy one: an ambush wants two crews and a van's loot room, and the Runner's strength is not being struck, which a raider does not need. Raider bots therefore keep their vans.
+
+**Pros and cons (player wording).** Pro: it is hard to catch (about one ambush in three misses it), and it gets small, urgent loads there 1.6 times sooner. Con: it carries only 16 units, one crew; if an ambush does catch it, the raiders win almost surely; and you can own only two.
+
+**Rules version.** `RULES_VERSION` stays 3: nothing containing it has been deployed. The snapshot shape is unchanged (carriers already had a kind), so there is no snapshot upgrade.
+
+**Harness, seeds 1 to 8** (before this change, then after):
+
+| Bot type | Districts/player | Credits at 48 h | Score/player     | Contracts taken / done / failed            |
+| -------- | ---------------- | --------------- | ---------------- | ------------------------------------------ |
+| merchant | 3.19 then 3.31   | 1716 then 1418  | 445.3 then 457.8 | 3.75 / 3.38 / 0.31 then 3.50 / 3.13 / 0.38 |
+| raider   | 3.94 then 4.06   | 417 then 417    | 562.1 then 568.9 | 0 then 0                                   |
+| turtle   | 3.44 then 3.44   | 272 then 228    | 521.9 then 527.7 | 2.25 / 1.81 / 0.44 then 2.81 / 2.25 / 0.50 |
+
+Raider lead over the best other type: 1.08x before, 1.08x after (limit 1.4x). Raids per season 21.3 then 21.0; hits 14.5 then 15.0; repelled 10.1 then 11.0; evaded 0 then 0.4; Runners bought per season 3.1; raid success (hits over hits, repelled and evaded) 59 then 57 percent, inside the 45 to 65 band. Invariant problems 0. The Runner costs the merchants some early credits but they finish a few more points ahead.
+
+**Finding.** Evasions are rare in the harness (0.4 per season): bot Runners mostly make short civic deliveries on streets nobody is watching. Buying earlier (spare 300 or less) made Runners more common but dropped raid success to about 40 percent for reasons not yet understood, so the later buy point stays. Worth a look when the Runner UI lets players run them deliberately.
 
 ## Markets
 
