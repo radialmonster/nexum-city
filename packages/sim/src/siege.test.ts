@@ -335,7 +335,7 @@ describe('determinism with a siege', () => {
     expect(of(jump.events, 'siege.started')).toHaveLength(1);
     expect(of(jump.events, 'combat.round').length).toBeGreaterThan(5);
     expect(checkInvariants(jump.state)).toEqual([]);
-  });
+  }, 30_000); // ~20k steps; markets and the street graph made each step heavier, and CI runners are slow
 
   it('agrees for uneven chunk sizes, through a capture', () => {
     let s = s0;
