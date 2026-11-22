@@ -99,6 +99,8 @@ export const movementSchema = z.object({
   recalledAtMs: z.number().optional(),
   recallFraction: z.number().optional(),
   sent: z.number().optional(),
+  /** A haul that delivers to this contract. */
+  contractId: idSchema.optional(),
   raid: z
     .object({
       a: idSchema,
@@ -134,6 +136,12 @@ export const SIM_EVENT_KINDS = [
   'raid.hit',
   'raid.repelled',
   'raid.ended',
+  'contract.posted',
+  'contract.taken',
+  'contract.progress',
+  'contract.done',
+  'contract.failed',
+  'contract.expired',
 ] as const;
 
 export const simEventSchema = z.object({
@@ -149,6 +157,29 @@ export const simEventSchema = z.object({
 export const feedItemSchema = z.object({ seq: z.number().int(), event: simEventSchema });
 
 const scoreSchema = z.object({ rank: z.number().int(), playerId: idSchema, score: z.number() });
+
+/**
+ * One contract on a hub's board. Public to everyone, taker included. `reward`, `deposit`,
+ * `delivered` and `paid` are atoms; `delivered` and `paid` are `null` unless you posted or took it.
+ */
+export const contractViewSchema = z.object({
+  id: idSchema,
+  hub: idSchema,
+  good: goodSchema,
+  qty: z.number(),
+  reward: z.number(),
+  poster: z.string(),
+  hours: z.number(),
+  postedMs: z.number(),
+  offerEndsMs: z.number(),
+  status: z.enum(['open', 'taken']),
+  taker: idSchema.nullable(),
+  takenMs: z.number(),
+  dueMs: z.number(),
+  deposit: z.number(),
+  delivered: z.number().nullable(),
+  paid: z.number().nullable(),
+});
 
 /** A district's capture bar as a player may see it (progress 0 to 1). */
 export const siegeViewSchema = z.object({ attacker: idSchema, progress: z.number() });
@@ -262,6 +293,7 @@ export const playerViewSchema = z.object({
   crews: z.record(idSchema, crewSchema),
   carriers: z.record(idSchema, carrierSchema),
   movements: z.record(idSchema, movementSchema),
+  contracts: z.record(idSchema, contractViewSchema),
   convoys: z.array(seenConvoySchema),
   ambushes: z.array(seenAmbushSchema),
   reveals: z.record(idSchema, z.number()),
@@ -286,10 +318,13 @@ export const standingSchema = z.object({
   districts: z.number().int(),
   tradeScore: z.number(),
   tradeMs: z.number(),
+  contractScore: z.number(),
+  contractMs: z.number(),
 });
 
 export type GoodName = z.infer<typeof goodSchema>;
 export type PlayerView = z.infer<typeof playerViewSchema>;
+export type ContractView = z.infer<typeof contractViewSchema>;
 export type DistrictView = z.infer<typeof districtViewSchema>;
 export type Standing = z.infer<typeof standingSchema>;
 export type FeedItem = z.infer<typeof feedItemSchema>;

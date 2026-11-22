@@ -44,6 +44,8 @@ export const orderSchema = z.discriminatedUnion('type', [
     crewIds,
     to: idSchema,
     cargo: cargoRequestSchema,
+    /** Deliver this load to a contract you have taken; `to` must be the contract's hub. */
+    contractId: idSchema.optional(),
   }),
   z.strictObject({
     type: z.literal('build'),
@@ -100,6 +102,19 @@ export const orderSchema = z.discriminatedUnion('type', [
     qty: z.number().int(),
   }),
   z.strictObject({ type: z.literal('market.cancel'), orderId: idSchema }),
+  z.strictObject({
+    type: z.literal('contract.post'),
+    hub: idSchema,
+    good: goodSchema,
+    /** Whole units wanted. */
+    qty: z.number().int(),
+    /** Whole credits, escrowed until the job ends. */
+    reward: z.number().int(),
+    /** Hours the taker gets to deliver. */
+    hours: z.number().int(),
+  }),
+  z.strictObject({ type: z.literal('contract.take'), contractId: idSchema }),
+  z.strictObject({ type: z.literal('contract.cancel'), contractId: idSchema }),
 ]);
 
 export type OrderBody = z.infer<typeof orderSchema>;
@@ -142,6 +157,15 @@ export const ORDER_ERROR_CODES = [
   'bad_window',
   'too_many_raids',
   'protected_no_raid',
+  'unknown_contract',
+  'contract_taken',
+  'contract_closed',
+  'not_taker',
+  'own_contract',
+  'board_full',
+  'too_many_contracts',
+  'bad_reward',
+  'wrong_cargo',
 ] as const;
 export const orderErrorCodeSchema = z.enum(ORDER_ERROR_CODES);
 export type OrderErrorCode = z.infer<typeof orderErrorCodeSchema>;
