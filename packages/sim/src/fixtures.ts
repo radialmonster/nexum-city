@@ -2,7 +2,10 @@ import { toAtoms } from './balance.js';
 import type { Ctx } from './ctx.js';
 import { afterWarehouseChange } from './production.js';
 import type { GameState, Id } from './types.js';
+import { stripNewcomerPerks } from './rush.js';
 import { addPlayer, createWorld } from './world.js';
+
+export { stripNewcomerPerks };
 
 /**
  * Shared setup for tests: a seeded city where `p1` holds two adjacent districts
@@ -13,6 +16,7 @@ export function scenario(seed = 7): GameState {
   s = addPlayer(s, { id: 'p1', districtId: 'd2_1', protectedHours: 0 });
   const first = s.districts['d2_1'];
   const second = s.districts['d3_1'];
+  stripNewcomerPerks(s);
   if (!first || !second) throw new Error('scenario districts missing');
   second.owner = 'p1';
   second.kind = 'grid';

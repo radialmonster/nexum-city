@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ATOMS_PER_UNIT, MS_PER_HOUR, balance } from './balance.js';
+import { stripNewcomerPerks } from './fixtures.js';
 import { validateOrder } from './orders.js';
 import { standings } from './score.js';
 import { step } from './step.js';
@@ -11,6 +12,7 @@ const SUPPLIES = 200 * ATOMS_PER_UNIT;
 function start(players = 2): GameState {
   let s = createWorld(5, { seasonHours: 24 * 7 });
   for (let i = 1; i <= players; i++) s = addPlayer(s, { id: `p${i}` });
+  stripNewcomerPerks(s);
   s = step(s, [], 3 * MS_PER_HOUR).state;
   for (const d of Object.values(s.districts))
     if (d.owner.startsWith('p')) d.warehouse.supplies = SUPPLIES;

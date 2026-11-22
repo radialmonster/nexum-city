@@ -67,6 +67,17 @@ export function checkInvariants(s: GameState): string[] {
   for (const p of Object.values(s.players)) {
     if (p.score < 0) problems.push(`${p.id} has negative score`);
     if (p.credits < 0) problems.push(`${p.id} has negative credits`);
+    if (p.jobs.length > balance.jobs.cap) problems.push(`${p.id} has ${p.jobs.length} street jobs`);
+    const refills = s.queue.filter((e) => e.kind === 'job.refill' && e.playerId === p.id).length;
+    const wantRefills = p.jobs.length < balance.jobs.cap ? 1 : 0;
+    // A player with no jobs and no clock has had street jobs switched off (the harness's "before" runs).
+    const jobsOff = p.jobs.length === 0 && p.jobNextMs === 0 && refills === 0;
+    if (refills !== wantRefills && !jobsOff)
+      problems.push(`${p.id} has ${refills} job refills queued`);
+    for (const j of p.jobs) {
+      if (j.creditsAtoms < 0 || (j.partsAtoms ?? 0) < 0)
+        problems.push(`job ${j.id} pays a negative amount`);
+    }
     for (const [hub, goods] of Object.entries(p.stash)) {
       for (const g of GOODS)
         if (goods[g] < 0) problems.push(`${p.id} stash at ${hub} negative ${g}`);
@@ -92,7 +103,7 @@ export function checkInvariants(s: GameState): string[] {
     if (due !== 1) problems.push(`${tag} has ${due} deadline events`);
   }
   for (const hub of Object.keys(s.markets)) {
-    const n = Object.values(s.contracts).filter((c) => c.hub === hub).length;
+    const n = Object.values(s.contracts).filter((c) => c.hub === hub && !c.reservedFor).length;
     if (n > balance.contracts.boardCap) problems.push(`${hub} board holds ${n} contracts`);
   }
   const orderIds = new Set<string>();

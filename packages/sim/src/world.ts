@@ -10,7 +10,10 @@ import {
   sectorName,
 } from './frontier.js';
 import { newHubBooks } from './market.js';
+import { postStarterContract } from './contracts.js';
 import { observe } from './fog.js';
+import { startNewcomer } from './jobs.js';
+import { rushEndsAt } from './rush.js';
 import { placeCrew } from './travel.js';
 import type {
   Carrier,
@@ -102,7 +105,7 @@ export function createWorld(seed: number, options: WorldOptions = {}): GameState
     seed,
     nowMs: startMs,
     rng,
-    counters: { crew: 0, carrier: 0, movement: 0, event: 0, seq: 3, order: 0, contract: 0 },
+    counters: { crew: 0, carrier: 0, movement: 0, event: 0, seq: 3, order: 0, contract: 0, job: 0 },
     world: { cols, rows, soundY: rows },
     graph: { nodes, edges },
     districts,
@@ -185,10 +188,15 @@ export function addPlayerWithEvents(
     contractMs: 0,
     contractDay: 0,
     contractDayMs: 0,
+    rushUntilMs: rushEndsAt(next.nowMs),
+    jobs: [],
+    jobNextMs: 0,
   };
   d.owner = opts.id;
   d.frontier = 'built';
   d.warehouse.supplies += toAtoms(opts.supplies ?? balance.player.startSupplies);
+  d.warehouse.parts += toAtoms(balance.rush.kit.parts);
+  d.warehouse.power += toAtoms(balance.rush.kit.power);
   const hours = opts.protectedHours ?? balance.player.protectedHours;
   if (hours > 0) d.protectedUntilMs = next.nowMs + hours * MS_PER_HOUR;
   for (let i = 0; i < (opts.crews ?? balance.player.startCrews); i++) {
@@ -216,6 +224,8 @@ export function addPlayerWithEvents(
   // Production and warehouse state depend on ownership; schedule the first overflow check.
   afterWarehouseChange(ctx, d);
   emit(ctx, 'player.joined', [opts.id], [d.id], { reason: 'new' });
+  startNewcomer(ctx, opts.id);
+  postStarterContract(ctx, opts.id, d.id);
   ensureFrontier(ctx);
   observe(ctx);
   return { state: next, events: ctx.events, districtId: d.id };

@@ -1,4 +1,5 @@
 import { MS_PER_HOUR, balance, toAtoms } from './balance.js';
+import { rushDuration } from './rush.js';
 import { emit, schedule, type Ctx } from './ctx.js';
 import { afterWarehouseChange, buildingLevel } from './production.js';
 import { refreshSiege } from './siege.js';
@@ -25,7 +26,8 @@ export function startConstruction(ctx: Ctx, d: District, building: BuildingType)
   const level = buildingLevel(d, building) + 1;
   const cost = buildCost(building, level);
   for (const g of GOODS) d.warehouse[g] -= cost[g];
-  const completesAtMs = ctx.state.nowMs + buildDurationMs(building, level);
+  const completesAtMs =
+    ctx.state.nowMs + rushDuration(ctx.state, d.owner, buildDurationMs(building, level));
   d.construction = { building, level, completesAtMs };
   schedule(ctx, completesAtMs, { kind: 'build.done', districtId: d.id });
   afterWarehouseChange(ctx, d);

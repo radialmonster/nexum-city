@@ -10,6 +10,7 @@ import {
 } from './contracts.js';
 import { buildCost, startConstruction } from './construction.js';
 import { emit, type Ctx } from './ctx.js';
+import { jobTaken, resolveJob } from './jobs.js';
 import { cancelOrder, findOrder, placeOrder, validatePlace } from './market.js';
 import { afterWarehouseChange, buildingLevel, storeAt } from './production.js';
 import { shortestRoute, travelMs, type Route } from './routing.js';
@@ -26,6 +27,7 @@ import {
   type Goods,
   type Id,
   type Input,
+  type JobOffer,
   type Movement,
   type MovementKind,
   type Order,
@@ -47,6 +49,7 @@ type Plan =
       durationMs: number;
       raid?: RaidInfo;
       contractId?: Id;
+      job?: JobOffer;
     }
   | { type: 'build'; district: District; building: BuildingType }
   | { type: 'stance'; district: District; stance: 'hold' | 'pullback' }
@@ -78,6 +81,8 @@ interface TravelRequest {
   edge?: { a: Id; b: Id; hours: number };
   /** Hauls only: deliver to this contract. */
   contractId?: Id;
+  /** Street jobs: the errand (its route and duration replace the walk). */
+  job?: JobOffer;
 }
 
 function resolveTravel(state: GameState, req: TravelRequest): Resolved {
@@ -113,6 +118,13 @@ function resolveTravel(state: GameState, req: TravelRequest): Resolved {
 
   let to = req.to;
   let raid: RaidInfo | undefined;
+  let jobRun: { route: Route; durationMs: number } | undefined;
+  if (req.job) {
+    const run = resolveJob(state, req.actorId, req.job, from, carrier !== null);
+    if ('error' in run) return fail(run.error);
+    jobRun = run;
+    to = run.route.route[run.route.route.length - 1] as Id;
+  }
   if (req.kind === 'raid' && req.edge) {
     const { a, b, hours } = req.edge;
     // A player shielded from raids may not raid: immunity plus ambushes would be a free ride.
@@ -148,6 +160,8 @@ function resolveTravel(state: GameState, req: TravelRequest): Resolved {
   if (req.kind !== 'raid' && to === from) return fail('invalid_target');
   if (req.kind === 'raid') {
     // Any street will do; the checks above are all a raid needs.
+  } else if (req.kind === 'job') {
+    // resolveJob checked the origin and picked the destination.
   } else if (req.kind === 'scout') {
     if (target.kind === 'hub') return fail('invalid_target');
   } else if (req.kind === 'siege') {
@@ -198,7 +212,7 @@ function resolveTravel(state: GameState, req: TravelRequest): Resolved {
     for (const g of GOODS) if (source[g] < cargo[g]) return fail('insufficient_goods');
   }
 
-  const route = shortestRoute(state.graph, from, to);
+  const route = jobRun?.route ?? shortestRoute(state.graph, from, to);
   if (!route) return fail('no_route');
   return {
     plan: {
@@ -209,9 +223,10 @@ function resolveTravel(state: GameState, req: TravelRequest): Resolved {
       crews,
       cargo,
       route,
-      durationMs: travelMs(route.lengthM, kind),
+      durationMs: jobRun?.durationMs ?? travelMs(route.lengthM, kind),
       ...(raid ? { raid } : {}),
       ...(req.contractId !== undefined ? { contractId: req.contractId } : {}),
+      ...(req.job ? { job: req.job } : {}),
     },
   };
 }
@@ -289,6 +304,21 @@ function resolve(state: GameState, input: Input): Resolved {
         to: order.a,
         edge: { a: order.a, b: order.b, hours: order.hours },
       });
+    case 'job.take': {
+      const offer = state.players[actorId]?.jobs.find((j) => j.id === order.jobId);
+      if (!offer) return fail('unknown_job');
+      return resolveTravel(state, {
+        kind: offer.kind === 'courier' ? 'haul' : 'job',
+        actorId,
+        carrierId: order.carrierId ?? null,
+        crewIds: [order.crewId],
+        to: '',
+        job: offer,
+        ...(offer.kind === 'courier' && offer.good && offer.qty
+          ? { cargo: { [offer.good]: offer.qty } }
+          : {}),
+      });
+    }
     case 'build': {
       const district = state.districts[order.districtId];
       if (!district) return fail('unknown_district');
@@ -312,6 +342,7 @@ function resolve(state: GameState, input: Input): Resolved {
       const movement = state.movements[order.movementId];
       if (!movement) return fail('unknown_movement');
       if (movement.owner !== actorId) return fail('not_owner');
+      if (movement.job) return fail('invalid_target');
       if (movement.recalledAtMs !== undefined || movement.kind === 'return') {
         return fail('already_recalled');
       }
@@ -395,6 +426,7 @@ export function applyOrder(ctx: Ctx, input: Input): Validation {
           : null;
       if (source) for (const g of GOODS) source[g] -= plan.cargo[g];
       startMovement(ctx, plan);
+      if (plan.job) jobTaken(ctx, plan.owner, plan.job);
       const from = state.districts[plan.route.route[0] as Id];
       if (source && from && from.kind !== 'hub') afterWarehouseChange(ctx, from);
       break;

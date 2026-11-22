@@ -16,6 +16,7 @@ import type {
   Good,
   Goods,
   Id,
+  JobOffer,
   MarketOrder,
   Movement,
   Owner,
@@ -218,7 +219,17 @@ export interface PlayerView {
   playerId: Id;
   nowMs: number;
   season: Pick<Season, 'startMs' | 'endMs' | 'finaleStartMs' | 'finale'>;
-  self: { credits: number; stash: Record<Id, Goods>; score: number };
+  self: {
+    credits: number;
+    stash: Record<Id, Goods>;
+    score: number;
+    /** The newcomer rush ends at this time (0 or in the past: no rush). */
+    rushUntilMs: number;
+    /** Your street jobs on offer. */
+    jobs: JobOffer[];
+    /** When the next street job arrives (0 while the list is full). */
+    jobNextMs: number;
+  };
   /** Public scoreboard: ranks and scores only. */
   standings: { rank: number; playerId: Id; score: number }[];
   districts: Record<Id, DistrictView>;
@@ -376,6 +387,8 @@ export function viewFor(state: GameState, playerId: Id): PlayerView {
 
   const contracts: Record<Id, ContractView> = {};
   for (const c of Object.values(state.contracts)) {
+    // A newcomer's starter contract is for them alone.
+    if (c.reservedFor && c.reservedFor !== playerId) continue;
     const mine = c.poster === playerId || c.taker === playerId;
     contracts[c.id] = { ...c, delivered: mine ? c.delivered : null, paid: mine ? c.paid : null };
   }
@@ -394,7 +407,14 @@ export function viewFor(state: GameState, playerId: Id): PlayerView {
       finaleStartMs: state.season.finaleStartMs,
       finale: state.season.finale,
     },
-    self: { credits: player.credits, stash: copy(player.stash), score: player.score / 3_600_000 },
+    self: {
+      credits: player.credits,
+      stash: copy(player.stash),
+      score: player.score / 3_600_000,
+      rushUntilMs: player.rushUntilMs,
+      jobs: copy(player.jobs),
+      jobNextMs: player.jobNextMs,
+    },
     standings: board,
     districts,
     crews,

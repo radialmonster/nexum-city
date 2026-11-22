@@ -3,6 +3,7 @@ import { buildCost } from './construction.js';
 import { civicAsk, civicBid } from './market.js';
 import { depositFor, referenceValue } from './contracts.js';
 import { shortestRoute, travelMs } from './routing.js';
+import { validateOrder } from './orders.js';
 import { isPlayerProtected } from './raid.js';
 import { isProtected } from './siege.js';
 import {
@@ -602,4 +603,44 @@ export const merchant: Bot = (s, me) => {
   return orders;
 };
 
-export const BOTS: Record<BotKind, Bot> = { raider, turtle, merchant };
+/**
+ * One street job per check-in, taken last so every other plan keeps its crews. A bot takes the
+ * first offer that the normal order check accepts, with the van when one is idle at the
+ * same district, and never uses a crew or carrier another order of this turn already names.
+ */
+export function streetJobOrders(s: GameState, me: Id, taken: Order[]): Order[] {
+  const player = s.players[me];
+  if (!player || player.jobs.length === 0) return [];
+  const used = new Set<Id>();
+  for (const o of taken) {
+    if ('crewIds' in o) for (const id of o.crewIds) used.add(id);
+    if ('carrierId' in o && o.carrierId) used.add(o.carrierId);
+  }
+  for (const base of mine(s, me)) {
+    if (base.kind === 'hub') continue;
+    const crew = idleCrews(s, base.id, me).find((c) => !used.has(c.id));
+    if (!crew) continue;
+    const van = vanAt(s, base.id, me);
+    const carriers = van && !used.has(van) ? [van, null] : [null];
+    for (const job of player.jobs) {
+      for (const carrierId of carriers) {
+        const order: Order = { type: 'job.take', jobId: job.id, crewId: crew.id, carrierId };
+        if (validateOrder(s, { actorId: me, order }).ok) return [order];
+      }
+    }
+  }
+  return [];
+}
+
+const withJobs =
+  (bot: Bot): Bot =>
+  (s, me) => {
+    const orders = bot(s, me);
+    return [...orders, ...streetJobOrders(s, me, orders)];
+  };
+
+export const BOTS: Record<BotKind, Bot> = {
+  raider: withJobs(raider),
+  turtle: withJobs(turtle),
+  merchant: withJobs(merchant),
+};

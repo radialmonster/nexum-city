@@ -1,6 +1,7 @@
 import { MS_PER_HOUR, balance, toUnits } from './balance.js';
 import { emit, schedule, unschedule, type Ctx } from './ctx.js';
 import { deliverToContract } from './contracts.js';
+import { finishJob } from './jobs.js';
 import { deposit } from './production.js';
 import { beginAmbush, scheduleStrikes } from './raid.js';
 import type { Route } from './routing.js';
@@ -13,6 +14,7 @@ import {
   type Crew,
   type Goods,
   type Id,
+  type JobOffer,
   type Movement,
   type MovementKind,
   type RaidInfo,
@@ -44,6 +46,8 @@ export interface MovementSpec {
   raid?: RaidInfo;
   /** Hauls only: the contract this haul delivers to. */
   contractId?: Id;
+  /** Street jobs only: the errand being run. */
+  job?: JobOffer;
 }
 
 /** Moves units out of their location and into a new movement. Units are never in two places. */
@@ -70,6 +74,7 @@ export function startMovement(ctx: Ctx, spec: MovementSpec): Movement {
   };
   if (spec.raid) movement.raid = spec.raid;
   if (spec.contractId) movement.contractId = spec.contractId;
+  if (spec.job) movement.job = { ...spec.job };
   if (spec.kind === 'haul' || spec.kind === 'settle')
     movement.sent = GOODS.reduce((n, g) => n + spec.cargo[g], 0);
   for (const crew of spec.crews) {
@@ -108,6 +113,10 @@ export const travelSystem: System = {
       if (!m) return;
       if (m.kind === 'raid' && m.recalledAtMs === undefined) {
         beginAmbush(ctx, m);
+        return;
+      }
+      if (m.job) {
+        finishJob(ctx, m);
         return;
       }
       for (const crewId of m.crewIds) {

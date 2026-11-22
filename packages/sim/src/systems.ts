@@ -3,9 +3,11 @@ import { contractSystem } from './contracts.js';
 import { constructionSystem } from './construction.js';
 import { observe } from './fog.js';
 import { frontierSystem } from './frontier.js';
+import { jobSystem } from './jobs.js';
 import { marketSystem } from './market.js';
 import { productionSystem } from './production.js';
 import { raidSystem } from './raid.js';
+import { rushSystem } from './rush.js';
 import { scoreSystem } from './score.js';
 import { settleSystem } from './settle.js';
 import { siegeSystem } from './siege.js';
@@ -43,6 +45,8 @@ export const systems: readonly System[] = [
   scoreSystem,
   marketSystem,
   contractSystem,
+  jobSystem,
+  rushSystem,
   frontierSystem,
   settleSystem,
   fogSystem,

@@ -3,6 +3,7 @@ import { BOTS, type BotKind } from './bots.js';
 import { hashState } from './hash.js';
 import { checkInvariants } from './invariants.js';
 import { validateOrder } from './orders.js';
+import { stripNewcomerPerks } from './rush.js';
 import { standings, type Standing } from './score.js';
 import { step } from './step.js';
 import { GOODS, type GameState, type Id, type Input, type SimEvent } from './types.js';
@@ -15,6 +16,10 @@ export interface SeasonOptions {
   bots?: BotKind[];
   /** How often the bots decide, in game minutes. */
   decideEveryMinutes?: number;
+  /** Called with the state after every beat (read-only; used by the market measurement). */
+  observe?: (state: GameState) => void;
+  /** Play the game as it was before the newcomer rush, starter contract and street jobs. */
+  noNewcomerPerks?: boolean;
 }
 
 export interface SeasonResult {
@@ -51,6 +56,13 @@ export interface SeasonResult {
   contractsBy: Record<Id, { taken: number; done: number; failed: number }>;
   contractsPosted: { civic: number; player: number };
   contractsExpired: number;
+  /** Street jobs per player: taken, finished, failed (raided), and the pay they brought in. */
+  jobsBy: Record<
+    Id,
+    { taken: number; done: number; failed: number; credits: number; parts: number }
+  >;
+  /** Street job payouts in whole units: the explicit civic source of credits and parts. */
+  jobPaid: { credits: number; parts: number };
   players: { id: Id; bot: BotKind }[];
   standings: Standing[];
   /** Broken invariants found at any decision time (empty is good). */
@@ -71,6 +83,7 @@ export function seasonStart(options: SeasonOptions = {}): {
   let state = createWorld(options.seed ?? 1, { seasonHours: days * 24 });
   const players = (options.bots ?? DEFAULT_BOTS).map((bot, i) => ({ id: `b${i + 1}`, bot }));
   for (const p of players) state = addPlayer(state, { id: p.id });
+  if (options.noNewcomerPerks) stripNewcomerPerks(state, { jobs: true });
   return { state, players };
 }
 
@@ -110,6 +123,10 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
   const contractsBy: SeasonResult['contractsBy'] = {};
   const contractsPosted = { civic: 0, player: 0 };
   let contractsExpired = 0;
+  const jobsBy: SeasonResult['jobsBy'] = {};
+  const jobPaid = { credits: 0, parts: 0 };
+  const jobOf = (id: unknown): SeasonResult['jobsBy'][string] =>
+    (jobsBy[String(id)] ??= { taken: 0, done: 0, failed: 0, credits: 0, parts: 0 });
   // Per contract: the escrowed reward, to prove each one pays out or refunds exactly that.
   const rewards = new Map<string, number>();
   // Per tagged haul: units the contract accepted plus excess, to match what arrived.
@@ -152,6 +169,27 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
         destroyedUnits += destroyed;
         const haul = String(e.data['haulId']);
         taken.set(haul, (taken.get(haul) ?? 0) + stolen + destroyed);
+      } else if (e.kind === 'job.done' || e.kind === 'job.failed') {
+        const j = jobOf(e.actors[0]);
+        if (e.kind === 'job.done') {
+          j.done += 1;
+          j.credits += Number(e.data['credits']);
+          j.parts += Number(e.data['parts']);
+          jobPaid.credits += Number(e.data['credits']);
+          jobPaid.parts += Number(e.data['parts']);
+        } else j.failed += 1;
+        if (e.data['job'] === 'courier') {
+          // A courier run carries nothing new: what left is back, or was taken by a raid.
+          const sent = Number(e.data['sent']);
+          const back = Number(e.data['returned']);
+          const lost = taken.get(String(e.data['movementId'])) ?? 0;
+          if (Math.abs(sent - back - lost) > 1e-6) {
+            problems.push(
+              `courier ${String(e.data['movementId'])}: sent ${sent} but ${back} came back and ${lost} were taken`,
+            );
+          }
+          taken.delete(String(e.data['movementId']));
+        }
       } else if (e.kind === 'contract.posted') {
         rewards.set(String(e.data['contractId']), Number(e.data['reward']));
         if (e.data['civic']) contractsPosted.civic += 1;
@@ -227,14 +265,17 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
       for (const order of BOTS[p.bot](state, p.id)) {
         const input: Input = { actorId: p.id, order, atMs: at };
         botOrders += 1;
-        if (validateOrder(state, input).ok) batch.push(input);
-        else botRejected += 1;
+        if (validateOrder(state, input).ok) {
+          batch.push(input);
+          if (order.type === 'job.take') jobOf(p.id).taken += 1;
+        } else botRejected += 1;
       }
     }
     inputs.push(...batch);
     const result = step(state, batch, Math.min(at + beatMs, endMs));
     state = result.state;
     count(result.events);
+    options.observe?.(state);
     if (at < EARLY_MS && state.nowMs >= EARLY_MS) {
       for (const p of players) creditsAt48h[p.id] = toUnits(state.players[p.id]?.credits ?? 0);
     }
@@ -279,6 +320,8 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
     contractsBy,
     contractsPosted,
     contractsExpired,
+    jobsBy,
+    jobPaid,
     players,
     standings: standings(state),
     problems,

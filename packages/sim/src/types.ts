@@ -117,6 +117,31 @@ export interface Player {
   contractDay: number;
   /** Contract score earned on `contractDay`, in district-milliseconds (capped per day). */
   contractDayMs: number;
+  /** Newcomer rush: builds and settles run faster until this time (0 for none). */
+  rushUntilMs: number;
+  /** Street jobs on offer (at most `balance.jobs.cap`). */
+  jobs: JobOffer[];
+  /** When the next job offer arrives (0 while the list is full). */
+  jobNextMs: number;
+}
+
+export type JobKind = 'courier' | 'salvage' | 'patrol';
+
+/** A quick street errand on a player's personal list. */
+export interface JobOffer {
+  id: Id;
+  kind: JobKind;
+  /** Base duration in minutes (a carrier shortens it). */
+  minutes: number;
+  /** Courier only: the good and whole units to carry. */
+  good?: Good;
+  qty?: number;
+  /** Credits paid, in atoms. */
+  creditsAtoms: number;
+  /** Salvage only: parts paid, in atoms. */
+  partsAtoms?: number;
+  /** Picks the hub or the street deterministically at take time. */
+  pick: number;
 }
 
 export type UnitLocation = { at: Id } | { movement: Id };
@@ -146,6 +171,8 @@ export type MovementKind =
   | 'settle'
   /** Crews walking to a street edge to lie in wait (raids, M2). */
   | 'raid'
+  /** A street job (salvage or patrol) in progress; couriers use a `haul` with a `job`. */
+  | 'job'
   /** Crews lying in wait on a street edge. Persistent; the crews are inside it. */
   | 'ambush'
   /** Raiders walking home with the loot. */
@@ -194,6 +221,8 @@ export interface Movement {
   sent?: number;
   /** Hauls only: the contract this haul delivers to (contracts board, M2). */
   contractId?: Id;
+  /** Street jobs only: the errand being run. */
+  job?: JobOffer;
 }
 
 export type QueuedEvent = { at: number; seq: number } & (
@@ -209,6 +238,8 @@ export type QueuedEvent = { at: number; seq: number } & (
   | { kind: 'raid.strike'; movementId: Id; targetId: Id }
   | { kind: 'contract.civic' }
   | { kind: 'contract.due'; contractId: Id }
+  | { kind: 'job.refill'; playerId: Id }
+  | { kind: 'rush.end'; playerId: Id }
 );
 export type QueuedKind = QueuedEvent['kind'];
 
@@ -305,6 +336,10 @@ export interface Contract {
   delivered: number;
   /** Credits paid out so far in atoms. */
   paid: number;
+  /** A newcomer's starter contract: only this player may take it, and it does not count toward the board caps. */
+  reservedFor?: Id;
+  /** Overrides `hours` as the delivery window, in ms (starter contracts only). */
+  windowMs?: number;
 }
 
 export interface Season {
@@ -337,6 +372,8 @@ export interface Counters {
   order: number;
   /** Last contract number issued. */
   contract: number;
+  /** Last street job number issued. */
+  job: number;
 }
 
 export interface GameState {
@@ -400,7 +437,9 @@ export type Order =
   | { type: 'contract.post'; hub: Id; good: Good; qty: number; reward: number; hours: number }
   | { type: 'contract.take'; contractId: Id }
   /** Withdraw your own contract while nobody has taken it. */
-  | { type: 'contract.cancel'; contractId: Id };
+  | { type: 'contract.cancel'; contractId: Id }
+  /** Take a street job from your list with a crew (and perhaps a carrier). */
+  | { type: 'job.take'; jobId: Id; crewId: Id; carrierId?: Id | null };
 
 export type OrderType = Order['type'];
 
@@ -462,6 +501,8 @@ export const ORDER_ERRORS = [
   'bad_reward',
   'wrong_cargo',
   'too_many_carriers',
+  'unknown_job',
+  'reserved_contract',
 ] as const;
 export type OrderError = (typeof ORDER_ERRORS)[number];
 
@@ -497,6 +538,9 @@ export type SimEventKind =
   | 'contract.failed'
   | 'contract.expired'
   | 'protection.ended'
+  | 'job.done'
+  | 'job.failed'
+  | 'rush.ended'
   | 'score.tick'
   | 'order.rejected';
 

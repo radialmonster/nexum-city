@@ -22,6 +22,7 @@ export { isProtected, progressAt, siegeFraction } from './siege.js';
 export { crossingTime } from './raid.js';
 export { applyOrder, validateOrder } from './orders.js';
 export { boardOf, depositFor, referenceValue } from './contracts.js';
+export { inRush, rushDuration, rushEndsAt, stripNewcomerPerks } from './rush.js';
 export { ATOMS_PER_CENT, civicAsk, civicBid } from './market.js';
 export { BOTS, merchant, raider, turtle } from './bots.js';
 export type { Bot, BotKind } from './bots.js';
@@ -52,3 +53,5 @@ export {
 export { ensureFrontier, wantedOpenPlots } from './frontier.js';
 export type { AddPlayerOptions, WorldOptions } from './world.js';
 export * from './types.js';
+export { firstSession } from './session.js';
+export type { SessionResult } from './session.js';

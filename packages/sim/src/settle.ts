@@ -1,4 +1,5 @@
 import { MS_PER_HOUR, balance, toAtoms } from './balance.js';
+import { rushDuration } from './rush.js';
 import { emit, schedule, unschedule, type Ctx } from './ctx.js';
 import { ensureFrontier } from './frontier.js';
 import { deposit } from './production.js';
@@ -41,7 +42,8 @@ export function beginSettle(ctx: Ctx, m: Movement, crews: readonly Crew[]): void
     });
     return;
   }
-  const completesAtMs = state.nowMs + balance.settle.hours * MS_PER_HOUR;
+  const completesAtMs =
+    state.nowMs + rushDuration(state, m.owner, balance.settle.hours * MS_PER_HOUR);
   d.settling = {
     owner: m.owner,
     crewIds: crews.map((c) => c.id),

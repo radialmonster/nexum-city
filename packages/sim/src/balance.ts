@@ -249,6 +249,32 @@ export const balance = {
     baseRefCents: { parts: 1800, power: 1400, data: 2400, supplies: 1000 },
   },
 
+  /**
+   * Newcomer rush (docs/rewrite/sim-spec.md, "Newcomer rush and street jobs"): for the first
+   * `hours` after joining, builds and settles run `factor` times faster.
+   */
+  rush: {
+    hours: 24,
+    factor: 10,
+    /** The starter civic contract reserved for a newcomer. */
+    starter: { good: 'supplies', qty: 5, premiumPercent: 100, graceMinutes: 20 },
+    /** Goods a new home district starts with, exactly one level-1 Workshop (so the first build is not a 30 minute haul away). */
+    kit: { parts: 30, power: 10 },
+  },
+
+  /** Street jobs: a personal list of quick errands, one new offer every `refillMinutes`. */
+  jobs: {
+    cap: 3,
+    refillMinutes: 30,
+    /** A carrier makes the errand this much of the base time (percent). */
+    carrierTimePercent: 67,
+    /** How long a patrol keeps the streets it walked revealed. */
+    patrolRevealMinutes: 60,
+    courier: { minMinutes: 4, maxMinutes: 8, minQty: 4, maxQty: 10, minCredits: 6, maxCredits: 12 },
+    salvage: { minMinutes: 3, maxMinutes: 6, minParts: 1, maxParts: 2 },
+    patrol: { minMinutes: 5, maxMinutes: 10, minCredits: 4, maxCredits: 8 },
+  },
+
   player: {
     startCredits: 500,
     startSupplies: 40,

@@ -1,8 +1,9 @@
-import { MS_PER_HOUR, balance, toAtoms, toUnits } from './balance.js';
+import { MS_PER_HOUR, MS_PER_MINUTE, balance, toAtoms, toUnits } from './balance.js';
 import { emit, schedule, unschedule, type Ctx } from './ctx.js';
 import { ATOMS_PER_CENT } from './market.js';
 import { deposit, emptyGoods } from './production.js';
 import { nextInt } from './rng.js';
+import { shortestRoute, travelMs } from './routing.js';
 import { addContractScore } from './score.js';
 import type { System } from './systems.js';
 import {
@@ -36,9 +37,12 @@ const big = (n: number): bigint => BigInt(Math.trunc(n));
 
 const credits = (atoms: number): number => toUnits(atoms);
 
-/** Contracts at a hub (live ones only: done, failed and expired ones are removed). */
+/**
+ * Contracts at a hub that count toward the board caps (live ones only: done, failed and expired
+ * ones are removed). A newcomer's reserved starter contract sits on the board but takes no seat.
+ */
 export function boardOf(state: GameState, hub: Id): Contract[] {
-  return Object.values(state.contracts).filter((c) => c.hub === hub);
+  return Object.values(state.contracts).filter((c) => c.hub === hub && !c.reservedFor);
 }
 
 /** The reference value of `qty` units of a good at a hub, in credit atoms. */
@@ -142,11 +146,12 @@ export function validateTake(state: GameState, actorId: Id, contractId: Id): Ord
   if (!c) return 'unknown_contract';
   if (c.status !== 'open') return 'contract_taken';
   if (c.poster === actorId) return 'own_contract';
+  if (c.reservedFor && c.reservedFor !== actorId) return 'reserved_contract';
   const player = state.players[actorId];
   if (!player) return 'unknown_actor';
   const held = Object.values(state.contracts).filter((k) => k.taker === actorId).length;
   if (held >= C.maxTaken) return 'too_many_contracts';
-  if (player.credits < depositFor(c.reward)) return 'insufficient_credits';
+  if (player.credits < (c.reservedFor ? 0 : depositFor(c.reward))) return 'insufficient_credits';
   return null;
 }
 
@@ -154,12 +159,12 @@ export function takeContract(ctx: Ctx, actorId: Id, contractId: Id): void {
   const { state } = ctx;
   const c = state.contracts[contractId] as Contract;
   const player = state.players[actorId] as { credits: number };
-  c.deposit = depositFor(c.reward);
+  c.deposit = c.reservedFor ? 0 : depositFor(c.reward);
   player.credits -= c.deposit;
   c.status = 'taken';
   c.taker = actorId;
   c.takenMs = state.nowMs;
-  c.dueMs = state.nowMs + c.hours * MS_PER_HOUR;
+  c.dueMs = state.nowMs + (c.windowMs ?? c.hours * MS_PER_HOUR);
   unschedule(state, (e) => e.kind === 'contract.due' && e.contractId === c.id);
   schedule(ctx, c.dueMs, { kind: 'contract.due', contractId: c.id });
   emit(ctx, 'contract.taken', participants(c, actorId), [c.hub], {
@@ -310,6 +315,54 @@ function expire(ctx: Ctx, c: Contract): void {
     refunded: credits(c.poster === 'civic' ? 0 : c.reward),
     civic: c.poster === 'civic',
   });
+}
+
+/**
+ * A newcomer's starter contract (newcomer rush, docs/rewrite/sim-spec.md): a small civic delivery
+ * at the hub nearest `from`, reserved for that player, with no deposit. The delivery window is
+ * the van's trip to the hub plus a grace period, so it is always doable. Uses no RNG. Does
+ * nothing when no hub can be reached.
+ */
+export function postStarterContract(ctx: Ctx, playerId: Id, from: Id): Contract | null {
+  const { state } = ctx;
+  const S = balance.rush.starter;
+  let best: { hub: Id; lengthM: number } | null = null;
+  for (const d of Object.values(state.districts)) {
+    if (d.kind !== 'hub') continue;
+    const route = shortestRoute(state.graph, from, d.id);
+    if (!route) continue;
+    if (
+      !best ||
+      route.lengthM < best.lengthM ||
+      (route.lengthM === best.lengthM && d.id < best.hub)
+    ) {
+      best = { hub: d.id, lengthM: route.lengthM };
+    }
+  }
+  const player = state.players[playerId];
+  if (!best || !player || player.rushUntilMs <= state.nowMs) return null;
+  const step = 5 * MS_PER_MINUTE;
+  const trip = travelMs(best.lengthM, 'van') + S.graceMinutes * MS_PER_MINUTE;
+  const windowMs = Math.ceil(trip / step) * step;
+  const good = S.good as Good;
+  const reward = Math.floor(
+    (referenceValue(state, best.hub, good, S.qty) * (100 + S.premiumPercent)) / 100,
+  );
+  const c = newContract(
+    ctx,
+    best.hub,
+    good,
+    S.qty,
+    reward,
+    'civic',
+    Math.ceil(windowMs / MS_PER_HOUR),
+  );
+  c.reservedFor = playerId;
+  c.windowMs = windowMs;
+  c.offerEndsMs = player.rushUntilMs;
+  unschedule(state, (e) => e.kind === 'contract.due' && e.contractId === c.id);
+  schedule(ctx, c.offerEndsMs, { kind: 'contract.due', contractId: c.id });
+  return c;
 }
 
 const GOOD_LIST: readonly Good[] = GOODS;
