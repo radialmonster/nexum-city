@@ -79,6 +79,13 @@ export const orderSchema = z.discriminatedUnion('type', [
     to: idSchema,
   }),
   z.strictObject({
+    type: z.literal('ambush.clear'),
+    ambushId: idSchema,
+    crewIds: crewIds.optional(),
+    /** Omitted: an idle van at the crews' district if there is one; null: on foot. */
+    carrierId: idSchema.nullable().optional(),
+  }),
+  z.strictObject({
     type: z.literal('scout'),
     crewId: idSchema,
     carrierId: idSchema.nullable(),

@@ -1,6 +1,6 @@
 export * from './balance.js';
 export { buildCost, buildDurationMs } from './construction.js';
-export { observe, sightOf, towerReach, towerSight, viewFor } from './fog.js';
+export { observe, sightOf, strengthRange, towerReach, towerSight, viewFor } from './fog.js';
 export type {
   BookLevel,
   ContractView,
@@ -20,6 +20,8 @@ export { addContractScore, addTradeScore, inFinale, settleScore, standings } fro
 export type { Standing } from './score.js';
 export { isProtected, progressAt, siegeFraction } from './siege.js';
 export { crossingTime } from './raid.js';
+export { estimateClear, pickClearCrews, visibleAmbush } from './clear.js';
+export type { ClearEstimate, ClearPick, ClearWorld } from './clear.js';
 export { applyOrder, validateOrder } from './orders.js';
 export { boardOf, depositFor, referenceValue } from './contracts.js';
 export { inRush, rushDuration, rushEndsAt, stripNewcomerPerks } from './rush.js';

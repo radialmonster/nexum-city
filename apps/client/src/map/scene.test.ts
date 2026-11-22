@@ -150,7 +150,13 @@ describe('ambushes', () => {
     const player = {
       ...base.player,
       ambushes: [
-        { id: 'z1', owner: base.player.playerId, edge: [a, b] as [string, string], untilMs: 5 },
+        {
+          id: 'z1',
+          owner: base.player.playerId,
+          edge: [a, b] as [string, string],
+          untilMs: 5,
+          strength: [4, 6] as [number, number],
+        },
       ],
     };
     const scene = layoutWorld({ ...base, player }, t);

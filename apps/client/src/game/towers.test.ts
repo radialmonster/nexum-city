@@ -10,7 +10,9 @@ function withTower(level: number) {
   const a = base.districts['a'] as OwnDistrict;
   return makeView({
     districts: { ...base.districts, a: { ...a, buildings: [{ type: 'watchtower', level }] } },
-    ambushes: [{ id: 'x1', owner: 'rival', edge: ['a', 'b'], untilMs: 2_000_000 }],
+    ambushes: [
+      { id: 'x1', owner: 'rival', edge: ['a', 'b'], untilMs: 2_000_000, strength: [4, 6] },
+    ],
   });
 }
 
@@ -35,7 +37,9 @@ describe('towers', () => {
   });
 
   it('ignores your own ambushes', () => {
-    const v = makeView({ ambushes: [{ id: 'm', owner: 'me', edge: ['a', 'b'], untilMs: 9e9 }] });
+    const v = makeView({
+      ambushes: [{ id: 'm', owner: 'me', edge: ['a', 'b'], untilMs: 9e9, strength: [4, 6] }],
+    });
     expect(knownAmbushes(v)).toEqual([]);
   });
 });

@@ -145,7 +145,7 @@ export function beginAmbush(ctx: Ctx, m: Movement): void {
   }
 }
 
-export type AmbushEnd = 'expired' | 'recalled' | 'repelled' | 'full';
+export type AmbushEnd = 'expired' | 'recalled' | 'repelled' | 'full' | 'cleared';
 
 /** Stops an ambush: the crews walk home with whatever they took. */
 export function endAmbush(ctx: Ctx, m: Movement, reason: AmbushEnd): void {
@@ -175,7 +175,7 @@ export function endAmbush(ctx: Ctx, m: Movement, reason: AmbushEnd): void {
   });
 }
 
-function roll(ctx: Ctx): number {
+export function roll(ctx: Ctx): number {
   const k = balance.raid.noisePercent / 100;
   return 1 + (nextFloat(ctx.state.rng) * 2 - 1) * k;
 }
@@ -199,7 +199,7 @@ function targetLabel(haul: Movement): string {
  * district, up to the starting strength. Without it every repelled ambush is a permanent loss and
  * raiders spiral down to strength 1 per crew (see sim-spec, "Raid balance after task 77").
  */
-function scheduleMend(ctx: Ctx, crews: Crew[]): void {
+export function scheduleMend(ctx: Ctx, crews: Crew[]): void {
   for (const c of crews) {
     if (c.strength >= balance.recruit.startStrength) continue;
     if (ctx.state.queue.some((e) => e.kind === 'crew.mend' && e.crewId === c.id)) continue;

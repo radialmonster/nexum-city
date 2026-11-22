@@ -304,7 +304,13 @@ describe('fog', () => {
     const other = viewFor(state, 'p2');
     // p2 holds one end of the street, so it sees that an ambush lies there, and only that.
     expect(other.ambushes).toHaveLength(1);
-    expect(Object.keys(other.ambushes[0] ?? {}).sort()).toEqual(['edge', 'id', 'owner', 'untilMs']);
+    expect(Object.keys(other.ambushes[0] ?? {}).sort()).toEqual([
+      'edge',
+      'id',
+      'owner',
+      'strength',
+      'untilMs',
+    ]);
     expect(other.ambushes[0]?.owner).toBe('p1');
     const raw = JSON.stringify(other);
     const amb = movementsOf(state, 'ambush')[0] as Movement;

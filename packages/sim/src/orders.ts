@@ -15,6 +15,7 @@ import { jobTaken, resolveJob } from './jobs.js';
 import { cancelOrder, findOrder, placeOrder, validatePlace } from './market.js';
 import { afterWarehouseChange, buildingLevel, storeAt } from './production.js';
 import { shortestRoute, travelMs, type Route } from './routing.js';
+import { pickClearCrews, visibleAmbush } from './clear.js';
 import { endAmbush, isPlayerProtected } from './raid.js';
 import { isProtected, refreshSiege } from './siege.js';
 import { placeCrew, recallMovement, startMovement } from './travel.js';
@@ -22,6 +23,7 @@ import {
   GOODS,
   type BuildingType,
   type Carrier,
+  type ClearInfo,
   type Crew,
   type District,
   type GameState,
@@ -49,6 +51,7 @@ type Plan =
       route: Route;
       durationMs: number;
       raid?: RaidInfo;
+      clear?: ClearInfo;
       contractId?: Id;
       job?: JobOffer;
     }
@@ -80,6 +83,8 @@ interface TravelRequest {
   cargo?: Partial<Record<string, number>>;
   /** Raids only: the street to lie in wait on, and for how many hours. */
   edge?: { a: Id; b: Id; hours: number };
+  /** Clears only: the ambush to break up. */
+  clearAmbushId?: Id;
   /** Hauls only: deliver to this contract. */
   contractId?: Id;
   /** Street jobs: the errand (its route and duration replace the walk). */
@@ -119,6 +124,7 @@ function resolveTravel(state: GameState, req: TravelRequest): Resolved {
 
   let to = req.to;
   let raid: RaidInfo | undefined;
+  let clear: ClearInfo | undefined;
   let jobRun: { route: Route; durationMs: number } | undefined;
   if (req.job) {
     const run = resolveJob(state, req.actorId, req.job, from, carrier !== null);
@@ -156,11 +162,22 @@ function resolveTravel(state: GameState, req: TravelRequest): Resolved {
       struck: [],
     };
   }
+  if (req.kind === 'clear' && req.clearAmbushId !== undefined) {
+    // A blind guess and an ambush that does not exist look the same: only what you see is a target.
+    const ambush = visibleAmbush(state, req.actorId, req.clearAmbushId);
+    if (!ambush?.raid) return fail('unknown_movement');
+    const { a, b } = ambush.raid;
+    const toA = shortestRoute(state.graph, from, a);
+    const toB = shortestRoute(state.graph, from, b);
+    if (!toA && !toB) return fail('no_route');
+    to = toA && (!toB || toA.lengthM <= toB.lengthM) ? a : b;
+    clear = { ambushId: ambush.id, a, b, near: to, home: from };
+  }
   const target = state.districts[to];
   if (!target) return fail('unknown_district');
-  if (req.kind !== 'raid' && to === from) return fail('invalid_target');
-  if (req.kind === 'raid') {
-    // Any street will do; the checks above are all a raid needs.
+  if (req.kind !== 'raid' && req.kind !== 'clear' && to === from) return fail('invalid_target');
+  if (req.kind === 'raid' || req.kind === 'clear') {
+    // Any street will do; the checks above are all a raid or a clear needs.
   } else if (req.kind === 'job') {
     // resolveJob checked the origin and picked the destination.
   } else if (req.kind === 'scout') {
@@ -227,6 +244,7 @@ function resolveTravel(state: GameState, req: TravelRequest): Resolved {
       durationMs:
         jobRun?.durationMs ?? travelMs(route.lengthM, kind, carrier ? wearOf(carrier) : 0),
       ...(raid ? { raid } : {}),
+      ...(clear ? { clear } : {}),
       ...(req.contractId !== undefined ? { contractId: req.contractId } : {}),
       ...(req.job ? { job: req.job } : {}),
     },
@@ -306,6 +324,27 @@ function resolve(state: GameState, input: Input): Resolved {
         to: order.a,
         edge: { a: order.a, b: order.b, hours: order.hours },
       });
+    case 'ambush.clear': {
+      const ambush = visibleAmbush(state, actorId, order.ambushId);
+      if (!ambush?.raid) return fail('unknown_movement');
+      let crewIds = order.crewIds ?? [];
+      let carrierId = order.carrierId ?? null;
+      if (order.crewIds === undefined) {
+        const pick = pickClearCrews(state, actorId, ambush.raid);
+        if (!pick) return fail('no_crew');
+        crewIds = pick.crewIds;
+        if (order.carrierId === undefined) carrierId = pick.carrierId;
+        else if (order.carrierId !== null) crewIds = crewIds.slice(0, 1);
+      }
+      return resolveTravel(state, {
+        kind: 'clear',
+        actorId,
+        carrierId,
+        crewIds,
+        to: '',
+        clearAmbushId: order.ambushId,
+      });
+    }
     case 'job.take': {
       const offer = state.players[actorId]?.jobs.find((j) => j.id === order.jobId);
       if (!offer) return fail('unknown_job');

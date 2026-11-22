@@ -217,6 +217,12 @@ export interface SeenConvoyView {
   segment: [Id, Id];
 }
 
+/** The fog on an ambush's strength: a quarter either way, rounded out, so the exact sum stays hidden. */
+export const strengthRange = (strength: number): [number, number] => [
+  Math.floor(strength * 0.75),
+  Math.ceil(strength * 1.25),
+];
+
 /** An ambush of another player, seen because one end of its street is in your sight. */
 export interface SeenAmbushView {
   id: Id;
@@ -224,6 +230,8 @@ export interface SeenAmbushView {
   /** The two ends of the ambushed street. */
   edge: [Id, Id];
   untilMs: number;
+  /** A range for the ambushers' total strength, `[low, high]` (a rough read, never the exact sum). */
+  strength: [number, number];
 }
 
 /** One price level of a public book: total open units at a price. */
@@ -369,7 +377,15 @@ export function viewFor(state: GameState, playerId: Id): PlayerView {
       const { a, b, untilMs } = m.raid;
       // Hidden unless the street is in sight; the target only learns when hit (`raid.hit`).
       if (sight.has(a) || sight.has(b))
-        ambushes.push({ id: m.id, owner: m.owner, edge: [a, b], untilMs });
+        ambushes.push({
+          id: m.id,
+          owner: m.owner,
+          edge: [a, b],
+          untilMs,
+          strength: strengthRange(
+            m.crewIds.reduce((n, id) => n + (state.crews[id]?.strength ?? 0), 0),
+          ),
+        });
       continue;
     }
     const segment = movementSegment(state.graph, m, state.nowMs);

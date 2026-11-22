@@ -54,6 +54,8 @@ export interface SeasonResult {
   raidFights: { raiderStrength: number; guard: number; n: number };
   /** Diagnostic: per raider player, ambushes set, hits, repels and strength lost. */
   raidsBy: Record<string, { set: number; hit: number; repelled: number; lost: number }>;
+  /** "Break it up" (task 78): per clearing player, ambushes broken, held and found gone. */
+  clearsBy: Record<string, { won: number; held: number; gone: number }>;
   runnersBought: number;
   /** Diagnostic (task 75): per player, ambush warnings from Watchtowers, carriers worn past the slow line, and carriers healed back. */
   wearBy: Record<Id, { spotted: number; worn: number; repaired: number }>;
@@ -126,6 +128,9 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
   const raidsAgainst: SeasonResult['raidsAgainst'] = {};
   const raidFights = { raiderStrength: 0, guard: 0, n: 0 };
   const raidsBy: SeasonResult['raidsBy'] = {};
+  const clearsBy: SeasonResult['clearsBy'] = {};
+  const clearOf = (id: unknown): SeasonResult['clearsBy'][string] =>
+    (clearsBy[String(id)] ??= { won: 0, held: 0, gone: 0 });
   const raidOf = (id: unknown): SeasonResult['raidsBy'][string] =>
     (raidsBy[String(id)] ??= { set: 0, hit: 0, repelled: 0, lost: 0 });
   const tally = (e: SimEvent, field: 'hit' | 'repelled' | 'evaded'): void => {
@@ -194,7 +199,10 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
         tally(e, 'repelled');
         raidOf(e.actors[0]).repelled += 1;
         raidOf(e.actors[0]).lost += Number(e.data['raiderLost']);
-      } else if (e.kind === 'raid.evaded') {
+      } else if (e.kind === 'ambush.cleared') clearOf(e.actors[0]).won += 1;
+      else if (e.kind === 'ambush.held') clearOf(e.actors[0]).held += 1;
+      else if (e.kind === 'ambush.gone') clearOf(e.actors[0]).gone += 1;
+      else if (e.kind === 'raid.evaded') {
         raidsEvaded += 1;
         tally(e, 'evaded');
       } else if (e.kind === 'carrier.bought') runnersBought += 1;
@@ -359,6 +367,7 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
     raidsAgainst,
     raidFights,
     raidsBy,
+    clearsBy,
     runnersBought,
     wearBy,
     stolenUnits,

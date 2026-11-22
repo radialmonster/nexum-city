@@ -98,6 +98,7 @@ export const movementSchema = z.object({
     'settle',
     'raid',
     'ambush',
+    'clear',
     'return',
     'job',
   ]),
@@ -129,6 +130,16 @@ export const movementSchema = z.object({
       struck: z.array(idSchema),
     })
     .optional(),
+  /** A clear in progress: the ambush it is marching on. */
+  clear: z
+    .object({
+      ambushId: idSchema,
+      a: idSchema,
+      b: idSchema,
+      near: idSchema,
+      home: idSchema,
+    })
+    .optional(),
 });
 
 export const SIM_EVENT_KINDS = [
@@ -158,6 +169,9 @@ export const SIM_EVENT_KINDS = [
   'carrier.repaired',
   'raid.spotted',
   'raid.ended',
+  'ambush.cleared',
+  'ambush.held',
+  'ambush.gone',
   'contract.posted',
   'contract.taken',
   'contract.progress',
@@ -274,6 +288,8 @@ export const seenAmbushSchema = z.object({
   owner: idSchema,
   edge: z.tuple([idSchema, idSchema]),
   untilMs: z.number(),
+  /** A fog-honest range for the ambushers' total strength: [low, high]. */
+  strength: z.tuple([z.number().int(), z.number().int()]),
 });
 
 const levelSchema = z.object({ price: z.number().int(), qty: z.number().int() });

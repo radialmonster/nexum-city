@@ -16,6 +16,7 @@ export type TimelineKind =
   | 'settle'
   | 'raid'
   | 'ambush'
+  | 'clear'
   | 'return'
   | 'build'
   | 'recruit'
@@ -58,6 +59,7 @@ const GLYPH: Record<TimelineKind, string> = {
   settle: '+',
   raid: 'x',
   ambush: 'x',
+  clear: 'x',
   return: '<',
   build: '+',
   recruit: '+',
@@ -104,6 +106,7 @@ export function timelineEntries(
       settle: 'SETTLE',
       raid: 'RAID',
       ambush: 'AMBUSH',
+      clear: 'BREAK UP',
       job: 'JOB',
       return: 'RETURN',
     };

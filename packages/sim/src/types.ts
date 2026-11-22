@@ -175,6 +175,8 @@ export type MovementKind =
   | 'raid'
   /** A street job (salvage or patrol) in progress; couriers use a `haul` with a `job`. */
   | 'job'
+  /** Crews walking to a street edge to break up an enemy ambush they can see (`ambush.clear`). */
+  | 'clear'
   /** Crews lying in wait on a street edge. Persistent; the crews are inside it. */
   | 'ambush'
   /** Raiders walking home with the loot. */
@@ -195,6 +197,19 @@ export interface RaidInfo {
   untilMs: number;
   /** Convoys already hit by this ambush; each is hit at most once. */
   struck: Id[];
+}
+
+/** The bookkeeping of a `clear` movement: the ambush it is marching on and where it goes home to. */
+export interface ClearInfo {
+  /** The ambush movement being attacked (its id outlives the ambush: it turns into a `return`). */
+  ambushId: Id;
+  /** The two ends of the ambushed street (sorted by id). */
+  a: Id;
+  b: Id;
+  /** The end the crews walk to. */
+  near: Id;
+  /** Where the crews came from and walk back to. */
+  home: Id;
 }
 
 /** A group of units travelling together along a route. */
@@ -219,6 +234,8 @@ export interface Movement {
   recallFraction?: number;
   /** Raids only: the ambush this movement belongs to. */
   raid?: RaidInfo;
+  /** Clears only: the ambush this movement is marching on. */
+  clear?: ClearInfo;
   /** Hauls only: the cargo it set out with, in atoms (for conservation checks and reports). */
   sent?: number;
   /** Hauls only: the contract this haul delivers to (contracts board, M2). */
@@ -429,6 +446,12 @@ export type Order =
   | { type: 'reinforce'; carrierId: Id | null; crewIds: Id[]; to: Id }
   | { type: 'settle'; carrierId: Id | null; crewIds: Id[]; target: Id }
   | { type: 'raid'; carrierId: Id | null; crewIds: Id[]; a: Id; b: Id; hours: number }
+  /**
+   * Send crews to break up an enemy ambush you can see (in your `view.ambushes`). Without `crewIds`
+   * the sim picks the strongest free crews at your nearest district, with an idle van there unless
+   * `carrierId` says otherwise (`null` is on foot). See sim-spec, "Break it up".
+   */
+  | { type: 'ambush.clear'; ambushId: Id; crewIds?: Id[]; carrierId?: Id | null }
   | { type: 'scout'; crewId: Id; carrierId: Id | null; target: Id }
   | { type: 'stance'; districtId: Id; stance: Stance }
   | { type: 'recall'; movementId: Id }
@@ -538,6 +561,9 @@ export type SimEventKind =
   | 'carrier.repaired'
   | 'raid.spotted'
   | 'raid.ended'
+  | 'ambush.cleared'
+  | 'ambush.held'
+  | 'ambush.gone'
   | 'contract.posted'
   | 'contract.taken'
   | 'contract.progress'

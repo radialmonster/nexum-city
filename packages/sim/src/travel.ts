@@ -4,6 +4,7 @@ import { deliverToContract } from './contracts.js';
 import { finishJob } from './jobs.js';
 import { deposit } from './production.js';
 import { wearCarrier } from './wear.js';
+import { resolveClear } from './clear.js';
 import { beginAmbush, scheduleStrikes } from './raid.js';
 import type { Route } from './routing.js';
 import { beginSettle } from './settle.js';
@@ -12,6 +13,7 @@ import type { System } from './systems.js';
 import {
   GOODS,
   type Carrier,
+  type ClearInfo,
   type Crew,
   type Goods,
   type Id,
@@ -45,6 +47,8 @@ export interface MovementSpec {
   durationMs: number;
   /** Raids only. */
   raid?: RaidInfo;
+  /** Clears only. */
+  clear?: ClearInfo;
   /** Hauls only: the contract this haul delivers to. */
   contractId?: Id;
   /** Street jobs only: the errand being run. */
@@ -74,6 +78,7 @@ export function startMovement(ctx: Ctx, spec: MovementSpec): Movement {
     arriveMs: state.nowMs + spec.durationMs,
   };
   if (spec.raid) movement.raid = spec.raid;
+  if (spec.clear) movement.clear = spec.clear;
   if (spec.contractId) movement.contractId = spec.contractId;
   if (spec.job) movement.job = { ...spec.job };
   if (spec.kind === 'haul' || spec.kind === 'settle')
@@ -114,6 +119,10 @@ export const travelSystem: System = {
       if (!m) return;
       if (m.kind === 'raid' && m.recalledAtMs === undefined) {
         beginAmbush(ctx, m);
+        return;
+      }
+      if (m.kind === 'clear' && m.recalledAtMs === undefined) {
+        resolveClear(ctx, m);
         return;
       }
       if (m.job) {
