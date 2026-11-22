@@ -214,4 +214,46 @@ describe('raid events', () => {
       'raid.repelled',
     ]);
   });
+
+  it('words an evaded ambush from both sides and folds the ambush end card into it', () => {
+    const at2 = { districts: ['a', 'b'] };
+    const data = { movementId: 'm1', haulId: 'h1', chancePercent: 35 };
+    const mine = describeEvent(
+      feedItem(5, 'raid.evaded', { ...at2, actors: ['rival', 'me'], data }),
+      view,
+    );
+    expect(mine).toMatchObject({ kind: 'RAID', tone: 'ok' });
+    expect(mine?.text).toContain('Your Runner slipped past an ambush between');
+    const theirs = describeEvent(
+      feedItem(5, 'raid.evaded', { ...at2, actors: ['me', 'rival'], data }),
+      view,
+    );
+    expect(theirs?.tone).toBe('warn');
+    expect(theirs?.text).toContain('A Runner slipped past your ambush between');
+    const end = feedItem(6, 'raid.ended', {
+      ...at2,
+      actors: ['me'],
+      data: { reason: 'expired', struck: 1, loot: {} },
+    });
+    expect(
+      buildFeedEntries(view, [
+        feedItem(5, 'raid.evaded', { ...at2, actors: ['me', 'rival'], data }),
+        end,
+      ]).map((e) => e.eventKind),
+    ).toEqual(['raid.evaded']);
+  });
+
+  it('shows only your own Runner purchases', () => {
+    const bought = (who: string) =>
+      describeEvent(
+        feedItem(7, 'carrier.bought', {
+          districts: ['a'],
+          actors: [who],
+          data: { carrierId: 'k9', kind: 'runner', credits: 700 },
+        }),
+        view,
+      );
+    expect(bought('me')?.text).toBe('You bought a Runner at Alpha Docks.');
+    expect(bought('rival')).toBeNull();
+  });
 });

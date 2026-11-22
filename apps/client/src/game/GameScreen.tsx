@@ -75,12 +75,26 @@ export function GameScreen() {
   const flashes = useMemo(
     () =>
       state.feed
-        .filter((f) => f.event.kind === 'raid.hit' && f.seq > flashFrom)
+        .filter(
+          (f) =>
+            (f.event.kind === 'raid.hit' || f.event.kind === 'raid.evaded') && f.seq > flashFrom,
+        )
         .flatMap((f) => {
           const [a, b] = f.event.districts;
           if (!a || !b) return [];
-          const lost = goodsText(f.event.data, 'stolen') ?? 'nothing';
           const mine = f.event.actors[0] === playerId;
+          if (f.event.kind === 'raid.evaded') {
+            return [
+              {
+                key: String(f.seq),
+                a,
+                b,
+                text: mine ? 'Runner slipped past' : 'Your Runner slipped past',
+                tone: mine ? ('warn' as const) : ('ok' as const),
+              },
+            ];
+          }
+          const lost = goodsText(f.event.data, 'stolen') ?? 'nothing';
           return [
             {
               key: String(f.seq),
@@ -155,6 +169,9 @@ export function GameScreen() {
       }}
       onBuild={(districtId) => {
         session.openDraft({ kind: 'build', districtId });
+      }}
+      onBuyRunner={(districtId) => {
+        void session.placeOrder({ type: 'carrier.buy', districtId, kind: 'runner' });
       }}
       onFly={fly}
       onMarket={(hub) => {

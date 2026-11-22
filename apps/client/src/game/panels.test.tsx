@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ATOMS_PER_CENT, ATOMS_PER_UNIT } from '@nexum/sim';
 import { BattleReport } from './BattleReport';
+import { DistrictPanel } from './DistrictPanel';
 import { Dossier } from './Dossier';
 import { MarketPanel } from './MarketPanel';
 import { buildReport } from './report';
@@ -160,5 +161,33 @@ describe('BattleReport and Dossier', () => {
     );
     expect(screen.getByText('Beta Stacks')).toBeTruthy();
     expect(screen.getByText(/They started a siege/)).toBeTruthy();
+  });
+});
+
+describe('Runner buy button', () => {
+  const props = {
+    districtId: 'a',
+    nowMs: 1_000_000,
+    onStance: vi.fn(),
+    onBuild: vi.fn(),
+    onFly: vi.fn(),
+  };
+  it('buys at the selected district when you can afford it', () => {
+    const onBuyRunner = vi.fn();
+    render(
+      <DistrictPanel
+        {...props}
+        view={makeView({ self: { credits: 400 * ATOMS_PER_UNIT, stash: {}, score: 0 } })}
+        onBuyRunner={onBuyRunner}
+      />,
+    );
+    expect(screen.getByTestId('runner-pitch').textContent).toContain('35% chance to slip past');
+    fireEvent.click(screen.getByRole('button', { name: /buy runner/i }));
+    expect(onBuyRunner).toHaveBeenCalledWith('a');
+  });
+  it('is disabled with a reason when you cannot afford it', () => {
+    render(<DistrictPanel {...props} view={makeView()} onBuyRunner={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /buy runner/i })).toHaveProperty('disabled', true);
+    expect(screen.getByTestId('runner-pitch').textContent).toContain('Needs 300 credits');
   });
 });

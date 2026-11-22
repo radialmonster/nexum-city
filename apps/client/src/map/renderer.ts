@@ -18,6 +18,9 @@ import {
   type Camera,
   type ZoomLevel,
 } from './camera';
+/** Palette colour of a street flash: a raid hit is red, an evade green (yours) or amber (your ambush's). */
+export type FlashTone = 'danger' | 'ok' | 'warn';
+
 import { readHudScale } from './hudScale';
 import { glowRings, insetPoints, kindDetail, lodFor, lotDetail, type Lod } from './detail';
 import {
@@ -106,6 +109,9 @@ export class MapRenderer {
     y2: number;
     text: string;
     startedAt: number;
+    /** Which palette colour and how long: a raid hit is red and long, an evade green or amber and brief. */
+    tone: FlashTone;
+    ms: number;
   }[] = [];
   private readonly flashed = new Set<string>();
   private hudScale = 1;
@@ -207,7 +213,7 @@ export class MapRenderer {
   }
 
   /** Flashes a street red with a callout, e.g. when a raid hits a haul. Repeat keys are ignored. */
-  flashStreet(key: string, a: Id, b: Id, text: string): void {
+  flashStreet(key: string, a: Id, b: Id, text: string, tone: FlashTone = 'danger'): void {
     if (this.flashed.has(key)) return;
     const da = this.scene.byId[a];
     const db = this.scene.byId[b];
@@ -220,6 +226,8 @@ export class MapRenderer {
       y2: db.cy,
       text,
       startedAt: performance.now(),
+      tone,
+      ms: tone === 'danger' ? this.pal.map.flashMs : this.pal.map.evadeFlashMs,
     });
     this.dirty = true;
   }
@@ -731,13 +739,13 @@ export class MapRenderer {
     }
 
     // raid-hit flashes: a red pulse on the street
-    this.flashes = this.flashes.filter((f) => now - f.startedAt < m.flashMs);
+    this.flashes = this.flashes.filter((f) => now - f.startedAt < f.ms);
     for (const f of this.flashes) {
-      const k = (now - f.startedAt) / m.flashMs;
+      const k = (now - f.startedAt) / f.ms;
       g.moveTo(f.x1, f.y1).lineTo(f.x2, f.y2);
       g.stroke({
         width: m.edgeWidthSelected * px * (2 + k * 2),
-        ...withA(pal.color.danger, 1 - k),
+        ...withA(pal.color[f.tone], 1 - k),
       });
     }
 
@@ -775,10 +783,14 @@ export class MapRenderer {
         pose.x + (fx * c - fy * s) * size,
         pose.y + (fx * s + fy * c) * size,
       ];
-      const [ax, ay] = pt(1.2, 0);
-      const [bx, by] = pt(-0.8, 0.7);
-      const [cx, cy] = pt(-0.8, -0.7);
-      g.circle(pose.x, pose.y, size * 1.6).fill(withA(col, 0.18));
+      // a Runner is a smaller, slimmer dart than a van's arrowhead
+      const runner = mv.carrierKind === 'runner';
+      const k = runner ? m.runnerScale : 1;
+      const w = runner ? m.runnerSlim : 1;
+      const [ax, ay] = pt(1.2 * k, 0);
+      const [bx, by] = pt(-0.8 * k, 0.7 * k * w);
+      const [cx, cy] = pt(-0.8 * k, -0.7 * k * w);
+      g.circle(pose.x, pose.y, size * 1.6 * k).fill(withA(col, 0.18));
       g.poly([ax, ay, bx, by, cx, cy], true).fill(col);
       g.poly([ax, ay, bx, by, cx, cy], true).stroke({
         width: m.edgeWidth * 0.5 * px,
@@ -855,7 +867,7 @@ export class MapRenderer {
     }
     this.flashes.forEach((f, i) => {
       const s = worldToScreen(cam, vp, (f.x1 + f.x2) / 2, (f.y1 + f.y2) / 2);
-      const t = this.label(`fl:${String(i)}`, f.text, tagSize * 1.3, pal.color.danger, true);
+      const t = this.label(`fl:${String(i)}`, f.text, tagSize * 1.3, pal.color[f.tone], true);
       this.place(t, s.x, s.y + tagSize * 1.8, m.pitchX * cam.zoom * 2);
     });
     // the Sound

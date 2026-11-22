@@ -21,6 +21,7 @@ import {
 import { crewName, empireSummary, formatEta, type CrewNames } from './derive';
 import { formatUnits } from './feed';
 import { MyContracts } from './MyContracts';
+import { buyRunnerBlocker, RUNNER_PITCH } from './runner';
 import styles from './DistrictPanel.module.css';
 
 export const GOOD_TONE: Readonly<Record<(typeof GOOD_KEYS)[number], Tone>> = {
@@ -37,6 +38,8 @@ export interface DistrictPanelProps {
   readonly nowMs: number;
   readonly onStance: (districtId: string, stance: 'hold' | 'pullback') => void;
   readonly onBuild: (districtId: string) => void;
+  /** Buys a Runner at this district. */
+  readonly onBuyRunner?: ((districtId: string) => void) | undefined;
   readonly onFly: (districtId: string) => void;
   /** Opens the market for a hub district. */
   readonly onMarket?: ((hubId: string) => void) | undefined;
@@ -63,6 +66,7 @@ export function DistrictPanel({
   nowMs,
   onStance,
   onBuild,
+  onBuyRunner,
   onFly,
   onMarket,
   onRival,
@@ -81,7 +85,14 @@ export function DistrictPanel({
       className={styles['panel']}
     >
       {isOwn(d) ? (
-        <Own d={d} view={view} nowMs={nowMs} onStance={onStance} onBuild={onBuild} />
+        <Own
+          d={d}
+          view={view}
+          nowMs={nowMs}
+          onStance={onStance}
+          onBuild={onBuild}
+          onBuyRunner={onBuyRunner}
+        />
       ) : d.relation === 'remembered' ? (
         <p className={styles['empty']}>
           Last seen under{' '}
@@ -121,9 +132,13 @@ function Own({
   nowMs,
   onStance,
   onBuild,
-}: Pick<DistrictPanelProps, 'view' | 'nowMs' | 'onStance' | 'onBuild'> & { d: OwnDistrict }) {
+  onBuyRunner,
+}: Pick<DistrictPanelProps, 'view' | 'nowMs' | 'onStance' | 'onBuild' | 'onBuyRunner'> & {
+  d: OwnDistrict;
+}) {
   const crews = crewsAt(view, d.id);
   const carriers = carriersAt(view, d.id);
+  const runnerBlocker = onBuyRunner ? buyRunnerBlocker(view) : 'Not available here.';
   const cap = warehouseCapacity(d);
   const rate = productionPerHour(d);
   const good = KIND_GOOD[d.kind];
@@ -209,6 +224,18 @@ function Own({
           carrier{carriers.length === 1 ? '' : 's'}
           {carriers.length > 0 && `: ${carriers.map((c) => c.kind).join(', ')}`}
         </span>
+        <Button
+          disabled={runnerBlocker !== null}
+          onClick={() => {
+            onBuyRunner?.(d.id);
+          }}
+        >
+          BUY RUNNER - {balance.runner.credits} CR
+        </Button>
+        <small className={styles['hint']} data-testid="runner-pitch">
+          {RUNNER_PITCH}
+          {runnerBlocker ? ` ${runnerBlocker}` : ''}
+        </small>
       </div>
       <div className={styles['block']}>
         <span className={styles['cap']}>STANCE</span>

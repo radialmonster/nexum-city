@@ -266,3 +266,63 @@ describe('OrderCard: settle, labels and fog', () => {
     expect(screen.queryByText(/to capture/)).toBeNull();
   });
 });
+
+describe('OrderCard: carrier choice on a contract haul', () => {
+  const NOW = 1_000_000;
+  const setup = (dueMs: number) => {
+    const view = makeView({
+      nowMs: NOW,
+      carriers: {
+        v: { id: 'v', owner: 'me', kind: 'van', loc: { at: 'a' } },
+        r: { id: 'r', owner: 'me', kind: 'runner', loc: { at: 'a' } },
+      },
+      contracts: {
+        k1: {
+          id: 'k1',
+          hub: 'b',
+          good: 'parts',
+          qty: 10,
+          reward: 1,
+          poster: 'civic',
+          hours: 2,
+          postedMs: 0,
+          offerEndsMs: 0,
+          status: 'taken',
+          taker: 'me',
+          takenMs: NOW,
+          dueMs,
+          deposit: 0,
+          delivered: 0,
+          paid: null,
+        },
+      },
+    });
+    const onConfirm = vi.fn(() => Promise.resolve(true));
+    render(
+      <OrderCard
+        view={view}
+        draft={{ kind: 'haul', districtId: 'b', contractId: 'k1', cargo: { parts: 10 } }}
+        nowMs={NOW}
+        onConfirm={onConfirm}
+        onClose={vi.fn()}
+        onRoute={vi.fn()}
+      />,
+    );
+    return onConfirm;
+  };
+
+  it('compares the carriers and starts on the Runner when time is short', () => {
+    const onConfirm = setup(NOW + 10 * 60_000);
+    expect(screen.getByText('Van: slow, can be escorted')).toBeTruthy();
+    expect(screen.getByText('Runner: fast, 35% dodge, no escort seat')).toBeTruthy();
+    expect(screen.getByTestId('runner-suggestion').textContent).toContain('deadline is tight');
+    expect((screen.getByLabelText(/carrier/i) as HTMLSelectElement).value).toBe('r');
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it('leaves the pick alone when the deadline is loose', () => {
+    setup(NOW + 600 * 60_000);
+    expect(screen.queryByTestId('runner-suggestion')).toBeNull();
+    expect(screen.getByTestId('carrier-compare')).toBeTruthy();
+  });
+});

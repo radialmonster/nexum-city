@@ -14,10 +14,12 @@ import {
   readyNodes,
   seatsFor,
 } from './derive';
+import { CarrierCompare } from './CarrierCompare';
 import { contractSentence } from './contracts';
 import { formatUnits } from './feed';
 import { messageFor } from './messages';
 import { siegeOdds } from './odds';
+import { compareCarriers, suggestRunner } from './runner';
 import type { OrderDraft } from './store';
 import styles from './OrderCard.module.css';
 
@@ -143,11 +145,30 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
         : readyNodes(view, nowMs).filter((n) => draft.kind === 'raid' || n !== draft.districtId),
     [view, nowMs, draft],
   );
+  // A contract delivery that fits a Runner and is short on time starts with the Runner picked.
+  const suggestion = useMemo(
+    () =>
+      draft.kind === 'haul'
+        ? suggestRunner(
+            view,
+            draft.contractId,
+            nodes.filter((n) => crewsAt(view, n).some((c) => c.readyAtMs <= nowMs)),
+            nowMs,
+          )
+        : null,
+    // only the first look matters: the pick is the player's after that
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
   const [from, setFrom] = useState<string | null>(
-    draft.from && nodes.includes(draft.from) ? draft.from : (nodes[0] ?? null),
+    suggestion
+      ? suggestion.from
+      : draft.from && nodes.includes(draft.from)
+        ? draft.from
+        : (nodes[0] ?? null),
   );
   const [picked, setPicked] = useState<readonly string[] | null>(null);
-  const [carrierId, setCarrierId] = useState<string | null>(null);
+  const [carrierId, setCarrierId] = useState<string | null>(suggestion?.carrierId ?? null);
   const [cargo, setCargo] = useState<Record<string, number>>({ ...draft.cargo });
   const [building, setBuilding] = useState<Pick['building']>('workshop');
   const [busy, setBusy] = useState(false);
@@ -416,6 +437,13 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
                 ))}
               </select>
             </label>
+            {draft.kind === 'haul' && source && (
+              <CarrierCompare
+                options={compareCarriers(view, source, draft.districtId, cargoTotal)}
+                chosen={kind}
+                suggestion={carrierId === suggestion?.carrierId ? (suggestion?.text ?? null) : null}
+              />
+            )}
             {draft.kind === 'haul' && (
               <fieldset className={styles['field']}>
                 <legend>

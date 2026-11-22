@@ -310,6 +310,9 @@ export const neonMap = {
   ringWidth: 4,
   ringGap: 10,
   carrierScale: 1.15,
+  /** A Runner's marker next to a van's: smaller, and slimmer (its width as a share of a van's). */
+  runnerScale: 0.8,
+  runnerSlim: 0.55,
   priceBarWidth: 9,
   priceBarHeight: 40,
   priceBarGap: 5,
@@ -353,6 +356,8 @@ export const neonMap = {
   ambushPulseMs: 1800,
   /** How long a raid-hit flash and its callout stay on the street, in ms. */
   flashMs: 2600,
+  /** How long the quick flash for a Runner slipping past an ambush stays, in ms. */
+  evadeFlashMs: 1400,
   /** Minimum drag distance in px before a press becomes a pan instead of a click. */
   dragSlop: 5,
 } satisfies Record<string, number>;

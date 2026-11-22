@@ -17,7 +17,7 @@ import { edgeArrows, type ArrowTarget } from './offscreen';
 import { readHudScale, readMotionMs } from './hudScale';
 import styles from './MapScreen.module.css';
 import { Minimap } from './Minimap';
-import type { MapRenderer } from './renderer';
+import type { FlashTone, MapRenderer } from './renderer';
 import { cityBounds, layoutWorld, routePath, type MapView, type Scene } from './scene';
 
 const LEVELS: readonly { id: ZoomLevel; label: string }[] = [
@@ -82,6 +82,8 @@ export interface MapFlash {
   readonly a: Id;
   readonly b: Id;
   readonly text: string;
+  /** Palette colour of the pulse; a raid hit is `danger`, an evade `ok` or `warn`. */
+  readonly tone?: FlashTone;
 }
 
 /** What the game screen hands the map: it owns the data, the selection and the orders. */
@@ -348,7 +350,7 @@ export function MapScreen({
   useEffect(() => {
     const r = rendererRef.current;
     if (!r || !embedFlashes) return;
-    for (const f of embedFlashes) r.flashStreet(f.key, f.a, f.b, f.text);
+    for (const f of embedFlashes) r.flashStreet(f.key, f.a, f.b, f.text, f.tone);
   }, [embedFlashes, scene, ready]);
 
   const act = (fn: (r: MapRenderer, now: number) => void) => {

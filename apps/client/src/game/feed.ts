@@ -189,6 +189,34 @@ export function describeEvent(
               : `${who(victim)}'s escort beat off ${who(raider)} ${street}.`,
       };
     }
+    case 'raid.evaded': {
+      const street = streetName(placeId, event.districts[1]);
+      const raider = event.actors[0];
+      const victim = event.actors[1];
+      return {
+        ...base,
+        kind: 'RAID',
+        glyph: '>',
+        tone: raider === me ? 'warn' : victim === me ? 'ok' : 'news',
+        text:
+          victim === me
+            ? `Your Runner slipped past an ambush ${street}.`
+            : raider === me
+              ? `A Runner slipped past your ambush ${street}.`
+              : `${who(victim)}'s Runner slipped past ${who(raider)}'s ambush ${street}.`,
+      };
+    }
+    case 'carrier.bought': {
+      if (event.actors[0] !== me) return null;
+      const kind = str(d, 'kind') ?? 'runner';
+      return {
+        ...base,
+        kind: 'FLEET',
+        glyph: '+',
+        tone: 'accentAlt',
+        text: `You bought a ${cap(kind)}${placeId ? ` at ${name(placeId)}` : ''}.`,
+      };
+    }
     case 'raid.ended': {
       const street = streetName(placeId, event.districts[1]);
       const loot = goodsText(d, 'loot');
@@ -385,7 +413,7 @@ const num2 = (v: unknown): number => (typeof v === 'number' ? v : 0);
  * The feed column's entries, newest first. Combat rounds are not lines of their own: the latest
  * round of a siege that is still running is folded into its `siege.started` card, which then
  * sits at the top as one running entry. A card is "running" until a capture or break closes it.
- * A contract's events fold into one card showing its latest state. Likewise an ambush's end card is folded into its hit or repelled card unless loot came home.
+ * A contract's events fold into one card showing its latest state. Likewise an ambush's end card is folded into its hit or repelled card unless loot came home (hit, repelled and evaded cards all absorb it).
  */
 export function buildFeedEntries(
   view: PlayerView,
@@ -431,7 +459,7 @@ export function buildFeedEntries(
       if (place !== undefined) open.delete(place);
     }
     if (event.kind === 'raid.ended') {
-      // a hit or repelled card already told the story: only loot coming home adds news
+      // a hit, repelled or evaded card already told the story: only loot coming home adds news
       if ((num(event.data, 'struck') ?? 0) > 0 && !goodsText(event.data, 'loot')) continue;
     }
     const entry = describeEvent(item, view, names);
