@@ -46,13 +46,14 @@ apps/
   server/       Node (Hono or Fastify) + SQLite: accounts, tick loop, API,
                 server-sent events, persistence, bot runner, static client
   client/       Vite + React HUD (UI kit) + PixiJS map
+tools/          repo tooling: the nexum ESLint plugin (no-raw-colors), lint fixtures
 docs/design/    design doc + mockup (the visual target)
 docs/rewrite/   this plan + tracker
 docs/decisions/ ADRs (0030 onward; 0001–0029 live in the private prototype repo)
 Dockerfile, docker-compose.yml
 ```
 
-There is one npm workspace at the root. `npm run check` runs lint, format, typecheck, test and build across all workspaces.
+There is one npm workspace at the root (`packages/*`, `apps/*`). `npm run check` runs lint (ESLint and stylelint), format check (Prettier), typecheck (`tsc -b` over the TypeScript project references), tests (Vitest) and build across all workspaces. CI (`.github/workflows/ci.yml`) runs `npm ci && npm run check` on Node 22.
 
 ## Phases
 

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "types": ["node"],
+    "rootDir": ".",
+    "outDir": "node_modules/.cache/tsc/tools",
+    "tsBuildInfoFile": "node_modules/.cache/tsc/tools.tsbuildinfo",
+    "emitDeclarationOnly": true
+  },
+  "include": ["*.config.js", "*.config.ts", "tools/**/*.js", "tools/**/*.ts"],
+  "exclude": ["tools/lint-fixtures/**"]
+}

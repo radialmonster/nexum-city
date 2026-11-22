@@ -55,7 +55,6 @@ Every number here is a **tunable default**, kept in one `balance.ts` config obje
   | Van     | 100           | 40    | 10        | 2          |
   | Hauler  | 60            | 150   | 25        | 2          |
   | Runner  | 180           | 15    | 3         | 1          |
-
   - Runner is a milestone 2 unit; model it now but keep it locked.
   - On foot is always available, as a pseudo-carrier with unlimited count.
 
@@ -63,18 +62,18 @@ Every number here is a **tunable default**, kept in one `balance.ts` config obje
 
 All orders are **asset-limited**: a crew or carrier can do one thing at a time, and there is no action budget.
 
-| Order | Kind | Effect |
-| --- | --- | --- |
-| `move` | timed | Crews and/or cargo travel along a route to a district you own or a hub |
-| `haul` | timed | Move cargo. It can chain hub actions: sell, then buy, then return |
-| `siege` | timed | Travel to the target, then start or join its capture bar |
-| `reinforce` | timed | Move crews into your own district's garrison |
-| `scout` | timed | A crew travels to the target and reveals it for 4 h after arriving |
-| `build` | timed | Spend goods from that district's warehouse; it completes after a set time |
-| `stance` | instant | `hold` or `pullback` |
-| `recall` | instant | An order in transit turns around and returns along the same path |
-| `market.*` | instant | Place or cancel a limit order at a hub where the actor has goods or credits |
-| `recruit` | instant, plus 30 min to be ready | See Units |
+| Order       | Kind                             | Effect                                                                      |
+| ----------- | -------------------------------- | --------------------------------------------------------------------------- |
+| `move`      | timed                            | Crews and/or cargo travel along a route to a district you own or a hub      |
+| `haul`      | timed                            | Move cargo. It can chain hub actions: sell, then buy, then return           |
+| `siege`     | timed                            | Travel to the target, then start or join its capture bar                    |
+| `reinforce` | timed                            | Move crews into your own district's garrison                                |
+| `scout`     | timed                            | A crew travels to the target and reveals it for 4 h after arriving          |
+| `build`     | timed                            | Spend goods from that district's warehouse; it completes after a set time   |
+| `stance`    | instant                          | `hold` or `pullback`                                                        |
+| `recall`    | instant                          | An order in transit turns around and returns along the same path            |
+| `market.*`  | instant                          | Place or cancel a limit order at a hub where the actor has goods or credits |
+| `recruit`   | instant, plus 30 min to be ready | See Units                                                                   |
 
 ## Siege
 
@@ -136,6 +135,7 @@ The rules are planned but not built in Phase 1. Leave a hook: a convoy that pass
 `step` returns typed events. They drive the "while you were away" feed, the replay and the notifications. Every event has `{ id, at, kind, actors[], districts[], data }`.
 
 **Kinds:**
+
 - `arrived`
 - `siege.started`, `siege.progress` (one milestone every 10%), `siege.captured`, `siege.broken`
 - `combat.round`

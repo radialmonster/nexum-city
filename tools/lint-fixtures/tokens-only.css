@@ -1,0 +1,9 @@
+/* Fixture: the token-only way to write the same rule; must pass stylelint. */
+.panel {
+  color: var(--color-accent);
+  background: var(--color-panel);
+  border-color: color-mix(in srgb, var(--color-accent-alt) 40%, transparent);
+  outline-color: currentcolor;
+  font-size: var(--font-size-md);
+  box-shadow: var(--glow-panel);
+}

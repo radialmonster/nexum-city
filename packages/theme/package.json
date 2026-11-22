@@ -1,0 +1,22 @@
+{
+  "name": "@nexum/theme",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Design tokens for Nexum City: CSS custom properties for the HUD and a numeric palette for the PixiJS map.",
+  "license": "UNLICENSED",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "!dist/.tsbuildinfo"
+  ],
+  "scripts": {
+    "build": "tsc -b"
+  }
+}

@@ -1,0 +1,13 @@
+# generated
+node_modules/
+dist/
+build/
+coverage/
+package-lock.json
+
+# owner's local files (never format or publish)
+.claude/
+loop.*
+steer-loop.ps1
+nextsessionprompt.md*
+.loop-tmp/

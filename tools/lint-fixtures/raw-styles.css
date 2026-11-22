@@ -1,0 +1,8 @@
+/* Fixture: every declaration breaks owner rule #1 and must fail stylelint. */
+.panel {
+  color: #19f0ff;
+  background: rgb(8 16 30 / 82%);
+  border-color: hsl(300deg 100% 58%);
+  outline-color: red;
+  font-size: 13px;
+}
