@@ -1,6 +1,6 @@
 import type { ContractView, GoodName, PlayerView } from '@nexum/contracts';
 import { balance, toAtoms, toUnits } from '@nexum/sim';
-import { crewName, formatHours, whoIs, type CrewNames } from './derive';
+import { crewName, formatEta, formatHours, whoIs, type CrewNames } from './derive';
 import { formatUnits } from './feed';
 
 const C = balance.contracts;
@@ -38,6 +38,22 @@ export function msLeft(c: ContractView, nowMs: number): number {
 
 export const timeLeft = (c: ContractView, nowMs: number): string =>
   formatHours(msLeft(c, nowMs) / HOUR_MS);
+
+/**
+ * A plain warning when the haul would land after the deadline of a contract you took,
+ * or null when it is on time (or the contract has no deadline for you yet).
+ */
+export function lateWarning(c: ContractView, etaMs: number, nowMs: number): string | null {
+  if (c.status !== 'taken' || nowMs + etaMs <= c.dueMs) return null;
+  const left = Math.max(0, c.dueMs - nowMs);
+  const deposit = creditsOf(c.deposit);
+  return (
+    `Arrives ${formatEta(etaMs)}, but the contract is due in ${formatEta(left)}. ` +
+    (deposit > 0
+      ? "You'll be late and lose the deposit."
+      : "You'll be late and the contract fails.")
+  );
+}
 
 const hubName = (view: PlayerView, hub: string): string => view.districts[hub]?.name ?? hub;
 

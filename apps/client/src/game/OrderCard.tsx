@@ -23,7 +23,7 @@ import {
   seatsFor,
 } from './derive';
 import { CarrierCompare } from './CarrierCompare';
-import { contractSentence } from './contracts';
+import { contractSentence, lateWarning } from './contracts';
 import { formatUnits } from './feed';
 import { messageFor } from './messages';
 import { siegeOdds } from './odds';
@@ -588,6 +588,9 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
                     : `ETA ${formatEta(route.durationMs)} over ${String(Math.round(route.lengthM))} m${slowText(carrierWear.slowPercent) ? ` (${slowText(carrierWear.slowPercent) ?? ''}, worn)` : ''}`
                   : 'No route'}
             </p>
+            {draft.kind === 'haul' && contract && route && (
+              <LateWarning text={lateWarning(contract, route.durationMs, nowMs)} />
+            )}
             {knownAmbush && (
               <p className={styles['warn']} role="alert" data-testid="ambush-warning">
                 {AMBUSH_ROUTE_WARNING}
@@ -646,6 +649,14 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
       </div>
     </Panel>
   );
+}
+
+function LateWarning({ text }: { readonly text: string | null }) {
+  return text ? (
+    <p className={styles['warn']} role="alert" data-testid="late-warning">
+      {text}
+    </p>
+  ) : null;
 }
 
 /** What a player can build, in the order the card lists it. */

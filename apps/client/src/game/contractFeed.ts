@@ -92,8 +92,8 @@ export function describeContract(
     case 'contract.failed': {
       const text =
         taker === me
-          ? `Contract at ${hubName} failed: you were late and lost your ${fmt(num(d, 'forfeited'))} cr deposit.`
-          : `${who(taker)} was late on your job at ${hubName}. You keep their ${fmt(num(d, 'forfeited'))} cr deposit and get your reward back.`;
+          ? `Contract at ${hubName} failed: you were late${num(d, 'forfeited') > 0 ? ` and lost your ${fmt(num(d, 'forfeited'))} cr deposit` : ''}.`
+          : `${who(taker)} was late on your job at ${hubName}. ${num(d, 'forfeited') > 0 ? `You keep their ${fmt(num(d, 'forfeited'))} cr deposit and get` : 'You get'} your reward back.`;
       return { ...base, tone: 'danger', text };
     }
     case 'contract.expired': {

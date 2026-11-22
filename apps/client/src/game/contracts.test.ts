@@ -1,7 +1,7 @@
 import type { ContractView } from '@nexum/contracts';
 import { ATOMS_PER_UNIT } from '@nexum/sim';
 import { describe, expect, it } from 'vitest';
-import { checkPost, contractSentence, remainingUnits, takeBlocker } from './contracts';
+import { checkPost, contractSentence, lateWarning, remainingUnits, takeBlocker } from './contracts';
 import { buildFeedEntries } from './feed';
 import { feedItem, makeView } from './testing';
 
@@ -146,5 +146,22 @@ describe('starter contract hook', () => {
       } as never,
     });
     expect(starterHookCopy(v, c)).toContain('about 12 min');
+  });
+});
+
+describe('lateWarning', () => {
+  const taken = (over: Partial<ContractView> = {}) =>
+    contract({ status: 'taken', dueMs: 14 * 60_000, ...over });
+  it('warns when the trip outlasts the deadline, naming the deposit', () => {
+    const w = lateWarning(taken(), 51 * 60_000, 0);
+    expect(w).toContain('Arrives 51m, but the contract is due in 14m.');
+    expect(w).toContain('lose the deposit');
+  });
+  it('does not mention a deposit when it is zero', () => {
+    expect(lateWarning(taken({ deposit: 0 }), 51 * 60_000, 0)).not.toContain('deposit');
+  });
+  it('stays quiet when you will make it', () => {
+    expect(lateWarning(taken(), 10 * 60_000, 0)).toBeNull();
+    expect(lateWarning(contract(), 99 * 60_000, 0)).toBeNull();
   });
 });
