@@ -884,7 +884,13 @@ function postSupplyContract(s: GameState, me: Id, budget: Budget): Order[] {
 const TURTLE_BUILDINGS = (_d: District, index: number): BuildingType[] =>
   index === 0 ? ['workshop', 'walls', 'watchtower', 'depot'] : ['walls', 'watchtower', 'workshop'];
 const TURTLE_SHOP_RESERVE = 120;
-const MERCHANT_SHOP_RESERVE = 400;
+/**
+ * Credits a merchant keeps back before it shops for buildings. Low (it was 400) since the nightly
+ * city tax was removed: idle credits no longer drain away, so the merchant spends them on walls
+ * and workshops instead of sitting on them (sim-spec, "Levy removed: retune").
+ */
+const MERCHANT_SHOP_RESERVE = 50;
+const HUNTER_SHOP_RESERVE = 400;
 
 /** Never attacks: recruits, walls and workshops everywhere, and keeps every district on hold. */
 export const turtle: Bot = (s, me) => {
@@ -936,7 +942,7 @@ export const merchant: Bot = (s, me) => {
   const merchantBuildings = (_d: District, index: number): BuildingType[] =>
     index === 0
       ? ['workshop', 'depot', ...(carriers >= 2 ? (['garage'] as const) : [])]
-      : ['workshop'];
+      : ['workshop', 'walls'];
   const want = nextWant(s, me, merchantBuildings);
   const keep = keepGoods(want);
   const orders = [
@@ -1002,7 +1008,7 @@ export const hunter: Bot = (s, me) => {
     ...fetch,
     ...(jobs.length > 0 || fetch.length > 0 ? [] : haulToHub(s, me, keep, true)),
     ...resupply(s, me, budget, want),
-    ...shopOrders(s, me, budget, want, MERCHANT_SHOP_RESERVE),
+    ...shopOrders(s, me, budget, want, HUNTER_SHOP_RESERVE),
     ...mine(s, me).map((d): Order => ({ type: 'stance', districtId: d.id, stance: 'hold' })),
   );
   return avoidAmbushes(s, me, orders);
