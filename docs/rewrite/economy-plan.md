@@ -37,7 +37,7 @@ Status: approved by the owner on 2026-11-22 ("make a plan file and proceed all")
 
 ### Stage 1 (task 79): price history and cost basis
 
-- **Price history.** Each hub book keeps the last 48 hourly samples of its reference price, as a ring buffer recorded in `market.tick`. The view exposes it for trend lines.
+- **Price history.** Each hub book keeps its reference price every hour for the whole season (7 days is 168 samples per hub and good, a few kilobytes), recorded in `market.tick` and cleared at season reset. Players check in rarely, so the history must cover the time since their last visit: the view exposes the full series, and the UI compares "now" with "when you were last here". The owner asked for more than 48 hours on 2026-11-22.
 - **Cost basis per stack.** Every pile of a good in a warehouse, a hub stash or a carrier cargo carries an average cost per unit, in integer centi-credits.
   - **Buying:** the cost is the fill price.
   - **Producing:** the cost is the local hub reference at the moment of production, its opportunity value. This is simple and needs no new concept.
@@ -77,7 +77,7 @@ Status: approved by the owner on 2026-11-22 ("make a plan file and proceed all")
 ### Stage 5 (tasks 79b to 82b): UI
 
 - **Price board.** Each good's price at every hub, with:
-  - a 48-hour trend line;
+  - a season-long trend line, with your last visit marked;
   - the best route and its gain after fuel;
   - a "why" line, such as "far from the docks", "raids on route" or "shortage".
 - **Resource chips:** show "best price at …".
