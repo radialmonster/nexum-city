@@ -121,3 +121,24 @@ describe('buildFeedEntries', () => {
     expect(JSON.stringify(out)).toContain('Iron Wolves');
   });
 });
+
+describe('settle events', () => {
+  it('words started, done and failed for you and for rivals', () => {
+    const at = { districts: ['b'] };
+    expect(
+      describeEvent(feedItem(1, 'settle.started', { ...at, data: { owner: 'me' } }), view)?.text,
+    ).toContain('Your crew is settling');
+    expect(
+      describeEvent(feedItem(2, 'settle.started', { ...at, data: { owner: 'rival' } }), view)?.text,
+    ).toContain('A rival is settling');
+    expect(
+      describeEvent(feedItem(3, 'settle.done', { ...at, data: { owner: 'me' } }), view)?.text,
+    ).toContain('is yours');
+    const failed = describeEvent(
+      feedItem(4, 'settle.failed', { ...at, data: { owner: 'me', reason: 'taken' } }),
+      view,
+    );
+    expect(failed).toMatchObject({ kind: 'SETTLE', tone: 'danger' });
+    expect(failed?.text).toContain('someone else got there first');
+  });
+});

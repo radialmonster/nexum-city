@@ -400,6 +400,74 @@ describe('orders', () => {
   });
 });
 
+describe('settling and sieges through the API', () => {
+  it('shows open plots in the view, settles one, and finishes the settlement', async () => {
+    const h = boot();
+    const { token, playerId } = await register(h, 'Ada');
+    // let the home warehouse fill with supplies first
+    h.clock.t += 6 * 3_600_000;
+    h.game.engine.tick();
+    const me = meResponseSchema.parse(await (await h.call('GET', '/api/me', { token })).json());
+    const plot = Object.values(me.view.districts).find(
+      (d) => d.relation === 'visible' && d.open && d.settling === null,
+    );
+    if (plot?.relation !== 'visible') throw new Error('no open plot in sight');
+    const crew = Object.values(me.view.crews).find((c) => c.owner === playerId);
+    if (!crew) throw new Error('no crew');
+
+    const order = { type: 'settle', carrierId: null, crewIds: [crew.id], target: plot.id };
+    const res = await h.call('POST', '/api/orders', { token, body: { order } });
+    if (res.status !== 202) throw new Error(JSON.stringify(await res.json()));
+
+    // arrives, then the settlement runs its timer, and is visible while it does
+    const m = Object.values(h.game.engine.current.movements)[0];
+    if (!m) throw new Error('no movement');
+    h.clock.t = m.arriveMs + 1000;
+    h.game.engine.tick();
+    const mid = meResponseSchema.parse(await (await h.call('GET', '/api/me', { token })).json());
+    const seen = mid.view.districts[plot.id];
+    expect(seen?.relation === 'visible' && seen.settling?.owner).toBe(playerId);
+
+    h.clock.t += balance.settle.hours * 3_600_000 + 1000;
+    h.game.engine.tick();
+    const feed = feedResponseSchema.parse(
+      await (await h.call('GET', '/api/feed?since=0', { token })).json(),
+    );
+    const kinds = feed.items.map((i) => i.event.kind);
+    expect(kinds).toContain('settle.started');
+    expect(kinds).toContain('settle.done');
+    const done = meResponseSchema.parse(await (await h.call('GET', '/api/me', { token })).json());
+    expect(done.view.districts[plot.id]?.relation).toBe('own');
+  });
+
+  it('launches a siege on a neighbour once protection ends, and refuses it before with a typed code', async () => {
+    const h = boot();
+    const a = await register(h, 'Ada');
+    const b = await register(h, 'Bob');
+    const me = meResponseSchema.parse(
+      await (await h.call('GET', '/api/me', { token: a.token })).json(),
+    );
+    const crew = Object.values(me.view.crews).find((c) => c.owner === a.playerId);
+    const bobHome = Object.values(h.game.engine.current.districts).find(
+      (d) => d.owner === b.playerId,
+    );
+    if (!crew || !bobHome) throw new Error('setup');
+    const order = { type: 'siege', carrierId: null, crewIds: [crew.id], target: bobHome.id };
+    const early = await h.call('POST', '/api/orders', { token: a.token, body: { order } });
+    expect(early.status).toBe(400);
+    expect(errorResponseSchema.parse(await early.json()).error).toBe('protected');
+
+    h.clock.t += (balance.player.protectedHours + 1) * 3_600_000;
+    h.game.engine.tick();
+    const res = await h.call('POST', '/api/orders', { token: a.token, body: { order } });
+    expect(res.status).toBe(202);
+    const sieging = Object.values(h.game.engine.current.movements).filter(
+      (m) => m.kind === 'siege',
+    );
+    expect(sieging).toHaveLength(1);
+  });
+});
+
 describe('persistence', () => {
   /** The same scripted session, used for both the interrupted and the uninterrupted run. */
   async function script(h: Harness, phase: 1 | 2): Promise<void> {

@@ -141,3 +141,37 @@ describe('timelineRows', () => {
     expect(rows[1]?.end).toBe(1);
   });
 });
+
+describe('settling in the timeline', () => {
+  it('shows my settlement with its time left, and ignores a rival one', () => {
+    const base = makeView();
+    const b = base.districts['b'];
+    if (b?.relation !== 'visible') throw new Error('fixture');
+    const mine = makeView({
+      districts: {
+        ...base.districts,
+        b: {
+          ...b,
+          owner: 'neutral',
+          open: true,
+          settling: { owner: 'me', completesAtMs: now + 3_600_000 },
+        },
+      },
+    });
+    const e = timelineEntries(mine, [], now).find((x) => x.kind === 'settle');
+    expect(e).toMatchObject({ districtId: 'b', state: 'running' });
+    expect(e?.text).toContain('SETTLING');
+    const theirs = makeView({
+      districts: {
+        ...base.districts,
+        b: {
+          ...b,
+          owner: 'neutral',
+          open: true,
+          settling: { owner: 'rival', completesAtMs: now + 1 },
+        },
+      },
+    });
+    expect(timelineEntries(theirs, [], now).some((x) => x.kind === 'settle')).toBe(false);
+  });
+});

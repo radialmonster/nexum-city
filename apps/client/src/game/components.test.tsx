@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { toAtoms } from '@nexum/sim';
 import { describe, expect, it, vi } from 'vitest';
 import { DistrictPanel } from './DistrictPanel';
 import { FeedPanel } from './FeedPanel';
@@ -165,5 +166,79 @@ describe('OrderCard', () => {
     fireEvent.click(screen.getByRole('button', { name: /^move$/i }));
     await Promise.resolve();
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe('OrderCard: settle, labels and fog', () => {
+  const goods = { parts: 0, power: 0, data: 0, supplies: 0 };
+  const withPlot = () => {
+    const base = makeView();
+    const a = base.districts['a'];
+    const b = base.districts['b'];
+    if (a?.relation !== 'own' || b?.relation !== 'visible') throw new Error('fixture');
+    return makeView({
+      districts: {
+        a: { ...a, warehouse: { ...goods, supplies: toAtoms(100) } },
+        b: { ...b, owner: 'neutral', open: true, presence: {} },
+      },
+    });
+  };
+
+  it('settles an open plot: shows the cost and timer, names the crew, posts the order', async () => {
+    const view = withPlot();
+    const onConfirm = vi.fn(() => Promise.resolve(true));
+    render(
+      <OrderCard
+        view={view}
+        draft={{ kind: 'settle', districtId: 'b' }}
+        nowMs={view.nowMs}
+        onConfirm={onConfirm}
+        onClose={vi.fn()}
+        onRoute={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId('settle-cost').textContent).toMatch(/60 supplies.*10 h/);
+    expect(screen.getByText('Crew 1')).toBeTruthy();
+    expect(screen.queryByText('c1')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /^settle$/i }));
+    await waitFor(() => {
+      expect(onConfirm).toHaveBeenCalledWith({
+        type: 'settle',
+        carrierId: null,
+        crewIds: ['c1'],
+        target: 'b',
+      });
+    });
+  });
+
+  it('says the odds are unknown when the enemy is fogged', () => {
+    const base = makeView();
+    const b = base.districts['b'];
+    if (b?.relation !== 'visible') throw new Error('fixture');
+    const view = makeView({
+      districts: {
+        ...base.districts,
+        b: {
+          relation: 'remembered',
+          id: 'b',
+          name: b.name,
+          kind: b.kind,
+          pos: b.pos,
+          lastKnownOwner: 'rival',
+        },
+      },
+    });
+    render(
+      <OrderCard
+        view={view}
+        draft={{ kind: 'siege', districtId: 'b' }}
+        nowMs={view.nowMs}
+        onConfirm={vi.fn(() => Promise.resolve(true))}
+        onClose={vi.fn()}
+        onRoute={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/Odds unknown: scout first/)).toBeTruthy();
+    expect(screen.queryByText(/to capture/)).toBeNull();
   });
 });
