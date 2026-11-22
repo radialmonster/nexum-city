@@ -116,6 +116,10 @@ export function GameScreen() {
     store.dispatch({ type: 'fly', id });
     setDrawer('map');
   };
+  /** From inside the district panel: select and recentre, but stay on the panel (phone drawer). */
+  const flyInPanel = (id: string) => {
+    store.dispatch({ type: 'fly', id });
+  };
 
   /** The first hub you can see: the resource chips open its market. */
   const firstHub = Object.values(view.districts).find((d) => d.relation === 'hub')?.id;
@@ -173,7 +177,7 @@ export function GameScreen() {
       onBuyRunner={(districtId) => {
         void session.placeOrder({ type: 'carrier.buy', districtId, kind: 'runner' });
       }}
-      onFly={fly}
+      onFly={flyInPanel}
       onMarket={(hub) => {
         openMarket(hub);
       }}
@@ -270,7 +274,8 @@ export function GameScreen() {
             },
             route,
             flashes,
-            menuHidden: state.draft !== null,
+            // the radial gives way to an order card or any modal (market, report, dossier)
+            menuHidden: state.draft !== null || panel !== null,
             // phone: the radial shows on the map; DETAILS opens the district tab
             ...(compact
               ? {
