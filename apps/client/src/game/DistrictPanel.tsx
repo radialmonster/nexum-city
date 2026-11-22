@@ -21,7 +21,7 @@ import {
   type OwnDistrict,
 } from './derive';
 import { crewName, empireSummary, formatEta, streetEnds, type CrewNames } from './derive';
-import { ambushesAt } from './clearAmbush';
+import { ambushesAt, clearUnderway } from './clearAmbush';
 import { formatUnits } from './feed';
 import { JobsPanel } from './JobsPanel';
 import { MyContracts } from './MyContracts';
@@ -439,14 +439,18 @@ function Ambushes({
             Between {streetEnds(name(a.edge[0]), name(a.edge[1]))}, ends in{' '}
             {formatEta(a.untilMs - nowMs)}
           </span>
-          <Button
-            variant="danger"
-            onClick={() => {
-              onBreakUp(a.id);
-            }}
-          >
-            BREAK IT UP
-          </Button>
+          {clearUnderway(view, a.id) ? (
+            <span className={styles['line']}>Your crew is on the way.</span>
+          ) : (
+            <Button
+              variant="danger"
+              onClick={() => {
+                onBreakUp(a.id);
+              }}
+            >
+              BREAK IT UP
+            </Button>
+          )}
         </div>
       ))}
     </div>
