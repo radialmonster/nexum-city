@@ -347,6 +347,10 @@ export const neonMap = {
   arrowInset: 34,
   /** Demo only: how long one looped carrier trip takes on screen, in ms. */
   demoLoopMs: 14000,
+  /** One pulse of an ambush street, in ms. */
+  ambushPulseMs: 1800,
+  /** How long a raid-hit flash and its callout stay on the street, in ms. */
+  flashMs: 2600,
   /** Minimum drag distance in px before a press becomes a pan instead of a click. */
   dragSlop: 5,
 } satisfies Record<string, number>;
