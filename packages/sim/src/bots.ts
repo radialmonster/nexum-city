@@ -2,6 +2,7 @@ import { MS_PER_HOUR, balance, toAtoms, toUnits } from './balance.js';
 import { buildCost } from './construction.js';
 import { civicAsk, civicBid } from './market.js';
 import { shortestRoute } from './routing.js';
+import { isPlayerProtected } from './raid.js';
 import { isProtected } from './siege.js';
 import {
   GOODS,
@@ -164,8 +165,10 @@ const AMBUSH_HOURS = 6;
  * from that district are most likely to pass). Bots guess; they do not watch convoys. That is
  * intentional: bots stay fog-honest and never read enemy convoys they could not see.
  */
-function ambushOrders(s: GameState, me: Id): Order[] {
+export function ambushOrders(s: GameState, me: Id): Order[] {
   if (Math.floor(s.nowMs / MS_PER_HOUR) % AMBUSH_EVERY_HOURS !== 0) return [];
+  // Protected players may not set ambushes (validateOrder refuses them).
+  if (isPlayerProtected(s, me)) return [];
   if (
     Object.values(s.movements).some(
       (m) => m.owner === me && ['raid', 'ambush', 'return'].includes(m.kind),

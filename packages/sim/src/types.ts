@@ -389,6 +389,7 @@ export const ORDER_ERRORS = [
   'bad_edge',
   'bad_window',
   'too_many_raids',
+  'protected_no_raid',
 ] as const;
 export type OrderError = (typeof ORDER_ERRORS)[number];
 

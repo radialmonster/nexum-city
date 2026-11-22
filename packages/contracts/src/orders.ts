@@ -141,6 +141,7 @@ export const ORDER_ERROR_CODES = [
   'bad_edge',
   'bad_window',
   'too_many_raids',
+  'protected_no_raid',
 ] as const;
 export const orderErrorCodeSchema = z.enum(ORDER_ERROR_CODES);
 export type OrderErrorCode = z.infer<typeof orderErrorCodeSchema>;

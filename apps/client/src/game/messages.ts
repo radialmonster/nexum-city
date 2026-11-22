@@ -49,6 +49,8 @@ const MESSAGES: Record<ApiErrorCode, string> = {
   bad_edge: 'That is not a street you can ambush.',
   bad_window: 'An ambush lasts from 1 to 8 hours.',
   too_many_raids: 'You already have the most ambushes allowed out.',
+  protected_no_raid:
+    'New-player protection shields you from raids, so you cannot set ambushes until it ends.',
 };
 
 /** Words for any rejection code; unknown ones fall back to a generic line. */

@@ -4,7 +4,7 @@ import { emit, type Ctx } from './ctx.js';
 import { cancelOrder, findOrder, placeOrder, validatePlace } from './market.js';
 import { afterWarehouseChange, buildingLevel, storeAt } from './production.js';
 import { shortestRoute, travelMs, type Route } from './routing.js';
-import { endAmbush } from './raid.js';
+import { endAmbush, isPlayerProtected } from './raid.js';
 import { isProtected, refreshSiege } from './siege.js';
 import { placeCrew, recallMovement, startMovement } from './travel.js';
 import {
@@ -99,6 +99,8 @@ function resolveTravel(state: GameState, req: TravelRequest): Resolved {
   let raid: RaidInfo | undefined;
   if (req.kind === 'raid' && req.edge) {
     const { a, b, hours } = req.edge;
+    // A player shielded from raids may not raid: immunity plus ambushes would be a free ride.
+    if (isPlayerProtected(state, req.actorId)) return fail('protected_no_raid');
     if (!state.graph.edges.some((e) => (e.a === a && e.b === b) || (e.a === b && e.b === a))) {
       return fail('bad_edge');
     }
