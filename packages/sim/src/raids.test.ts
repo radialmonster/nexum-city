@@ -4,6 +4,7 @@ import { clone, crewsOf, scenario, vanOf } from './fixtures.js';
 import { viewFor } from './fog.js';
 import { checkInvariants } from './invariants.js';
 import { validateOrder } from './orders.js';
+import { crossingTime } from './raid.js';
 import { step } from './step.js';
 import type { GameState, Id, Input, Movement, Order, OrderError } from './types.js';
 
@@ -292,5 +293,239 @@ describe('fog', () => {
     const amb = movementsOf(state, 'ambush')[0] as Movement;
     for (const id of amb.crewIds) expect(raw).not.toContain(`"${id}"`);
     expect(other.convoys.some((c) => c.id === amb.id)).toBe(false);
+  });
+});
+
+describe('fog after strikes', () => {
+  it('drops a beaten ambush from every view and never shows convoy cargo or raider crews', () => {
+    const w = haulWorld();
+    const state = ambushed(w);
+    for (const id of crewsOf(state, 'p1')) {
+      const c = state.crews[id];
+      if (c) c.strength = 1;
+    }
+    for (const id of crewsOf(state, 'p2')) {
+      const c = state.crews[id];
+      if (c) c.strength = 500;
+    }
+    const mid = step(
+      state,
+      [{ actorId: 'p2', order: w.haul, atMs: state.nowMs + 1 }],
+      state.nowMs + 1,
+    ).state;
+    for (const who of ['p1', 'p2']) {
+      expect(JSON.stringify(viewFor(mid, who).convoys)).not.toContain('cargo');
+    }
+    const after = step(mid, [], mid.nowMs + 24 * MS_PER_HOUR).state;
+    expect(viewFor(after, 'p2').ambushes).toEqual([]);
+    expect(viewFor(after, 'p1').ambushes).toEqual([]);
+  });
+});
+
+describe('newbie protection', () => {
+  const protect = (s: GameState, owner: Id, hours: number): void => {
+    for (const d of Object.values(s.districts)) {
+      if (d.owner === owner) d.protectedUntilMs = s.nowMs + hours * MS_PER_HOUR;
+    }
+  };
+  const strongRaiders = (s: GameState): void => {
+    for (const id of crewsOf(s, 'p1')) {
+      const c = s.crews[id];
+      if (c) c.strength = 500;
+    }
+    for (const id of crewsOf(s, 'p2')) {
+      const c = s.crews[id];
+      if (c) c.strength = 1;
+    }
+  };
+  const run = (state: GameState, haul: Order) =>
+    step(
+      state,
+      [{ actorId: 'p2', order: haul, atMs: state.nowMs + 1 }],
+      state.nowMs + 24 * MS_PER_HOUR,
+    );
+
+  it('does not let raiders strike a protected player haul', () => {
+    const w = haulWorld();
+    const state = ambushed(w);
+    strongRaiders(state);
+    protect(state, 'p2', 48);
+    const r = run(state, w.haul);
+    expect(kinds(r.events)).not.toContain('raid.hit');
+    expect(kinds(r.events)).not.toContain('raid.repelled');
+    // The cargo arrives whole.
+    const arrived = r.events.find((e) => e.kind === 'arrived' && e.actors.includes('p2'))?.data as {
+      cargo: number;
+      sent: number;
+    };
+    expect(arrived.cargo).toBeCloseTo(arrived.sent, 6);
+  });
+
+  it('strikes again once protection has run out before the crossing', () => {
+    const w = haulWorld();
+    const state = ambushed(w);
+    strongRaiders(state);
+    protect(state, 'p2', 0.001);
+    expect(kinds(run(state, w.haul).events)).toContain('raid.hit');
+  });
+
+  it('is a shield on the target only: a protected player may still set an ambush', () => {
+    const w = haulWorld();
+    protect(w.s, 'p1', 48);
+    expect(err(w.s, raidOrder(w.s, w.a, w.b))).toBeNull();
+  });
+});
+
+describe('settle carriers and recalled hauls', () => {
+  /** p2 settles an open plot; the ambush sits on the first street of that walk. */
+  function settleWorld(): { s: GameState; a: Id; b: Id; order: Order } {
+    const s = scenario();
+    const home = s.districts['d0_0'];
+    if (home) home.warehouse.supplies = toAtoms(100);
+    const settled = step(s, [], s.nowMs + 3 * MS_PER_HOUR).state;
+    const plot = Object.values(settled.districts).find(
+      (d) => d.owner === 'neutral' && d.frontier === 'open' && d.kind !== 'hub',
+    );
+    if (!plot) throw new Error('no open plot');
+    const order: Order = {
+      type: 'settle',
+      carrierId: null,
+      crewIds: [crewsOf(settled, 'p2')[0] as Id],
+      target: plot.id,
+    };
+    const probe = step(settled, [{ actorId: 'p2', order }], settled.nowMs + 1).state;
+    const m = Object.values(probe.movements).find((x) => x.kind === 'settle');
+    if (!m || m.route.length < 2) throw new Error('no settle walk');
+    return { s: settled, a: m.route[0] as Id, b: m.route[1] as Id, order };
+  }
+
+  it('lets raiders rob a settle carrier, which then fails as raided and goes home', () => {
+    const w = settleWorld();
+    const st = ambushed({ s: w.s, a: w.a, b: w.b, haul: w.order });
+    for (const id of crewsOf(st, 'p1')) {
+      const c = st.crews[id];
+      if (c) c.strength = 500;
+    }
+    for (const id of crewsOf(st, 'p2')) {
+      const c = st.crews[id];
+      if (c) c.strength = 1;
+    }
+    const before = st.districts['d0_0']?.warehouse.supplies ?? 0;
+    const r = step(
+      st,
+      [{ actorId: 'p2', order: w.order, atMs: st.nowMs + 1 }],
+      st.nowMs + 48 * MS_PER_HOUR,
+    );
+    expect(kinds(r.events)).toContain('raid.hit');
+    const failed = r.events.find((e) => e.kind === 'settle.failed');
+    expect(failed?.data['reason']).toBe('raided');
+    expect(kinds(r.events)).not.toContain('settle.started');
+    // Conservation: sent = what arrived + taken.
+    const arrived = r.events.find((e) => e.kind === 'arrived' && e.data['movement'] === 'settle')
+      ?.data as { cargo: number; sent: number };
+    const hit = r.events.find((e) => e.kind === 'raid.hit')?.data as {
+      stolen: Record<string, number>;
+      destroyed: Record<string, number>;
+    };
+    const sum = (o: Record<string, number>): number => Object.values(o).reduce((n, v) => n + v, 0);
+    expect(arrived.sent).toBeCloseTo(balance.settle.supplies, 6);
+    expect(arrived.cargo + sum(hit.stolen) + sum(hit.destroyed)).toBeCloseTo(arrived.sent, 6);
+    // The survivors' supplies are not lost: the settlers' home has more than just the spent amount missing.
+    expect(toUnits(r.state.districts['d0_0']?.warehouse.supplies ?? 0)).toBeGreaterThan(
+      toUnits(before) - balance.settle.supplies,
+    );
+    expect(checkInvariants(r.state)).toEqual([]);
+  });
+
+  it('strikes a settle carrier that is protected from nothing: protection shields it too', () => {
+    const w = settleWorld();
+    const st = ambushed({ s: w.s, a: w.a, b: w.b, haul: w.order });
+    for (const id of crewsOf(st, 'p1')) {
+      const c = st.crews[id];
+      if (c) c.strength = 500;
+    }
+    const d = st.districts['d0_0'];
+    if (d) d.protectedUntilMs = st.nowMs + 48 * MS_PER_HOUR;
+    const r = step(
+      st,
+      [{ actorId: 'p2', order: w.order, atMs: st.nowMs + 1 }],
+      st.nowMs + 48 * MS_PER_HOUR,
+    );
+    expect(kinds(r.events)).not.toContain('raid.hit');
+    expect(kinds(r.events)).toContain('settle.started');
+  });
+
+  it('strikes a recalled haul that is walking home with cargo', () => {
+    const w = haulWorld();
+    // A slow haul on foot, so the raiders (in a van) get into place while it is still walking.
+    w.haul = { ...w.haul, carrierId: null, cargo: { parts: 5 } } as Order;
+    // The haul sets out with the raiders; the raiders get in place only after the haul has crossed
+    // the middle of the street, so the outbound walk is safe. Recalled then, it must cross again.
+    let state = step(
+      w.s,
+      [
+        { actorId: 'p2', order: w.haul },
+        { actorId: 'p1', order: raidOrder(w.s, w.a, w.b) },
+      ],
+      w.s.nowMs + 1,
+    ).state;
+    const haul = movementsOf(state, 'haul')[0] as Movement;
+    let guard = 0;
+    while (movementsOf(state, 'ambush').length === 0 && guard++ < 200) {
+      state = step(state, [], state.nowMs + 60_000).state;
+    }
+    const amb = movementsOf(state, 'ambush')[0] as Movement;
+    expect(amb).toBeDefined();
+    const outbound = crossingTime({ state, events: [] }, haul, w.a, w.b) ?? Infinity;
+    expect(outbound).toBeLessThan(state.nowMs);
+    expect(state.movements[haul.id]).toBeDefined();
+    for (const id of crewsOf(state, 'p1')) {
+      const c = state.crews[id];
+      if (c) c.strength = 500;
+    }
+    for (const id of crewsOf(state, 'p2')) {
+      const c = state.crews[id];
+      if (c) c.strength = 1;
+    }
+    const turned = step(
+      state,
+      [{ actorId: 'p2', order: { type: 'recall', movementId: haul.id }, atMs: state.nowMs }],
+      state.nowMs,
+    ).state;
+    const back = turned.movements[haul.id] as Movement;
+    expect(back.recalledAtMs).toBeDefined();
+    const r = step(turned, [], back.arriveMs + 1);
+    expect(kinds(r.events)).toContain('raid.hit');
+    expect(checkInvariants(r.state)).toEqual([]);
+  });
+
+  it('strikes a haul recalled while the ambush is already in place', () => {
+    const w = haulWorld();
+    const st = ambushed(w);
+    for (const id of crewsOf(st, 'p1')) {
+      const c = st.crews[id];
+      if (c) c.strength = 500;
+    }
+    for (const id of crewsOf(st, 'p2')) {
+      const c = st.crews[id];
+      if (c) c.strength = 1;
+    }
+    const sent = step(
+      st,
+      [{ actorId: 'p2', order: w.haul, atMs: st.nowMs + 1 }],
+      st.nowMs + 1,
+    ).state;
+    const hm = movementsOf(sent, 'haul')[0] as Movement;
+    // The haul turns back before the middle of the street, so it never crosses outbound; the
+    // outbound strike must be dropped, and it is never struck at all (it never reaches the middle).
+    const early = hm.departMs + 1_000;
+    const turned = step(
+      sent,
+      [{ actorId: 'p2', order: { type: 'recall', movementId: hm.id }, atMs: early }],
+      early,
+    );
+    const r = step(turned.state, [], turned.state.nowMs + 24 * MS_PER_HOUR);
+    expect(kinds(r.events)).not.toContain('raid.hit');
+    expect(checkInvariants(r.state)).toEqual([]);
   });
 });
