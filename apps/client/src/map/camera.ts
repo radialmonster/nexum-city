@@ -330,3 +330,47 @@ export class CameraController {
     return false;
   }
 }
+
+/**
+ * How far (screen pixels) to move a plot so a square of half-size `half` centred on it lies inside
+ * the viewport and clear of every obstacle rectangle (the HUD cards). Returns `{0,0}` when it
+ * already fits, the smallest shift otherwise, and null when no position works (the view is too
+ * small): the caller then falls back to a clamped menu. Candidate centres are the ones that put
+ * the box against an edge of the viewport or of an obstacle.
+ */
+export function panToFit(
+  at: { x: number; y: number },
+  half: number,
+  vp: Viewport,
+  obstacles: readonly Rect[],
+): { dx: number; dy: number } | null {
+  if (half <= 0) return { dx: 0, dy: 0 };
+  const hits = (x: number, y: number): boolean =>
+    x - half < 0 ||
+    y - half < 0 ||
+    x + half > vp.w ||
+    y + half > vp.h ||
+    obstacles.some(
+      (o) => x + half > o.x && x - half < o.x + o.w && y + half > o.y && y - half < o.y + o.h,
+    );
+  if (!hits(at.x, at.y)) return { dx: 0, dy: 0 };
+  const xs = [at.x, half, vp.w - half];
+  const ys = [at.y, half, vp.h - half];
+  for (const o of obstacles) {
+    xs.push(o.x + o.w + half, o.x - half);
+    ys.push(o.y + o.h + half, o.y - half);
+  }
+  let best: { dx: number; dy: number } | null = null;
+  let bestD = Infinity;
+  for (const x of xs) {
+    for (const y of ys) {
+      if (hits(x, y)) continue;
+      const d = Math.hypot(x - at.x, y - at.y);
+      if (d < bestD) {
+        bestD = d;
+        best = { dx: x - at.x, dy: y - at.y };
+      }
+    }
+  }
+  return best;
+}

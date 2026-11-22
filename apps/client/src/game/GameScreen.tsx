@@ -70,7 +70,6 @@ export function GameScreen() {
   const alerts = Object.values(view.districts).filter((d) => isOwn(d) && d.siege !== null).length;
   const select = (id: string | null) => {
     store.dispatch({ type: 'select', id });
-    if (id !== null && compact) setDrawer('district');
   };
   const fly = (id: string) => {
     store.dispatch({ type: 'fly', id });
@@ -203,6 +202,14 @@ export function GameScreen() {
             },
             route,
             menuHidden: state.draft !== null,
+            // phone: the radial shows on the map; DETAILS opens the district tab
+            ...(compact
+              ? {
+                  onDetails: () => {
+                    setDrawer('district');
+                  },
+                }
+              : {}),
           }}
         />
         {finaleClock(view, nowMs).phase === 'over' && endSeen !== view.season.endMs && (

@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { App } from '../App';
-import { clampMenu, formatEta, formatSector, parseMapOptions } from './MapScreen';
+import { clampMenu, formatEta, formatSector, orderMenu, parseMapOptions } from './MapScreen';
 
 describe('parseMapOptions', () => {
   it('reads the query flags', () => {
@@ -68,5 +68,14 @@ describe('clampMenu', () => {
       y: 5,
       facing: 'around',
     });
+  });
+});
+
+describe('orderMenu', () => {
+  const home = { mine: true, isHub: false, remembered: false };
+  it('adds DETAILS before CLOSE only when asked (phone)', () => {
+    expect(orderMenu(home).map((i) => i.id)).not.toContain('details');
+    const ids = orderMenu({ ...home, details: true }).map((i) => i.id);
+    expect(ids.slice(-2)).toEqual(['details', 'close']);
   });
 });

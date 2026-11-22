@@ -4,10 +4,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '../theme/ThemeProvider';
 import { Button, Panel, RadialMenu, Tag, type RadialFacing, type RadialItem } from '../ui';
 import { cx, vars } from '../ui/util';
-import { frameBounds, zoomForLevel, type Camera, type ZoomLevel } from './camera';
+import {
+  frameBounds,
+  panToFit,
+  zoomForLevel,
+  type Rect,
+  type Camera,
+  type ZoomLevel,
+} from './camera';
 import { demoView, DEMO_SELF } from './demo';
 import { edgeArrows, type ArrowTarget } from './offscreen';
-import { readHudScale } from './hudScale';
+import { readHudScale, readMotionMs } from './hudScale';
 import styles from './MapScreen.module.css';
 import { Minimap } from './Minimap';
 import type { MapRenderer } from './renderer';
@@ -38,6 +45,7 @@ const ORDER_ITEMS: Record<MapOrderKind, RadialItem> = {
   build: { id: 'build', glyph: 'B', label: 'BUILD' },
   settle: { id: 'settle', glyph: 'F', label: 'SETTLE' },
 };
+const DETAILS_ITEM: RadialItem = { id: 'details', glyph: 'i', label: 'DETAILS' };
 const CLOSE_ITEM: RadialItem = { id: 'close', glyph: 'x', label: 'CLOSE' };
 
 /** The radial menu for a district in the game screen: what you can order there. */
@@ -47,6 +55,8 @@ export function orderMenu(d: {
   readonly remembered: boolean;
   /** An unclaimed open frontier plot in sight: it can be settled. */
   readonly open?: boolean;
+  /** Add a DETAILS item (phone: the district panel is a separate tab). */
+  readonly details?: boolean;
 }): readonly RadialItem[] {
   const kinds: MapOrderKind[] = d.mine
     ? ['move', 'haul', 'reinforce', 'build']
@@ -57,7 +67,11 @@ export function orderMenu(d: {
         : d.open
           ? ['settle', 'siege', 'scout']
           : ['siege', 'scout'];
-  return [...kinds.map((k) => ORDER_ITEMS[k]), CLOSE_ITEM];
+  return [
+    ...kinds.map((k) => ORDER_ITEMS[k]),
+    ...(d.details === true ? [DETAILS_ITEM] : []),
+    CLOSE_ITEM,
+  ];
 }
 
 /** What the game screen hands the map: it owns the data, the selection and the orders. */
@@ -72,6 +86,8 @@ export interface MapEmbed {
   readonly route?: readonly Id[] | null;
   /** Hide the radial menu, e.g. while an order card is open. */
   readonly menuHidden?: boolean;
+  /** Phone: the radial gets a DETAILS item that opens the district panel. */
+  readonly onDetails?: (districtId: Id) => void;
 }
 
 const ZOOM_STEP = 1.6;
@@ -138,6 +154,7 @@ export function MapScreen({
   );
   const source = embedView ? 'live' : fetchedSource;
   const hostRef = useRef<HTMLDivElement>(null);
+  const screenRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<MapRenderer | null>(null);
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -368,6 +385,7 @@ export function MapScreen({
   const menuAction = (id: string) => {
     if (embed && sel) {
       if (id === 'close') setSelected(null);
+      else if (id === 'details') embed.onDetails?.(sel.id);
       else embed.onOrder(id as MapOrderKind, sel.id);
       return;
     }
@@ -418,6 +436,45 @@ export function MapScreen({
     if (menuEl.parentElement) ro.observe(menuEl.parentElement);
     return () => ro.disconnect();
   }, [wantMenu, menuEl, hudInset]);
+  /** The HUD cards over the map, as rectangles in map-viewport pixels (empty boxes skipped). */
+  const hudRects = useCallback((): Rect[] => {
+    const host = hostRef.current?.getBoundingClientRect();
+    const root = screenRef.current;
+    if (!host || !root) return [];
+    const out: Rect[] = [];
+    root
+      .querySelectorAll<HTMLElement>(
+        '[class*="readout"], [class*="minimap"], [class*="controls"], [class*="jump"], [class*="toggles"], [class*="drawer"], [class*="dock"], [class*="info"]',
+      )
+      .forEach((el) => {
+        const r = el.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0)
+          out.push({ x: r.left - host.left, y: r.top - host.top, w: r.width, h: r.height });
+      });
+    return out;
+  }, []);
+
+  // Selecting a plot pans the camera, only if needed, so the plot and its whole ring sit in the
+  // clear part of the map. Once per selection; waits for a running camera move to finish.
+  const pannedFor = useRef<Id | null>(null);
+  useEffect(() => {
+    if (!sel) {
+      pannedFor.current = null;
+      return;
+    }
+    const r = rendererRef.current;
+    if (!wantMenu || !r || menuBox.half <= 0 || pannedFor.current === sel.id) return;
+    const c = r.controller;
+    if (c.moving) return;
+    pannedFor.current = sel.id;
+    const at = worldToHud(sel, c.cam, c.viewport);
+    const d = panToFit(at, menuBox.half, c.viewport, hudRects());
+    if (!d || (d.dx === 0 && d.dy === 0)) return;
+    const target = { ...c.cam, x: c.cam.x - d.dx / c.cam.zoom, y: c.cam.y - d.dy / c.cam.zoom };
+    const ms = readMotionMs('--duration-slow');
+    if (ms <= 0) c.set(target);
+    else c.animateTo(target, nowFn(), ms);
+  }, [sel, wantMenu, menuBox.half, cam, hudRects]);
   const menuAt =
     sel && wantMenu ? clampMenu(worldToHud(sel, cam, vp), vp, menuBox.half, menuBox) : null;
   const menuId = menuAt && sel ? sel.id : null;
@@ -463,6 +520,7 @@ export function MapScreen({
 
   return (
     <div
+      ref={screenRef}
       className={styles['screen']}
       data-source={source}
       data-compact={compact}
@@ -649,7 +707,7 @@ export function MapScreen({
               style={vars({ '--x': `${String(menuAt.x)}px`, '--y': `${String(menuAt.y)}px` })}
             >
               <RadialMenu
-                items={embed ? orderMenu(sel) : MENU}
+                items={embed ? orderMenu({ ...sel, details: embed.onDetails !== undefined }) : MENU}
                 title={sel.name.toUpperCase()}
                 facing={menuAt.facing}
                 onSelect={menuAction}

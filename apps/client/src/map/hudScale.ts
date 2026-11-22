@@ -13,3 +13,17 @@ export function readHudScale(doc: Document = document): number {
   };
   return num(SCALE_VIEWPORT_VAR) * num(SCALE_USER_VAR);
 }
+
+/**
+ * A theme duration token (`--duration-slow`) in ms, for animations driven from JS such as camera
+ * moves. Zero when the player prefers reduced motion or the token is missing.
+ */
+export function readMotionMs(name: string, doc: Document = document): number {
+  if (
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  )
+    return 0;
+  const v = Number.parseFloat(getComputedStyle(doc.documentElement).getPropertyValue(name));
+  return Number.isFinite(v) && v > 0 ? v : 0;
+}

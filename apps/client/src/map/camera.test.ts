@@ -7,6 +7,7 @@ import {
   clampZoom,
   frameBounds,
   levelForZoom,
+  panToFit,
   screenToWorld,
   visibleRect,
   worldToScreen,
@@ -128,5 +129,24 @@ describe('phone viewport', () => {
     const small = acrossForZoom(zoomForLevel('tactical', phone, t), phone.w, t);
     expect(small).toBeLessThan(wide);
     expect(levelForZoom(zoomForLevel('tactical', phone, t), phone, t)).toBe('tactical');
+  });
+});
+
+describe('panToFit', () => {
+  const vp = { w: 1000, h: 800 };
+  const card = { x: 0, y: 0, w: 300, h: 100 };
+  it('stays put when the box already fits', () => {
+    expect(panToFit({ x: 500, y: 400 }, 150, vp, [card])).toEqual({ dx: 0, dy: 0 });
+  });
+  it('moves a top-row plot down or right, clear of the card and the edge', () => {
+    const r = panToFit({ x: 200, y: 60 }, 150, vp, [card]);
+    expect(r).not.toBeNull();
+    const x = 200 + (r?.dx ?? 0);
+    const y = 60 + (r?.dy ?? 0);
+    expect(y - 150).toBeGreaterThanOrEqual(0);
+    expect(x - 150 >= 300 || y - 150 >= 100).toBe(true);
+  });
+  it('returns null when the view is too small for the ring', () => {
+    expect(panToFit({ x: 100, y: 100 }, 500, vp, [])).toBeNull();
   });
 });
