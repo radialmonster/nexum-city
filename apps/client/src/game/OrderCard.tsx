@@ -476,7 +476,9 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
             )}
             <p className={styles['line']} data-testid="eta">
               {route
-                ? `ETA ${formatEta(route.durationMs)} over ${String(Math.round(route.lengthM))} m`
+                ? draft.kind === 'raid' && route.lengthM < 1
+                  ? 'Crews are in place at once.'
+                  : `ETA ${formatEta(route.durationMs)} over ${String(Math.round(route.lengthM))} m`
                 : 'No route'}
             </p>
             {draft.kind === 'settle' && (
