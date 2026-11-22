@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import styles from './TimelineRow.module.css';
 import { clamp01, cx, factionColor, pct, vars, type Faction } from './util';
 
@@ -26,6 +26,8 @@ export interface TimelineRowProps {
   readonly previews?: readonly TimelinePreview[];
   /** The order kind, for a distinct look: ambush bars wait dashed, return bars are muted. */
   readonly kind?: string;
+  /** Phone layout: a label that does not fit the bar goes on its own line under the track. */
+  readonly stackLabel?: boolean;
   readonly className?: string | undefined;
 }
 
@@ -46,15 +48,35 @@ export function TimelineRow({
   children,
   previews = [],
   kind,
+  stackLabel = false,
   className,
 }: TimelineRowProps) {
   const s = clamp01(start);
   const e = Math.max(s, clamp01(end));
+  const hasText = children !== undefined && children !== null;
+  const orderRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [clipped, setClipped] = useState(false);
+  // A label wider than its bar (measured, so it holds at any track width) moves out of the bar.
+  useLayoutEffect(() => {
+    const order = orderRef.current;
+    const text = textRef.current;
+    if (!order || !text || typeof ResizeObserver === 'undefined') return undefined;
+    const measure = () => {
+      setClipped(text.scrollWidth > text.clientWidth);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(order);
+    return () => {
+      ro.disconnect();
+    };
+  }, [children, s, e]);
   // a bar too short to hold its label gets the label beside it
-  const narrow = e - s < NARROW_BAR && children !== undefined && children !== null;
+  const narrow = hasText && (e - s < NARROW_BAR || clipped);
   return (
     <div
-      className={cx(styles['row'], className)}
+      className={cx(styles['row'], stackLabel && narrow && styles['stack'], className)}
       style={vars({ '--k': factionColor(faction) })}
       role="listitem"
       data-kind={kind}
@@ -69,6 +91,7 @@ export function TimelineRow({
       </span>
       <div className={styles['track']}>
         <div
+          ref={orderRef}
           className={cx(
             styles['order'],
             state === 'pending' && styles['pending'],
@@ -77,7 +100,9 @@ export function TimelineRow({
           style={vars({ '--from': pct(s), '--size': pct(e - s), '--p': pct(progress) })}
           title={typeof children === 'string' ? children : undefined}
         >
-          {!narrow && <span className={styles['text']}>{children}</span>}
+          <span ref={textRef} className={cx(styles['text'], narrow && styles['text-moved'])}>
+            {children}
+          </span>
         </div>
         {narrow && (
           <span

@@ -56,6 +56,7 @@ export function Timeline({ view, feed, nowMs, onRecall, onFly, compact = false }
                 progress={r.progress}
                 state={r.state}
                 kind={r.kind}
+                stackLabel={compact}
               >
                 {r.text}
               </TimelineRow>
