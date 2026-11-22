@@ -1,0 +1,30 @@
+.stance {
+  display: flex;
+  border: var(--border-thin) solid var(--color-line);
+}
+
+.option {
+  flex: 1;
+  padding: var(--space-sm) var(--space-md);
+  font-family: var(--font-head);
+  font-size: var(--font-size-sm);
+  letter-spacing: var(--letter-spacing-wider);
+  white-space: nowrap;
+  color: var(--color-text-dim);
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+.on {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-on-accent);
+  background: var(--color-accent);
+  box-shadow: var(--glow-accent);
+}
+
+.on.pull {
+  color: var(--color-text-on-warn);
+  background: var(--color-warn);
+  box-shadow: var(--glow-warn);
+}

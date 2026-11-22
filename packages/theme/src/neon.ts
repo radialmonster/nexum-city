@@ -52,6 +52,10 @@ export const neonColor = {
   news: blue,
   special: violet,
   disabled: grey,
+  dangerSurface: '#28040e',
+  // empty bar tracks and timeline grid lines
+  track: withAlpha('#ffffff', 0.07),
+  trackLine: withAlpha('#6c87a6', 0.14),
   // the map
   street: '#0d2233',
   streetGlow: withAlpha(cyan, 0.2),
@@ -143,6 +147,26 @@ export const neonSpace = {
   '2xl': 18,
   '3xl': 24,
   '4xl': 32,
+} satisfies Record<string, number>;
+
+/**
+ * Fixed component dimensions in px at `--s: 1` (the CSS output multiplies by
+ * `--s`): bar thicknesses, row heights, minimum column widths, icon boxes.
+ */
+export const neonSize = {
+  hairline: 2,
+  bar: 8,
+  barThick: 14,
+  stack: 10,
+  row: 18,
+  control: 30,
+  icon: 26,
+  gauge: 120,
+  spark: 90,
+  radial: 300,
+  toggle: 160,
+  column: 380,
+  page: 2400,
 } satisfies Record<string, number>;
 
 /** Corner radii in px at `--s: 1`. Panels use angled corners (clip-path), not radii. */

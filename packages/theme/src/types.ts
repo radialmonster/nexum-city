@@ -14,6 +14,7 @@ import type {
   neonLineHeight,
   neonRadius,
   neonShadow,
+  neonSize,
   neonSpace,
   neonTextGlow,
   neonZ,
@@ -28,6 +29,7 @@ export type FontWeightKey = keyof typeof neonFontWeight;
 export type LetterSpacingKey = keyof typeof neonLetterSpacing;
 export type LineHeightKey = keyof typeof neonLineHeight;
 export type SpaceKey = keyof typeof neonSpace;
+export type SizeKey = keyof typeof neonSize;
 export type RadiusKey = keyof typeof neonRadius;
 export type BorderKey = keyof typeof neonBorder;
 export type BlurKey = keyof typeof neonBlur;
@@ -85,6 +87,8 @@ export interface Theme {
   readonly lineHeight: Readonly<Record<LineHeightKey, number>>;
   /** px at `--s: 1` */
   readonly space: Readonly<Record<SpaceKey, number>>;
+  /** px at `--s: 1` */
+  readonly size: Readonly<Record<SizeKey, number>>;
   /** px at `--s: 1` */
   readonly radius: Readonly<Record<RadiusKey, number>>;
   /** px, not scaled */

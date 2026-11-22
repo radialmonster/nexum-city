@@ -1,0 +1,53 @@
+.button {
+  padding: var(--space-sm) var(--space-3xl);
+  font-family: var(--font-head);
+  font-size: var(--font-size-md);
+  letter-spacing: var(--letter-spacing-widest);
+  white-space: nowrap;
+  cursor: pointer;
+  color: var(--btn-color);
+  background: var(--btn-fill);
+  border: var(--border-thin) solid var(--btn-edge);
+  box-shadow: var(--btn-glow);
+  clip-path: polygon(
+    var(--radius-sm) 0,
+    100% 0,
+    100% calc(100% - var(--radius-sm)),
+    calc(100% - var(--radius-sm)) 100%,
+    0 100%,
+    0 var(--radius-sm)
+  );
+  transition: filter var(--duration-fast) var(--easing-standard);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.button:hover:not(:disabled) {
+  filter: brightness(1.2);
+}
+
+.primary {
+  --btn-color: var(--color-text-on-accent);
+  --btn-fill: var(--color-accent);
+  --btn-edge: var(--color-accent);
+  --btn-glow: var(--glow-accent);
+
+  font-weight: var(--font-weight-bold);
+}
+
+.ghost {
+  --btn-color: var(--color-text-dim);
+  --btn-fill: transparent;
+  --btn-edge: var(--color-text-dim);
+  --btn-glow: none;
+}
+
+.danger {
+  --btn-color: var(--color-danger);
+  --btn-fill: transparent;
+  --btn-edge: var(--color-danger);
+  --btn-glow: var(--glow-danger);
+}

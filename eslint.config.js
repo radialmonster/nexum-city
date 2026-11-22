@@ -1,6 +1,7 @@
 // @ts-check
 import js from '@eslint/js';
 import { defineConfig, globalIgnores } from 'eslint/config';
+import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 import nexum from './tools/eslint-plugin-nexum/index.js';
@@ -29,6 +30,11 @@ export default defineConfig(
       globals: { ...globals.node },
     },
     linterOptions: { reportUnusedDisableDirectives: 'error' },
+  },
+  {
+    files: ['apps/client/**/*.{ts,tsx}'],
+    extends: [reactHooks.configs.flat.recommended],
+    languageOptions: { globals: { ...globals.browser } },
   },
   // Owner rule #1: no hard-coded styles outside the theme package.
   {

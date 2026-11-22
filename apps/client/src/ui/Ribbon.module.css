@@ -1,0 +1,53 @@
+.ribbon {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-xs) var(--space-xs) var(--space-xs) var(--space-lg);
+  font-size: var(--font-size-md);
+  border: var(--border-thin) solid var(--tone);
+  background: color-mix(in srgb, var(--tone) 14%, var(--color-danger-surface));
+  box-shadow: 0 0 var(--space-2xl) color-mix(in srgb, var(--tone) 35%, transparent);
+  animation: urgent var(--duration-urgent) infinite;
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% calc(100% - var(--radius-sm)),
+    calc(100% - var(--radius-sm)) 100%,
+    var(--radius-sm) 100%,
+    0 calc(100% - var(--radius-sm))
+  );
+}
+
+.icon {
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-none);
+  color: var(--tone);
+}
+
+.title {
+  font-size: var(--font-size-sm);
+  letter-spacing: var(--letter-spacing-wide);
+  color: var(--tone);
+}
+
+.badge {
+  margin-left: auto;
+  padding: var(--space-3xs) var(--space-md);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  font-style: normal;
+  letter-spacing: var(--letter-spacing-tight);
+  color: var(--color-text-on-accent);
+  background: var(--tone);
+}
+
+@keyframes urgent {
+  0%,
+  100% {
+    filter: none;
+  }
+
+  50% {
+    filter: brightness(1.35);
+  }
+}

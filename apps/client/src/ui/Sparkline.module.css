@@ -1,0 +1,16 @@
+.spark {
+  display: inline-block;
+  width: var(--size-spark);
+  height: auto;
+  color: var(--k);
+  overflow: visible;
+}
+
+.line {
+  stroke-width: var(--border-medium);
+  stroke-linejoin: round;
+}
+
+.dot {
+  filter: drop-shadow(0 0 var(--space-2xs) var(--k));
+}

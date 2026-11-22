@@ -1,0 +1,25 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-md);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+  border: var(--border-thin) solid var(--color-line);
+  background: color-mix(in srgb, var(--color-accent) 5%, transparent);
+}
+
+.icon {
+  color: var(--k);
+  text-shadow: 0 0 var(--space-sm) var(--k);
+}
+
+.label {
+  color: var(--color-text-dim);
+}
+
+.value {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-bright);
+}

@@ -11,6 +11,7 @@ const PREFIX = {
   letterSpacing: 'letter-spacing',
   lineHeight: 'line-height',
   space: 'space',
+  size: 'size',
   radius: 'radius',
   border: 'border',
   blur: 'blur',
@@ -89,6 +90,7 @@ function groupValues(theme: Theme, group: TokenGroup): [string, string][] {
       return Object.entries(theme[group]);
     case 'fontSize':
     case 'space':
+    case 'size':
     case 'radius':
       return Object.entries(theme[group]).map(([k, v]) => [k, scaledPx(v)]);
     case 'border':

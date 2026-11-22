@@ -55,6 +55,7 @@ describe('themes', () => {
       theme.letterSpacing,
       theme.lineHeight,
       theme.space,
+      theme.size,
       theme.radius,
       theme.border,
       theme.blur,

@@ -1,0 +1,31 @@
+.bar {
+  position: relative;
+  height: var(--size-bar);
+  overflow: hidden;
+  background: var(--color-track);
+}
+
+.fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--p);
+  background: var(--k);
+  box-shadow: 0 0 var(--space-md) var(--k);
+  transition: width var(--duration-slow) var(--easing-standard);
+}
+
+.segmented {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--color-track) 0 var(--space-sm),
+    transparent var(--space-sm) calc(var(--space-sm) + var(--space-3xs))
+  );
+}
+
+.segmented .fill {
+  mask: repeating-linear-gradient(
+    90deg,
+    var(--color-text-bright) 0 var(--space-sm),
+    transparent var(--space-sm) calc(var(--space-sm) + var(--space-3xs))
+  );
+}

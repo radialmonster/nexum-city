@@ -1,0 +1,10 @@
+.tag {
+  display: inline-block;
+  padding: var(--space-3xs) var(--space-xs);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+  color: var(--k);
+  border: var(--border-thin) solid var(--k);
+  background: color-mix(in srgb, var(--k) 10%, transparent);
+}

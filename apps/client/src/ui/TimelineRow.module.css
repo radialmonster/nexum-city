@@ -1,0 +1,111 @@
+.row {
+  display: grid;
+  grid-template-columns: minmax(var(--size-toggle), 20%) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-lg);
+  height: var(--size-row);
+}
+
+.who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-width: 0;
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.glyph {
+  flex: none;
+  width: var(--size-icon);
+  font-size: var(--font-size-lg);
+  font-style: normal;
+  text-align: center;
+  color: var(--k);
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track {
+  position: relative;
+  height: 100%;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--color-track-line) 0 var(--border-thin),
+    transparent var(--border-thin) 12.5%
+  );
+}
+
+.order {
+  position: absolute;
+  top: var(--space-3xs);
+  bottom: var(--space-3xs);
+  left: var(--from);
+  width: var(--size);
+  z-index: var(--z-base);
+  overflow: hidden;
+  border: var(--border-thin) solid var(--k);
+  background: color-mix(in srgb, var(--k) 16%, transparent);
+}
+
+/* the progress fill, striped and slowly moving */
+.order::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--p);
+  z-index: var(--z-below);
+  background: repeating-linear-gradient(
+    110deg,
+    color-mix(in srgb, var(--k) 55%, transparent) 0 var(--space-sm),
+    color-mix(in srgb, var(--k) 38%, transparent) var(--space-sm) calc(2 * var(--space-sm))
+  );
+  background-size: 200% 100%;
+  animation: stripes var(--duration-sweep) linear infinite;
+}
+
+.text {
+  display: block;
+  padding: 0 var(--space-xs);
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-none);
+  white-space: nowrap;
+  color: var(--color-text-bright);
+}
+
+.pending {
+  background: none;
+  border-style: dashed;
+}
+
+.pending::before {
+  display: none;
+}
+
+.hot {
+  box-shadow: 0 0 var(--space-md) var(--k);
+}
+
+.preview {
+  position: absolute;
+  top: 50%;
+  left: var(--from);
+  width: var(--size);
+  border-top: var(--border-medium) dashed var(--k);
+  opacity: 0.6;
+}
+
+@keyframes stripes {
+  from {
+    background-position: 0 0;
+  }
+
+  to {
+    background-position: 200% 0;
+  }
+}

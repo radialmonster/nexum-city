@@ -1,0 +1,25 @@
+.stack {
+  display: flex;
+  gap: var(--space-3xs);
+  height: var(--size-stack);
+}
+
+.cell {
+  flex: 1;
+  background: var(--k);
+  box-shadow: 0 0 var(--space-sm) color-mix(in srgb, var(--k) 60%, transparent);
+}
+
+.free {
+  background: var(--color-track);
+  box-shadow: none;
+}
+
+.caption {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--space-xs);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-dim);
+}

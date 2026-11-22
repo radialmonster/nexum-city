@@ -21,7 +21,7 @@ sizes everywhere outside this package.
 | `color`                                   | `#rrggbb[aa]`     | `--color-text-dim`      |
 | `faction`                                 | `#rrggbb[aa]`     | `--faction-raider`      |
 | `font`                                    | font stack        | `--font-mono`           |
-| `fontSize`, `space`, `radius`             | px at `--s: 1`    | `calc(13px * var(--s))` |
+| `fontSize`, `space`, `radius`, `size`     | px at `--s: 1`    | `calc(13px * var(--s))` |
 | `fontWeight`, `lineHeight`, `z`           | unitless          | `--z-modal`             |
 | `letterSpacing`                           | em                | `--letter-spacing-wide` |
 | `border`, `blur`                          | px (not scaled)   | `--border-thin`         |
