@@ -188,11 +188,12 @@ These are milestones 2 and 3 in the design doc:
 
 ## Open decisions
 
-| #   | Question                                                                     | Needed by       |
-| --- | ---------------------------------------------------------------------------- | --------------- |
-| 1   | Domain or subdomain for the game                                             | Phase 6         |
-| 2   | Timer lengths (travel 15–90 min, captures 6–12 h, builds 1–8 h)              | Phase 1 tuning  |
-| 3   | Goods list: parts, power, data and supplies, plus credits                    | Phase 1         |
-| 4   | Does trade volume count toward season score?                                 | Phase 1 scoring |
-| 5   | Bot flavour: names, faces, voice                                             | Phase 5         |
-| 6   | Hono or Fastify. Default: Hono (smaller), unless a need for Fastify comes up | Phase 0         |
+| #   | Question                                                                                                                          | Needed by       |
+| --- | --------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| 1   | Domain or subdomain for the game                                                                                                  | Phase 6         |
+| 2   | Timer lengths (travel 15–90 min, captures 6–12 h, builds 1–8 h)                                                                   | Phase 1 tuning  |
+| 3   | Goods list: parts, power, data and supplies, plus credits                                                                         | Phase 1         |
+| 4   | Does trade volume count toward season score?                                                                                      | Phase 1 scoring |
+| 5   | Bot flavour: names, faces, voice                                                                                                  | Phase 5         |
+| 6   | Hono or Fastify. Default: Hono (smaller), unless a need for Fastify comes up                                                      | Phase 0         |
+| 7   | Balance after the first season run: settle order, tougher neutrals, trade score. See [balance-proposals.md](balance-proposals.md) | Phase 5 (bots)  |
