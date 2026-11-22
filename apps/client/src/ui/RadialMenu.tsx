@@ -74,7 +74,11 @@ export function RadialMenu({
         const y = CENTRE + RING * Math.sin(angle);
         const on = item.id === selected;
         // labels of the upper items sit above their button, so they never run into a lower neighbour
-        const above = Math.sin(angle) < -0.25;
+        // On a half ring the two end items sit level with the hub and their neighbour is further out,
+        // so their labels go on the hub side (above when fanned down, below when fanned up): on the
+        // outer side a label would run under the next button along the arc.
+        const s = Math.sin(angle);
+        const above = facing === 'down' ? s < 0.4 : facing === 'up' ? s < -0.4 : s < -0.25;
         const labelY = above ? y - BUTTON - LABEL_GAP : y + BUTTON + LABEL_GAP;
         return (
           <g

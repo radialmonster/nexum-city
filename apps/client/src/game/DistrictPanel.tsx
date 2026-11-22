@@ -237,7 +237,7 @@ function Own({
             onHaulSurplus(surplus);
           }}
         >
-          HAUL SURPLUS TO THE NEAREST HUB
+          HAUL SURPLUS TO A HUB
         </Button>
       )}
       <div className={styles['goods']}>

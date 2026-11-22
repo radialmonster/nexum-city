@@ -121,7 +121,7 @@ export function FeedPanel({
                       if (draft) onHaulSurplus(draft);
                     }}
                   >
-                    HAUL SURPLUS TO THE NEAREST HUB
+                    HAUL SURPLUS TO A HUB
                   </Button>
                 </div>
               )}
