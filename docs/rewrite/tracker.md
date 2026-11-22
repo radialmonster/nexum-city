@@ -86,12 +86,12 @@ Live status for [`plan.md`](plan.md). Update this file in the same commit as the
 
 ## Phase 5: Bots and a living city
 
-| ID  | Task                                                  | Status | Notes |
-| --- | ----------------------------------------------------- | ------ | ----- |
-| 51  | Bot framework that uses the same order API as players | todo   |       |
-| 52  | Raider, Turtle and Merchant personalities             | todo   |       |
-| 53  | Frontier growth and arrival events                    | todo   |       |
-| 54  | Balance pass using the fast-forward harness           | todo   |       |
+| ID  | Task                                                  | Status | Notes                |
+| --- | ----------------------------------------------------- | ------ | -------------------- |
+| 51  | Bot framework that uses the same order API as players | done   | 2026-11-22 (821095d) |
+| 52  | Raider, Turtle and Merchant personalities             | done   | 2026-11-22 (821095d) |
+| 53  | Frontier growth and arrival events                    | done   | 2026-11-22 (821095d) |
+| 54  | Balance pass using the fast-forward harness           | todo   |                      |
 
 ## Phase 6: Test season and deploy
 
@@ -122,3 +122,4 @@ Live status for [`plan.md`](plan.md). Update this file in the same commit as the
 - 2026-11-22: Map polish toward the mockup. Tactical zoom frames about 35 plots at 1920 wide (minimum on-screen plot width tokens); the demo has six rival crews, neutral plots and is revealed by default; plots get faction borders and tints, chamfered corners, an inner glow, per-kind detail patterns (`detail.ts`) and an owner sub-label; the city level draws territory blobs with the Sound; labels follow on-screen size; phones get a compact layout with a districts drawer and a minimap toggle; the jump list scrollbar is themed and labels scale with `--s`.
 - 2026-11-22: Phase 2 tasks 41 to 44 done (`b7c350b`). `/` is now the playable game: sign-in and register, typed API client parsed with the contract schemas, a game store, live updates over SSE with polling fallback, the top bar with the season race, the "While you were away" feed (fly to place, last-seen stored), the district panel (own detail, reduced view for others, stance, build) and the order confirm card (carrier and crew pickers, ETA, siege odds, plain-language rejections). Checked end to end with two players, a move and a siege, and at 2560, 1920 and 390 wide. The bottom timeline is still an empty slot.
 - 2026-11-22: Phase 2 tasks 45 to 47 done (adfd491). Bottom orders timeline (one row per busy asset, axis from now to +4 h, recall), market panel (order book depth, civic price, fills sparkline, stash, open orders with cancel, limit order form with plain-language rejections, escrow line), battle report (feed events siege.captured and siege.broken) and rival dossier (from the district panel). Also: full-height framed feed and district columns, softer fog (name and kind of known plots stay visible, dimmed; ownership, garrison and stock stay hidden), per-player race bar segments, a tighter pan margin so the Sound is a strip. Checked end to end through the env-gated `DEV_SEED` routes (`/api/dev/seed`, `/api/dev/advance`). Gap: `combat.round` is not shown in the feed, so it cannot open a report yet.
+- 2026-11-22: Phase 4 tasks 51 to 53 done (821095d). Server bots (`apps/server/src/game/bots/`): a `bots` table, a check-in scheduler (a few seeded visits a day), the sim `BOTS` fed a fogged view through an adapter, orders through the normal order path and inputs log, personalities with crew names, roster of `BOT_COUNT` retiring to `BOT_MIN` as humans join (retired bots keep their districts), and public `player.joined` and `frontier.opened` events with crew, district and side in everyone's feed and the client feed text. A 3-day fake-clock game with 6 bots had 3 captures, 12 fills and no invariant problems. Gap: the sim bots do not check affordability, so about two thirds of their proposals are rejected `insufficient_goods`.

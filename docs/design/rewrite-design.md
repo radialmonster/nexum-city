@@ -220,6 +220,8 @@ Bots play by exactly the same rules and on the same clock. They also visit perio
 
 Bots announce their intentions in readable language ("Rival 4 is moving on the city leader"), they avoid piling onto the same target, and they defend their own districts. When real players join, they take empty bot slots or join alongside them.
 
+How the server runs them (tasks 51 to 53): bots are real players with a row in `bots` instead of an account. They act only at a few seeded, jittered check-ins a day, decide from the same fogged view a player gets, and send orders through the normal order path, so they are validated and logged like anyone's. `BOT_COUNT` (default 6) bots start; each human who joins retires one, at most one per game hour, down to `BOT_MIN` (default 2). A retired bot stops acting but keeps its districts as a dormant crew that players can raid. New crews and new frontier plots are announced to everyone's feed.
+
 ## Seasons and winning
 
 - A season lasts 4 weeks.
