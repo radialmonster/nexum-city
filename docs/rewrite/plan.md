@@ -153,7 +153,7 @@ Each phase ends with something you can open, run or test. Tasks and their status
 
 ### Phase 7: Milestone 2 mechanics
 
-- Raids and escorts (task 71, sim, contracts and bots done; `RULES_VERSION` 2). Then the raids UI (72), contracts board (73), Runner carrier (74), Watchtower and Garage (75) and a Hunter bot (76). Rows are in the tracker.
+- Raids and escorts (task 71, sim, contracts and bots done; `RULES_VERSION` 2). Then the raids UI (72), contracts board (73), Runner carrier (74), Watchtower and Garage (75) and a Hunter bot (76). Planned next: regional hub prices (79), see [regional-prices-plan.md](regional-prices-plan.md). Rows are in the tracker.
 
 ### Phase 6: Test season and deploy
 

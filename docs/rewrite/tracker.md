@@ -120,6 +120,8 @@ Live status for [`plan.md`](plan.md). Update this file in the same commit as the
 | 76b | Hunter UI (faction colour already exists; show the hunter in the roster and the Bot building notes)                 | todo   | no new shapes; `hunter` is a new bot kind and the harness has `raidsAgainst`         |
 | 78  | Break it up: clear a spotted ambush (order, events, fogged estimate, bots, harness)                                 | done   | 2026-11-22; RULES_VERSION stays 3, no snapshot change; see sim-spec                  |
 | 78b | Break it up UI (button on the spotted feed card and map marker, with the plain estimate)                            | todo   | order ambush.clear; estimateClear in @nexum/sim; SeenAmbushView.strength             |
+| 79  | Regional hub prices: hub character from nearby production, shortages (sim, bots, harness)                           | todo   | plan: [regional-prices-plan.md](regional-prices-plan.md)                             |
+| 79b | Regional prices UI: price compare board, best-price chips, shortage feed card and hub tag                           | todo   | after 79                                                                             |
 
 ## Playtest findings
 
