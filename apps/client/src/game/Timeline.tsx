@@ -9,20 +9,24 @@ export interface TimelineProps {
   readonly nowMs: number;
   readonly onRecall: (movementId: string) => void;
   readonly onFly: (districtId: string) => void;
+  /** Phone layout: the axis is hidden and each row's actions sit under it. */
+  readonly compact?: boolean;
 }
 
 const TICKS = [0, 1, 2, 3, 4] as const;
 
 /** The bottom band: one row per busy asset on a time axis from now to about four hours ahead. */
-export function Timeline({ view, feed, nowMs, onRecall, onFly }: TimelineProps) {
+export function Timeline({ view, feed, nowMs, onRecall, onFly, compact = false }: TimelineProps) {
   const rows = timelineRows(timelineEntries(view, feed, nowMs), nowMs);
   return (
     <Panel
       title="Active orders"
       tag={rows.length === 0 ? 'NOTHING RUNNING' : `${String(rows.length)} RUNNING`}
-      className={styles['timeline']}
+      className={
+        compact ? `${styles['timeline'] ?? ''} ${styles['compact'] ?? ''}` : styles['timeline']
+      }
     >
-      <div className={styles['line']} aria-hidden="true">
+      <div className={`${styles['line'] ?? ''} ${styles['axis-line'] ?? ''}`} aria-hidden="true">
         <div className={styles['axis']}>
           <span />
           <div className={styles['ticks']}>

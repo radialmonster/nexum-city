@@ -306,6 +306,7 @@ export function GameScreen() {
           feed={state.feed}
           nowMs={nowMs}
           onFly={fly}
+          compact={compact}
           onRecall={(movementId) => {
             void session.placeOrder({ type: 'recall', movementId });
           }}
