@@ -34,26 +34,6 @@ export type CreatePlayerResult = { ok: true; playerId: Id } | { ok: false; error
  * and catches the clock up to now. `step` is exact over any split of time, so the replay hashes
  * the same as an uninterrupted run.
  */
-/**
- * A new world whose game time is the wall clock. The sim starts at game time 0, with the season
- * and the first hourly score tick measured from there, so all of them shift to the start time;
- * otherwise the season would already be over and the first catch-up would run months of ticks.
- */
-function genesis(seed: number, startMs: number): GameState {
-  const world = createWorld(seed);
-  return {
-    ...world,
-    nowMs: startMs,
-    season: {
-      ...world.season,
-      startMs: world.season.startMs + startMs,
-      endMs: world.season.endMs + startMs,
-      finaleStartMs: world.season.finaleStartMs + startMs,
-    },
-    queue: world.queue.map((e) => ({ ...e, at: e.at + startMs })),
-  };
-}
-
 export class Engine {
   private state: GameState;
   /** Inputs persisted but not yet applied to `state`. */
@@ -97,7 +77,7 @@ export class Engine {
       const seed = Number(store.getMeta('seed') ?? opts.seed);
       store.setMeta('seed', String(seed));
       store.setMeta('created_ms', String(opts.now()));
-      const world = genesis(seed, opts.now());
+      const world = createWorld(seed, { startMs: opts.now() });
       store.insertSnapshot(world, hashState(world), 0);
       engine = new Engine(opts, world, 0, []);
     }
@@ -166,9 +146,13 @@ export class Engine {
   createPlayer(link: (playerId: Id) => void): CreatePlayerResult {
     this.tick();
     const playerId = `p${Object.keys(this.state.players).length + 1}`;
-    const districtId = pickStartDistrict(this.state);
-    if (!districtId) return { ok: false, error: 'world_full' };
-    const next = addPlayer(this.state, { id: playerId, districtId });
+    let next: GameState;
+    try {
+      // The sim picks a frontier plot for the newcomer.
+      next = addPlayer(this.state, { id: playerId });
+    } catch {
+      return { ok: false, error: 'world_full' };
+    }
     this.opts.store.transaction(() => {
       link(playerId);
       this.opts.store.insertSnapshot(next, hashState(next), this.appliedSeq);
@@ -195,24 +179,6 @@ export class Engine {
   abandon(): void {
     this.listeners.clear();
   }
-}
-
-/**
- * Picks a free district for a new player: the neutral, non-hub district farthest from any owned
- * district (ties by id), so newcomers spread out. TODO(task 1A): frontier placement.
- */
-export function pickStartDistrict(state: GameState): Id | undefined {
-  const all = Object.values(state.districts);
-  const owned = all.filter((d) => d.owner !== 'neutral');
-  let best: { id: Id; score: number } | undefined;
-  for (const d of all.sort((a, b) => (a.id < b.id ? -1 : 1))) {
-    if (d.kind === 'hub' || d.owner !== 'neutral') continue;
-    const score = owned.length
-      ? Math.min(...owned.map((o) => Math.hypot(o.pos.x - d.pos.x, o.pos.y - d.pos.y)))
-      : 0;
-    if (!best || score > best.score) best = { id: d.id, score };
-  }
-  return best?.id;
 }
 
 export type { SimEvent };

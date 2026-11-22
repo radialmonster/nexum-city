@@ -188,3 +188,42 @@ Where the spec was silent, these simple choices were made. Code: `packages/sim`.
 - **Fog.** `viewFor(state, playerId)` returns a JSON-safe `PlayerView`: own districts in full; districts in sight and hubs with owner, protected flag, crew counts per owner and siege progress; everything else as `remembered` (last known owner only). Sight is one street hop from your districts and crews, the streets your convoys are on, scout reveals, and hubs always. Foreign crews and carriers are never listed, only counted; other players' convoys appear only inside your sight (position and carrier kind, no cargo). Memory updates at event and input boundaries only, never at the end of a step, so it is tick-independent.
 - **Watchtower** is not a building type yet, so it adds no sight; the code already reads its level when it appears.
 - **Season.** 168 h; the last 48 h are the finale (`season.finale` is updated by the hourly tick; `addPlayer` throws from `finaleStartMs`). Score is exact integer district-milliseconds (`MS_PER_HOUR` = one point), stops at `endMs`. `score.tick` fires hourly with standings. Leader = strict top; below median = strictly below the median score (recomputed hourly); those players recruit in 75% of the usual time.
+
+## Decisions made in tasks 17, 1A and 1B
+
+### Markets (task 17)
+
+- **Units.** Prices are integer centi-credits per unit (`balance.market.priceScale` = 100); quantities are whole units (1-1000). Credit atoms per centi-credit per unit: `ATOMS_PER_UNIT / 100` = 3 600 000, so every trade is an exact integer.
+- **Books.** `state.markets[hub][good]`, created by `createWorld` for `hubW` and `hubE`. Bids sort best price first, asks lowest first, ties by order number (`seq`). `checkInvariants` verifies ordering, no empty or duplicate orders and non-negative civic depth.
+- **Escrow.** A sell removes the goods from the hub stash. A buy locks `price x qty` credits at the limit. When a buy fills below its limit, the difference is refunded at once. Cancel returns the remaining escrow (goods to the hub stash). Trades execute at the resting order's price.
+- **Limits.** 20 open orders per player. New typed errors: `unknown_good`, `bad_price`, `unknown_order`, `too_many_orders`; `bad_quantity`, `insufficient_goods`, `insufficient_credits`, `not_owner` and `invalid_target` are reused.
+- **Civic traders are virtual.** They are not orders; each book holds `refCents`, `bidDepth` and `askDepth`. The standing bid is `ref x 92%` (rounded down) and the ask `ref x 108%` (rounded up). A player order trades with the best price, and a player order wins a tie with civic. A civic fill takes `min(qty, depth)` in one trade.
+- **Reference.** After each fill it moves 1/8 of the way to the trade price. Each hour it moves 5% of the way back to its base, and is clamped to 50%-200% of base. Starting references are as in the spec.
+- **Depth.** 60 units per side per good per hub, refilled 20 per hour up to the cap. The refill, reversion and a sweep (resting orders that now cross the civic price trade with civic) run in a `market.tick` queue event each hour, so tick and jump agree exactly.
+- **View.** `PlayerView.markets` lists every hub book by price level (all quantities summed), the civic quote and depth, `refCents` and `lastCents`. `PlayerView.orders` lists only your own open orders. Books are public: hubs are always in sight.
+- **Events.** `trade.filled` (actors: buyer and seller, civic omitted) with `hub, good, price, qty, buyer, seller, taker, buyOrder, sellOrder`.
+- **Gap.** Snapshots written before this change have no `markets`; there are no live players, so the server does not migrate them.
+
+### Frontier and city growth (task 1A)
+
+- `District.frontier` is `open | surveying | built`. Plots are laid out on the compact edge of the city (most occupied neighbours, then nearest the centre), never south of the Sound; the south row is docks.
+- The city keeps `max(4, ceil(players / 3))` open or surveying plots (`balance.frontier`). A new plot is surveyed for 4 h (`frontier.survey` queue event), then opens: it joins the street graph, with streets to every finished neighbour, and `frontier.opened` fires. Surveying plots are hidden from views.
+- `createWorld(seed, { startMs })` starts the season, queue and ticks at a given game time; the server's `genesis()` workaround is gone. The first open plots are created at world creation (instantly, with event ids reset to 0).
+- `addPlayer` with no `districtId` claims an open plot next to at least 2 neutral districts, as far as possible from other players' districts. If none is open, one is opened at once. `addPlayerWithEvents` also returns the events (`player.joined`, reason `new`). The explicit-id path is kept for tests.
+- A player who loses their last district gets a protected frontier plot chosen the same way (`relocatePlayer`), with `player.joined` reason `relocated`.
+- `PlayerView.graph` carries the public street graph (nodes, edges with lengths, hub ids) so the client can preview routes and ETAs.
+
+### Season harness and balance findings (task 1B)
+
+`runSeason` (`harness.ts`) plays a season with three scripted bots from `bots.ts`: the **raider** sieges the nearest unprotected district it does not own, one campaign at a time; the **turtle** builds walls, a workshop and a depot and holds; the **merchant** hauls its biggest pile to the nearest hub and sells it to the civic bid. Every bot also recruits and builds one building per district. Bots decide on an hourly beat; the harness keeps only orders that pass `validateOrder`, steps the state, counts `siege.captured` and `trade.filled` events, and runs `checkInvariants` after every beat. `npm run sim:season [-- seed [days]]` (after `npm run build`) prints the summary; timing lives in the script because the sim may not read a clock.
+
+Why the full-week check uses 60 s ticks and one jump, with 2 s ticks only for the first 6 hours: `step` has no per-tick state (it advances to the next scheduled event), so any slicing of time must give the same hash. A 2 s replay of 7 days is about 302,000 steps (about 20 s), which is too slow for the check; 60 s ticks are 10,080 steps (about 0.7 s) and still cut across every hourly beat and every travel, siege and survey event. The 2 s slicing is proven on the busiest part, the first 6 hours (opening orders and first marches), and is the same code path.
+
+Reference run (seed 1, 7 days, 2 raiders, 2 turtles, 2 merchants): 38 districts, 695 orders (0 rejected), 12 captures, 84 civic fills (3,270 units), 0 invariant problems, hash identical as one jump, hourly, and in 60 s ticks; the run takes about 170 ms.
+
+Balance findings, not yet acted on:
+
+- **Raiders dominate.** They finish with 8 and 6 districts, while turtles and merchants stay at 1. Most captures are of neutral frontier plots, which are unprotected once the 48 h newcomer protection has passed.
+- **Non-raiders have no way to grow without attacking.** Frontier plots cannot be claimed peacefully, so a turtle or merchant can only stay put. Consider a peaceful claim (survey and settle) or merchant income that buys expansion.
+- **Merchants earn credits but not an edge.** They sold 3,270 units on the civic bid, yet their score equals a turtle's; selling does not convert to districts or score yet.
+- **Neutral plots are the cheapest target.** Raids on neutral plots should probably cost more or give less, so that attacking players is the better prize.

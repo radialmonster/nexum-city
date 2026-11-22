@@ -1,6 +1,7 @@
 import { MS_PER_MINUTE, balance, toAtoms } from './balance.js';
 import { buildCost, startConstruction } from './construction.js';
 import { emit, type Ctx } from './ctx.js';
+import { cancelOrder, findOrder, placeOrder, validatePlace } from './market.js';
 import { afterWarehouseChange, buildingLevel, storeAt } from './production.js';
 import { shortestRoute, travelMs, type Route } from './routing.js';
 import { isProtected, refreshSiege } from './siege.js';
@@ -17,6 +18,7 @@ import {
   type Input,
   type Movement,
   type MovementKind,
+  type Order,
   type OrderError,
   type Validation,
 } from './types.js';
@@ -36,7 +38,9 @@ type Plan =
   | { type: 'build'; district: District; building: BuildingType }
   | { type: 'stance'; district: District; stance: 'hold' | 'pullback' }
   | { type: 'recall'; movement: Movement }
-  | { type: 'recruit'; district: District };
+  | { type: 'recruit'; district: District }
+  | { type: 'place'; order: Extract<Order, { type: 'market.place' }> }
+  | { type: 'cancel'; orderId: Id };
 
 type Resolved = { plan: Plan } | { error: OrderError };
 
@@ -218,6 +222,16 @@ function resolve(state: GameState, input: Input): Resolved {
       if (movement.recalledAtMs !== undefined) return fail('already_recalled');
       return { plan: { type: 'recall', movement } };
     }
+    case 'market.place': {
+      const error = validatePlace({ state }, actorId, order);
+      return error ? fail(error) : { plan: { type: 'place', order } };
+    }
+    case 'market.cancel': {
+      const found = findOrder({ state }, order.orderId);
+      if (!found) return fail('unknown_order');
+      if (found.order.owner !== actorId) return fail('not_owner');
+      return { plan: { type: 'cancel', orderId: order.orderId } };
+    }
     case 'recruit': {
       const district = state.districts[order.districtId];
       if (!district) return fail('unknown_district');
@@ -272,6 +286,15 @@ export function applyOrder(ctx: Ctx, input: Input): Validation {
     case 'recall':
       recallMovement(ctx, plan.movement);
       break;
+    case 'place': {
+      placeOrder(ctx, input.actorId, plan.order);
+      break;
+    }
+    case 'cancel': {
+      const found = findOrder(ctx, plan.orderId);
+      if (found) cancelOrder(ctx, found.order, found.book);
+      break;
+    }
     case 'recruit': {
       const { district } = plan;
       const player = state.players[input.actorId] as { credits: number };

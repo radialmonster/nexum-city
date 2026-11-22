@@ -4,6 +4,7 @@ import {
   carrierKindSchema,
   goodSchema,
   idSchema,
+  sideSchema,
   stanceSchema,
 } from './orders.js';
 
@@ -173,6 +174,34 @@ export const seenConvoySchema = z.object({
   segment: z.tuple([idSchema, idSchema]),
 });
 
+const levelSchema = z.object({ price: z.number().int(), qty: z.number().int() });
+
+/** A hub's public book for one good (prices in centi-credits per unit). */
+export const marketBookViewSchema = z.object({
+  bids: z.array(levelSchema),
+  asks: z.array(levelSchema),
+  civic: z.object({
+    bid: z.number().int(),
+    ask: z.number().int(),
+    bidDepth: z.number().int(),
+    askDepth: z.number().int(),
+  }),
+  refCents: z.number().int(),
+  lastCents: z.number().int().nullable(),
+});
+
+/** A resting market order. */
+export const marketOrderSchema = z.object({
+  id: idSchema,
+  owner: idSchema,
+  hub: idSchema,
+  good: goodSchema,
+  side: sideSchema,
+  price: z.number().int(),
+  qty: z.number().int(),
+  seq: z.number().int(),
+});
+
 /** Mirrors `PlayerView` from `viewFor` in `@nexum/sim`: fogged, never holds rivals' private data. */
 export const playerViewSchema = z.object({
   playerId: idSchema,
@@ -195,6 +224,16 @@ export const playerViewSchema = z.object({
   movements: z.record(idSchema, movementSchema),
   convoys: z.array(seenConvoySchema),
   reveals: z.record(idSchema, z.number()),
+  markets: z.record(idSchema, z.record(goodSchema, marketBookViewSchema)),
+  orders: z.array(marketOrderSchema),
+  graph: z.object({
+    nodes: z.record(
+      idSchema,
+      z.object({ id: idSchema, type: z.enum(['district', 'junction']), pos: posSchema }),
+    ),
+    edges: z.array(z.object({ a: idSchema, b: idSchema, lengthM: z.number() })),
+    hubs: z.array(idSchema),
+  }),
 });
 
 /** Mirrors `Standing` from `standings` in `@nexum/sim`. */

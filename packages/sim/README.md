@@ -18,7 +18,7 @@ const { state, events } = step(prev, inputs, toMs);
 
 ## Systems
 
-`src/systems.ts` holds the registry: `System = { name, settle?, handlers? }`. Today: `travel`, `production`, `construction`. Siege, markets, fog, scoring and the frontier (later tasks) plug in by adding a system and extending the `QueuedEvent` union.
+`src/systems.ts` holds the registry: `System = { name, settle?, handlers? }`. Today: `travel`, `production`, `construction`. Siege, markets, fog and scoring are systems; the frontier (task 1A) plugs in by adding a system and extending the `QueuedEvent` union.
 
 ## Events
 
@@ -37,3 +37,15 @@ const { state, events } = step(prev, inputs, toMs);
 - `siege` and `reinforce` orders; one capture bar per district (`state.sieges`), exact and lazy. `progressAt`, `siegeFraction` and `isProtected` read it. Events: `siege.started`, `siege.progress` (every 10%), `siege.captured` (with a battle `report`), `siege.broken`, `combat.round`. Tuning lives in `balance.siege`.
 - `viewFor(state, playerId)` gives a JSON-safe, player-specific `PlayerView` (own districts in full, districts in sight, remembered owners elsewhere, convoys in sight). `sightOf` is the underlying set.
 - `state.season` holds the clock (`startMs`, `endMs`, `finaleStartMs`, `finale`). Score is exact district-milliseconds; `standings(state)` ranks players; `score.tick` fires hourly. Below-median players recruit faster and captures against the leader are faster.
+
+## Frontier
+
+Open plots along the city edge keep newcomers placed (`frontier.ts`: `ensureFrontier`, `chooseStartPlot`). `createWorld(seed, { startMs })`, `addPlayer` without a district id, and `addPlayerWithEvents` are the entry points. Tuning is in `balance.frontier`.
+
+## Markets
+
+`market.place { hub, side, good, price, qty }` and `market.cancel { orderId }`. One book per hub and good in `state.markets`; orders fill instantly when they cross, at the resting price, with price-time priority. Escrow is held by the order (goods from the hub stash, or credits). Virtual civic traders quote the reference plus and minus 8% with limited hourly depth (`civicBid`, `civicAsk`); an hourly `market.tick` refills depth, pulls the reference back and sweeps. `viewFor` includes `markets` (public) and `orders` (yours). Tuning is in `balance.market`; decisions are in `docs/rewrite/sim-spec.md`.
+
+## Season harness
+
+`runSeason({ seed, days, bots })` plays a scripted season (raider, turtle and merchant bots in `bots.ts`) and returns the recorded inputs, final state, hash, capture and fill counts and any invariant problems. `replay(start, inputs, sliceMs, toMs?)` rebuilds it in any time slicing (0 is one jump) to prove `step` is exact. `checkInvariants(state)` lists negative stock or credits and units in two places. Run `npm run sim:season` for a printed summary with timing (timing lives in the script, since the sim reads no clock). Findings are in `docs/rewrite/sim-spec.md`.
