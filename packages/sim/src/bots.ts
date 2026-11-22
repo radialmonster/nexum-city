@@ -1,6 +1,7 @@
 import { MS_PER_HOUR, balance, toAtoms, toUnits } from './balance.js';
 import { buildCost } from './construction.js';
-import { sightOf, towerReach } from './fog.js';
+import { estimateClear, pickClearCrews, visibleAmbush } from './clear.js';
+import { sightOf, strengthRange, towerReach } from './fog.js';
 import { buildingLevel, totalGoods, warehouseCapacity } from './production.js';
 import { civicAsk, civicBid } from './market.js';
 import { depositFor, referenceValue } from './contracts.js';
@@ -17,6 +18,7 @@ import {
   type Good,
   type Goods,
   type Id,
+  type Movement,
   type Order,
 } from './types.js';
 
@@ -934,16 +936,56 @@ export function streetJobOrders(s: GameState, me: Id, taken: Order[]): Order[] {
   return [];
 }
 
+/**
+ * "Break it up": once per check-in a bot may send its free crews at an ambush it can see, when the
+ * fogged estimate says it is likely to win. `nearOwn` limits it to ambushes on a street with an end
+ * at one of its own districts (the Turtle defends its doorstep and does not go looking). Taken after
+ * every other plan so it only uses crews nothing else wanted.
+ */
+export function clearOrders(s: GameState, me: Id, taken: Order[], nearOwn: boolean): Order[] {
+  const used = new Set<Id>();
+  for (const o of taken) {
+    if ('crewIds' in o) for (const id of o.crewIds) used.add(id);
+    if ('carrierId' in o && o.carrierId) used.add(o.carrierId);
+  }
+  const going = new Set(
+    Object.values(s.movements)
+      .filter((m) => m.kind === 'clear' && m.owner === me)
+      .map((m) => m.clear?.ambushId),
+  );
+  const owned = new Set(mine(s, me).map((d) => d.id));
+  for (const id of Object.keys(s.movements).sort()) {
+    const m = s.movements[id] as Movement;
+    const r = m.raid;
+    if (going.has(id) || !r || !visibleAmbush(s, me, id)) continue;
+    if (nearOwn && !owned.has(r.a) && !owned.has(r.b)) continue;
+    const pick = pickClearCrews(s, me, r, used);
+    if (!pick) continue;
+    const range = strengthRange(m.crewIds.reduce((n, c) => n + (s.crews[c]?.strength ?? 0), 0));
+    if (estimateClear(pick.strength, { strength: range }).label === 'risky') continue;
+    const order: Order = {
+      type: 'ambush.clear',
+      ambushId: id,
+      crewIds: pick.crewIds,
+      carrierId: pick.carrierId,
+    };
+    if (validateOrder(s, { actorId: me, order }).ok) return [order];
+  }
+  return [];
+}
+
 const withJobs =
-  (bot: Bot): Bot =>
+  (bot: Bot, clears?: 'any' | 'near'): Bot =>
   (s, me) => {
     const orders = bot(s, me);
-    return [...orders, ...streetJobOrders(s, me, orders)];
+    const jobs = streetJobOrders(s, me, orders);
+    const all = [...orders, ...jobs];
+    return clears ? [...all, ...clearOrders(s, me, all, clears === 'near')] : all;
   };
 
 export const BOTS: Record<BotKind, Bot> = {
   raider: withJobs(raider),
-  turtle: withJobs(turtle),
+  turtle: withJobs(turtle, 'near'),
   merchant: withJobs(merchant),
-  hunter: withJobs(hunter),
+  hunter: withJobs(hunter, 'any'),
 };

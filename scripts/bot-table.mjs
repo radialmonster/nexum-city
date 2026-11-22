@@ -7,6 +7,7 @@ const days = Number(process.argv[3] ?? 7);
 const agg = {};
 const rates = [];
 const vic = {};
+const clr = {};
 let hit = 0,
   decided = 0,
   raids = 0;
@@ -23,6 +24,13 @@ for (let seed = 1; seed <= n; seed++) {
     const v = (vic[bot] ??= { hit: 0, n: 0 });
     v.hit += t.hit;
     v.n += t.hit + t.repelled + t.evaded;
+  }
+  for (const [id, c] of Object.entries(r.clearsBy ?? {})) {
+    const bot = r.players.find((p) => p.id === id)?.bot ?? 'other';
+    const v = (clr[bot] ??= { won: 0, held: 0, gone: 0 });
+    v.won += c.won;
+    v.held += c.held;
+    v.gone += c.gone;
   }
   for (const s of r.standings) {
     const bot = r.players.find((p) => p.id === s.playerId).bot;
@@ -44,6 +52,12 @@ console.log('raid success against each type:');
 for (const [bot, v] of Object.entries(vic)) {
   console.log(
     `  ${bot.padEnd(9)} ${((100 * v.hit) / Math.max(1, v.n)).toFixed(0)}% (${v.hit}/${v.n})`,
+  );
+}
+console.log('clears (won/held/gone) by clearing bot type:');
+for (const [bot, v] of Object.entries(clr)) {
+  console.log(
+    `  ${bot.padEnd(9)} ${v.won}/${v.held}/${v.gone} (${v.won + v.held + v.gone} attempted)`,
   );
 }
 const best = Math.max(
