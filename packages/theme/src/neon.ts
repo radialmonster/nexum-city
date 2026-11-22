@@ -160,6 +160,8 @@ export const neonSize = {
   stack: 10,
   row: 18,
   control: 30,
+  /** The smallest comfortable touch target: phone buttons and tabs are at least this tall. */
+  touch: 44,
   icon: 26,
   gauge: 120,
   spark: 90,

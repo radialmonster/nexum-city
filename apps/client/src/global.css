@@ -39,3 +39,17 @@ body {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* Phone and touch: every control is a comfortable touch target (token, scaled with the UI). */
+[data-compact='true'] button,
+[data-compact='true'] [role='tab'] {
+  min-height: var(--size-touch);
+  min-width: var(--size-touch);
+}
+
+@media (pointer: coarse) {
+  button,
+  [role='tab'] {
+    min-height: var(--size-touch);
+  }
+}

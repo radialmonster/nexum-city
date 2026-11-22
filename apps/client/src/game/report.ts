@@ -1,6 +1,12 @@
 import type { FeedItem, PlayerView } from '@nexum/contracts';
+import { whoIs, type CrewNames } from './derive';
 
-export const REPORT_KINDS = ['siege.captured', 'siege.broken', 'combat.round'] as const;
+export const REPORT_KINDS = [
+  'siege.started',
+  'siege.captured',
+  'siege.broken',
+  'combat.round',
+] as const;
 
 /** True for the feed events that open a battle report when clicked. */
 export const hasReport = (kind: string): boolean =>
@@ -55,6 +61,7 @@ export function buildReport(
   feed: readonly FeedItem[],
   view: PlayerView,
   seq: number,
+  names: CrewNames = {},
 ): BattleReport | null {
   const hit = feed.find((f) => f.seq === seq);
   if (!hit || !hasReport(hit.event.kind)) return null;
@@ -110,13 +117,20 @@ export function buildReport(
       : 'broken'
     : 'ongoing';
   const districtName = view.districts[districtId]?.name ?? districtId;
-  const name = (id: string): string => (id === view.playerId ? 'You' : id);
+  const me = view.playerId;
+  const name = (id: string): string => whoIs(names, me, id);
+  const from_ = defender === 'neutral' ? 'nobody' : defender === me ? 'you' : name(defender);
+  const reason = str(data, 'reason') ? ` (${String(str(data, 'reason'))})` : '';
   const summary =
     outcome === 'captured'
-      ? `${name(attacker)} took ${districtName} from ${defender === 'neutral' ? 'nobody' : name(defender)}.`
+      ? `${name(attacker)} took ${districtName} from ${from_}.`
       : outcome === 'broken'
-        ? `The siege of ${districtName} by ${name(attacker)} ended without a capture${str(data, 'reason') ? ` (${String(str(data, 'reason'))})` : ''}.`
-        : `${name(attacker)} is still besieging ${districtName}.`;
+        ? attacker === me
+          ? `Your crews' siege of ${districtName} ended without a capture${reason}.`
+          : `The siege of ${districtName} by ${name(attacker)} ended without a capture${reason}.`
+        : attacker === me
+          ? `Your crews are still besieging ${districtName}.`
+          : `${name(attacker)} is still besieging ${districtName}.`;
 
   return {
     districtId,

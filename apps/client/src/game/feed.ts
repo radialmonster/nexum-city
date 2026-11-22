@@ -1,5 +1,6 @@
 import type { FeedItem, PlayerView } from '@nexum/contracts';
 import type { Tone } from '../ui';
+import { whoIs, type CrewNames } from './derive';
 
 /** One line of the "While you were away" column. */
 export interface FeedEntry {
@@ -14,6 +15,12 @@ export interface FeedEntry {
   readonly districtId: string | null;
   /** The sim event kind, so the column can open a battle report for siege events. */
   readonly eventKind: string;
+  /** A running siege: rounds fought so far and the latest strengths. */
+  readonly siege?: {
+    readonly rounds: number;
+    readonly attackerStrength: number;
+    readonly defenderStrength: number;
+  };
 }
 
 type Data = FeedItem['event']['data'];
@@ -36,9 +43,14 @@ export function formatUnits(n: number): string {
 
 /**
  * Turns a sim event into a feed line, or `null` for events a player does not need to read
- * (siege progress ticks, combat rounds, score ticks).
+ * (siege progress ticks, score ticks). Combat rounds are folded into the siege entry by
+ * `feedEntries`.
  */
-export function describeEvent(item: FeedItem, view: PlayerView): FeedEntry | null {
+export function describeEvent(
+  item: FeedItem,
+  view: PlayerView,
+  names: CrewNames = {},
+): FeedEntry | null {
   const { event } = item;
   const d = event.data;
   const me = view.playerId;
@@ -47,7 +59,7 @@ export function describeEvent(item: FeedItem, view: PlayerView): FeedEntry | nul
     if (!id) return 'the city';
     return view.districts[id]?.name ?? id;
   };
-  const who = (id: string | undefined): string => (id === me ? 'You' : (id ?? 'Someone'));
+  const who = (id: string | undefined): string => (id ? whoIs(names, me, id) : 'Someone');
   const base = { seq: item.seq, at: event.at, districtId: placeId, eventKind: event.kind };
 
   switch (event.kind) {
@@ -201,7 +213,9 @@ export function describeEvent(item: FeedItem, view: PlayerView): FeedEntry | nul
       };
     case 'player.joined': {
       const actor = event.actors[0];
-      const crew = str(d, 'crew') ?? actor ?? 'A new crew';
+      const crew = actor
+        ? (names[actor] ?? str(d, 'crew') ?? actor)
+        : (str(d, 'crew') ?? 'A new crew');
       const district = str(d, 'district') ?? (placeId ? name(placeId) : 'a plot');
       const side = str(d, 'side');
       const where = side && side !== 'centre' ? ` on the ${side} frontier` : '';
@@ -238,4 +252,61 @@ export function ago(nowMs: number, atMs: number): string {
   const h = Math.floor(m / 60);
   if (h < 48) return `${String(h)}h ago`;
   return `${String(Math.floor(h / 24))}d ago`;
+}
+
+const num2 = (v: unknown): number => (typeof v === 'number' ? v : 0);
+
+/**
+ * The feed column's entries, newest first. Combat rounds are not lines of their own: the latest
+ * round of a siege that is still running is folded into its `siege.started` card, which then
+ * sits at the top as one running entry. A card is "running" until a capture or break closes it.
+ */
+export function buildFeedEntries(
+  view: PlayerView,
+  feed: readonly FeedItem[],
+  names: CrewNames = {},
+  limit = 40,
+): FeedEntry[] {
+  const out: FeedEntry[] = [];
+  /** district id -> index in `out` of the siege card still open there */
+  const open = new Map<string, number>();
+  for (const item of feed) {
+    const { event } = item;
+    const place = event.districts[0];
+    if (event.kind === 'combat.round') {
+      const i = place === undefined ? undefined : open.get(place);
+      const card = i === undefined ? undefined : out[i];
+      if (i !== undefined && card) {
+        out.splice(i, 1);
+        // the card moves to the end: it was active most recently
+        out.push({
+          ...card,
+          at: event.at,
+          siege: {
+            rounds: (card.siege?.rounds ?? 0) + 1,
+            attackerStrength: num2(event.data['attackerStrength']),
+            defenderStrength: num2(event.data['defenderStrength']),
+          },
+        });
+        for (const [k, v] of open) if (v > i) open.set(k, v - 1);
+        open.set(place as string, out.length - 1);
+      }
+      continue;
+    }
+    if (event.kind === 'siege.captured' || event.kind === 'siege.broken') {
+      if (place !== undefined) open.delete(place);
+    }
+    const entry = describeEvent(item, view, names);
+    if (!entry) continue;
+    out.push(entry);
+    if (event.kind === 'siege.started' && place !== undefined) open.set(place, out.length - 1);
+  }
+  return out.reverse().slice(0, limit);
+}
+
+/** The running-siege line under a card's text, or null for any other entry. */
+export function siegeProgress(e: FeedEntry): string | null {
+  if (!e.siege) return null;
+  const n = e.siege.rounds;
+  return `Round ${String(n)}: attack ${formatUnits(e.siege.attackerStrength)} against defence ${formatUnits(e.siege.defenderStrength)}.`;
 }

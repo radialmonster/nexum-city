@@ -15,6 +15,7 @@ const me = () => ({
   ok: true as const,
   account: { id: 1, username: 'ann' },
   playerId: 'me',
+  names: { me: 'Ann' },
   view: makeView(),
 });
 

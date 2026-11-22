@@ -201,13 +201,19 @@ export function gameRoutes(game: Game): Hono<Env> {
       account: { id: account.id, username: account.username },
       playerId: account.playerId,
       view,
+      names: store.crewNames(),
     };
     return c.json(res);
   });
 
   api.get('/standings', requireAuth, (c) => {
     const state = engine.current;
-    const res: StandingsResponse = { ok: true, nowMs: state.nowMs, standings: standings(state) };
+    const res: StandingsResponse = {
+      ok: true,
+      nowMs: state.nowMs,
+      standings: standings(state),
+      names: store.crewNames(),
+    };
     return c.json(res);
   });
 

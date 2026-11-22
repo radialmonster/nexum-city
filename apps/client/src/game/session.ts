@@ -80,7 +80,7 @@ export function createSession(store: GameStore, overrides: Partial<SessionDeps> 
     lastRefresh = deps.wallNow();
     try {
       const me = await deps.api.me();
-      store.dispatch({ type: 'view', view: me.view, at: deps.wallNow() });
+      store.dispatch({ type: 'view', view: me.view, at: deps.wallNow(), names: me.names });
     } catch (e) {
       if (e instanceof ApiError && e.code === 'unauthorized') {
         stopLive();
@@ -133,6 +133,7 @@ export function createSession(store: GameStore, overrides: Partial<SessionDeps> 
       type: 'session',
       account: me.account,
       view: me.view,
+      names: me.names,
       at,
       lastSeenMs: readSeen(me.playerId),
     });

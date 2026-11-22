@@ -20,6 +20,7 @@ describe('api', () => {
         ok: true,
         account: { id: 1, username: 'ann' },
         playerId: 'me',
+        names: { me: 'Me' },
         view: makeView(),
       }),
     );

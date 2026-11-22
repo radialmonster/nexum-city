@@ -1,5 +1,5 @@
 import type { FeedItem, PlayerView } from '@nexum/contracts';
-import { shortName } from './derive';
+import { crewName, type CrewNames } from './derive';
 
 export interface DossierDistrict {
   readonly id: string;
@@ -44,6 +44,7 @@ export function buildDossier(
   feed: readonly FeedItem[],
   playerId: string,
   limit = 8,
+  names: CrewNames = {},
 ): Dossier {
   const me = view.playerId;
   const standing = view.standings.find((s) => s.playerId === playerId);
@@ -133,7 +134,7 @@ export function buildDossier(
 
   return {
     playerId,
-    name: shortName(playerId),
+    name: crewName(names, playerId),
     rank: standing?.rank ?? null,
     score: standing?.score ?? null,
     districtCount: districts.length > 0 || standing ? districts.length : null,

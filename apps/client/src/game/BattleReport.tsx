@@ -3,11 +3,12 @@ import { vars } from '../ui/util';
 import styles from './BattleReport.module.css';
 import type { BattleReport as Report } from './report';
 import { formatUnits } from './feed';
-import { shortName } from './derive';
+import { whoIs, type CrewNames } from './derive';
 
 export interface BattleReportProps {
   readonly report: Report;
   readonly me: string;
+  readonly names?: CrewNames | undefined;
   readonly nowMs: number;
   readonly onRival: (playerId: string) => void;
   readonly onFly: (districtId: string) => void;
@@ -20,8 +21,15 @@ const clock = (ms: number | null): string =>
   ms === null ? '-' : new Date(ms).toISOString().slice(5, 16).replace('T', ' ');
 
 /** One siege, told from the events: who fought, how the strength moved, what it cost. */
-export function BattleReport({ report: r, me, onRival, onFly, onClose }: BattleReportProps) {
-  const who = (id: string): string => (id === me ? 'You' : shortName(id));
+export function BattleReport({
+  report: r,
+  me,
+  names = {},
+  onRival,
+  onFly,
+  onClose,
+}: BattleReportProps) {
+  const who = (id: string): string => whoIs(names, me, id);
   const loot = Object.entries(r.loot).filter(([, n]) => n > 0);
   const series = (pick: (p: Report['rounds'][number]) => number): number[] => {
     const xs = r.rounds.map(pick);

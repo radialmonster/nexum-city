@@ -51,17 +51,22 @@ export const authResponseSchema = z.object({
 });
 export const okResponseSchema = z.object({ ok: z.literal(true) });
 
+/** Crew names by player id: usernames for humans, crew names for bots. Public to every player. */
+export const crewNamesSchema = z.record(idSchema, z.string());
+
 export const meResponseSchema = z.object({
   ok: z.literal(true),
   account: accountSchema,
   playerId: idSchema,
   view: playerViewSchema,
+  names: crewNamesSchema,
 });
 
 export const standingsResponseSchema = z.object({
   ok: z.literal(true),
   nowMs: z.number(),
   standings: z.array(standingSchema),
+  names: crewNamesSchema,
 });
 
 export const placeOrderRequestSchema = z.strictObject({ order: orderSchema });

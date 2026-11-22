@@ -1,7 +1,8 @@
 import type { FeedItem, PlayerView } from '@nexum/contracts';
 import { Panel } from '../ui';
 import { cx, toneColor, vars } from '../ui/util';
-import { ago, describeEvent, type FeedEntry } from './feed';
+import { ago, buildFeedEntries, siegeProgress, type FeedEntry } from './feed';
+import type { CrewNames } from './derive';
 import styles from './FeedPanel.module.css';
 import { hasReport } from './report';
 
@@ -11,6 +12,7 @@ export interface FeedPanelProps {
   /** Game time of the previous visit: entries after it are marked new. */
   readonly lastSeenMs: number;
   readonly nowMs: number;
+  readonly names?: CrewNames | undefined;
   readonly onFly: (districtId: string) => void;
   /** Opens the battle report for a siege event (by feed seq). */
   readonly onReport?: ((seq: number) => void) | undefined;
@@ -23,15 +25,9 @@ export function feedEntries(
   view: PlayerView,
   feed: readonly FeedItem[],
   limit: number,
+  names: CrewNames = {},
 ): FeedEntry[] {
-  const out: FeedEntry[] = [];
-  for (let i = feed.length - 1; i >= 0 && out.length < limit; i--) {
-    const item = feed[i];
-    if (!item) continue;
-    const e = describeEvent(item, view);
-    if (e) out.push(e);
-  }
-  return out;
+  return buildFeedEntries(view, feed, names, limit);
 }
 
 /** "While you were away": events since the last visit, newest first; a click flies the map there. */
@@ -40,11 +36,12 @@ export function FeedPanel({
   feed,
   lastSeenMs,
   nowMs,
+  names,
   onFly,
   onReport,
   limit = 40,
 }: FeedPanelProps) {
-  const entries = feedEntries(view, feed, limit);
+  const entries = feedEntries(view, feed, limit, names);
   const away = lastSeenMs > 0 ? ago(nowMs, lastSeenMs) : null;
   const fresh = entries.filter((e) => e.at > lastSeenMs).length;
   return (
@@ -77,6 +74,7 @@ export function FeedPanel({
                     {e.kind} <small>{ago(nowMs, e.at)}</small>
                   </span>
                   <span className={styles['text']}>{e.text}</span>
+                  {siegeProgress(e) && <span className={styles['text']}>{siegeProgress(e)}</span>}
                 </span>
               </button>
             </li>

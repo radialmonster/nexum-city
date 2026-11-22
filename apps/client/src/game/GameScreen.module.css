@@ -81,5 +81,17 @@
 }
 
 .game[data-compact='true'] > .timeline {
+  grid-area: map;
+  z-index: var(--z-hud);
+  overflow-y: auto;
+  background: var(--color-panel-solid);
+}
+
+.game[data-compact='true'] > .timeline > * {
+  max-height: none;
+  min-height: 100%;
+}
+
+.timeline[hidden] {
   display: none;
 }

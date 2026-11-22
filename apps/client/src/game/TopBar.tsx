@@ -2,13 +2,15 @@ import type { GoodName, PlayerView } from '@nexum/contracts';
 import { toUnits } from '@nexum/sim';
 import { Button, Chip } from '../ui';
 import { cx, factionColor, vars, type Faction } from '../ui/util';
-import { raceOf, seasonClock, shortName, warehouseTotals } from './derive';
+import type { CrewNames } from './derive';
+import { crewName, raceOf, seasonClock, warehouseTotals } from './derive';
 import { formatUnits } from './feed';
 import styles from './TopBar.module.css';
 
 export interface TopBarProps {
   readonly view: PlayerView;
   readonly nowMs: number;
+  readonly names?: CrewNames | undefined;
   readonly username: string;
   /** How many events need attention (sieges against you). */
   readonly alerts: number;
@@ -28,6 +30,7 @@ const SEGMENT_ROLES: readonly Faction[] = ['merchant', 'raider', 'turtle', 'riva
 export function TopBar({
   view,
   nowMs,
+  names = {},
   username,
   alerts,
   link,
@@ -67,7 +70,7 @@ export function TopBar({
                 ),
                 '--share': Math.max(s.share, 0.01),
               })}
-              title={s.me ? 'You' : shortName(s.id)}
+              title={s.me ? 'You' : crewName(names, s.id)}
             />
           ))}
         </div>

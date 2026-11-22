@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { ago, describeEvent, formatUnits } from './feed';
+import {
+  ago,
+  buildFeedEntries,
+  describeEvent,
+  formatUnits,
+  siegeProgress,
+  type FeedEntry,
+} from './feed';
 import { feedItem, makeView } from './testing';
 
 const view = makeView();
@@ -60,7 +67,7 @@ describe('describeEvent', () => {
   });
 
   it('hides events a player does not need to read', () => {
-    for (const k of ['siege.progress', 'combat.round', 'score.tick'] as const)
+    for (const k of ['siege.progress', 'score.tick'] as const)
       expect(describeEvent(feedItem(1, k), view)).toBeNull();
   });
 });
@@ -71,5 +78,46 @@ describe('formatting', () => {
   });
   it('says how long ago', () => {
     expect(ago(10 * 60_000, 0)).toMatch(/10/);
+  });
+});
+
+describe('buildFeedEntries', () => {
+  const started = feedItem(1, 'siege.started', {
+    actors: ['rival'],
+    districts: ['a'],
+    data: { attacker: 'rival', defender: 'me' },
+  });
+  const rnd = (seq: number, r: number, a: number, d: number) =>
+    feedItem(seq, 'combat.round', {
+      districts: ['a'],
+      data: { round: r, attackerStrength: a, defenderStrength: d },
+    });
+  const view = makeView();
+
+  it('shows siege.started and folds rounds into one running card', () => {
+    const out = buildFeedEntries(view, [started, rnd(2, 1, 90, 70), rnd(3, 2, 80, 60)], {});
+    expect(out).toHaveLength(1);
+    expect(out[0]?.eventKind).toBe('siege.started');
+    expect(out[0]?.siege).toEqual({ rounds: 2, attackerStrength: 80, defenderStrength: 60 });
+    expect(siegeProgress(out[0] as FeedEntry)).toContain('Round 2');
+  });
+
+  it('ignores rounds with no open siege and closes the card on capture', () => {
+    expect(buildFeedEntries(view, [rnd(1, 1, 5, 5)], {})).toHaveLength(0);
+    const out = buildFeedEntries(
+      view,
+      [
+        started,
+        feedItem(2, 'siege.broken', { districts: ['a'], actors: ['rival'] }),
+        rnd(3, 1, 1, 1),
+      ],
+      {},
+    );
+    expect(out.every((e) => !e.siege)).toBe(true);
+  });
+
+  it('uses crew names', () => {
+    const out = buildFeedEntries(view, [started], { rival: 'Iron Wolves' });
+    expect(JSON.stringify(out)).toContain('Iron Wolves');
   });
 });

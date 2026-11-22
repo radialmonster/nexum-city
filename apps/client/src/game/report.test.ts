@@ -78,7 +78,7 @@ describe('buildReport', () => {
   });
 
   it('refuses other events', () => {
-    expect(buildReport(feed, view, 1)).toBeNull();
+    expect(buildReport(feed, view, 9999)).toBeNull();
     expect(hasReport('arrived')).toBe(false);
     expect(hasReport('siege.broken')).toBe(true);
   });

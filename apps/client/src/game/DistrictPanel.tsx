@@ -7,16 +7,16 @@ import {
   crewsAt,
   fromKitStance,
   GOOD_KEYS,
+  ownDistricts,
   isOwn,
   KIND_GOOD,
   nearby,
   productionPerHour,
-  shortName,
   toKitStance,
   warehouseCapacity,
   type OwnDistrict,
 } from './derive';
-import { formatEta } from './derive';
+import { crewName, empireSummary, formatEta, type CrewNames } from './derive';
 import { formatUnits } from './feed';
 import styles from './DistrictPanel.module.css';
 
@@ -30,6 +30,7 @@ export const GOOD_TONE: Readonly<Record<(typeof GOOD_KEYS)[number], Tone>> = {
 export interface DistrictPanelProps {
   readonly view: PlayerView;
   readonly districtId: string | null;
+  readonly names?: CrewNames | undefined;
   readonly nowMs: number;
   readonly onStance: (districtId: string, stance: 'hold' | 'pullback') => void;
   readonly onBuild: (districtId: string) => void;
@@ -50,6 +51,7 @@ const relationLabel = (d: DistrictView, me: string): string => {
 /** The right column: the selected district, what is in it, and what you can do there. */
 export function DistrictPanel({
   view,
+  names = {},
   districtId,
   nowMs,
   onStance,
@@ -59,13 +61,7 @@ export function DistrictPanel({
   onRival,
 }: DistrictPanelProps) {
   const d = districtId ? view.districts[districtId] : undefined;
-  if (!d) {
-    return (
-      <Panel title="District" tag="NONE SELECTED" className={styles['panel']}>
-        <p className={styles['empty']}>Pick a district on the map or in the feed to see it here.</p>
-      </Panel>
-    );
-  }
+  if (!d) return <Empire view={view} onFly={onFly} />;
   return (
     <Panel
       title={d.name}
@@ -78,16 +74,16 @@ export function DistrictPanel({
         <p className={styles['empty']}>
           Last seen under{' '}
           {d.lastKnownOwner && onRival ? (
-            <RivalLink id={d.lastKnownOwner} me={view.playerId} onRival={onRival} />
+            <RivalLink id={d.lastKnownOwner} me={view.playerId} names={names} onRival={onRival} />
           ) : d.lastKnownOwner ? (
-            shortName(d.lastKnownOwner)
+            crewName(names, d.lastKnownOwner)
           ) : (
             'nobody'
           )}
           . Send a scout to see it now.
         </p>
       ) : (
-        <Seen d={d} me={view.playerId} onMarket={onMarket} onRival={onRival} />
+        <Seen d={d} me={view.playerId} names={names} onMarket={onMarket} onRival={onRival} />
       )}
       <Nearby view={view} id={d.id} onFly={onFly} />
     </Panel>
@@ -222,10 +218,12 @@ function Own({
 function RivalLink({
   id,
   me,
+  names,
   onRival,
 }: {
   id: string;
   me: string;
+  names: CrewNames;
   onRival: (playerId: string) => void;
 }) {
   if (id === me) return <>you</>;
@@ -237,7 +235,7 @@ function RivalLink({
         onRival(id);
       }}
     >
-      {shortName(id)}
+      {crewName(names, id)}
     </button>
   );
 }
@@ -245,9 +243,11 @@ function RivalLink({
 function Seen({
   d,
   me,
+  names,
   onMarket,
   onRival,
 }: {
+  names: CrewNames;
   d: Exclude<DistrictView, { relation: 'own' | 'remembered' }>;
   me: string;
   onMarket: DistrictPanelProps['onMarket'];
@@ -259,9 +259,9 @@ function Seen({
       <div className={styles['chips']}>
         <Tag faction="rival">
           {d.owner && onRival ? (
-            <RivalLink id={d.owner} me={me} onRival={onRival} />
+            <RivalLink id={d.owner} me={me} names={names} onRival={onRival} />
           ) : d.owner ? (
-            shortName(d.owner)
+            crewName(names, d.owner)
           ) : (
             'NO OWNER'
           )}
@@ -289,7 +289,7 @@ function Seen({
       </div>
       {d.siege && (
         <div className={styles['block']}>
-          <span className={styles['cap']}>CAPTURE BAR - {shortName(d.siege.attacker)}</span>
+          <span className={styles['cap']}>CAPTURE BAR - {crewName(names, d.siege.attacker)}</span>
           <Bar value={d.siege.progress} faction="raider" segmented label="Capture progress" />
         </div>
       )}
@@ -300,7 +300,7 @@ function Seen({
         ) : (
           presence.map(([who, n]) => (
             <span key={who} className={styles['line']}>
-              {shortName(who)}: {n} crew{n === 1 ? '' : 's'}
+              {crewName(names, who)}: {n} crew{n === 1 ? '' : 's'}
             </span>
           ))
         )}
@@ -341,5 +341,55 @@ function Nearby({
         ))}
       </ul>
     </div>
+  );
+}
+
+/** Nothing selected: what the whole empire adds up to, and a way to jump to each district. */
+function Empire({ view, onFly }: Pick<DistrictPanelProps, 'view' | 'onFly'>) {
+  const e = empireSummary(view);
+  const own = ownDistricts(view);
+  return (
+    <Panel title="Your empire" tag="NONE SELECTED" className={styles['panel']}>
+      <div className={styles['stack']}>
+        <div className={styles['chips']}>
+          <Chip label="DISTRICTS" value={String(e.districts)} />
+          <Chip label="CREWS" value={String(e.crews)} />
+          <Chip label="CARRIERS" value={String(e.carriers)} />
+        </div>
+        <div className={styles['block']}>
+          <span className={styles['cap']}>INCOME PER HOUR</span>
+          {e.totalPerHour > 0 ? (
+            GOOD_KEYS.filter((g) => e.perHour[g] > 0).map((g) => (
+              <span key={g} className={styles['line']}>
+                {formatUnits(e.perHour[g])} {g}
+              </span>
+            ))
+          ) : (
+            <span className={styles['line']}>Nothing made yet.</span>
+          )}
+        </div>
+        {e.besieged > 0 && (
+          <span className={styles['status']} data-tone="danger">
+            {e.besieged} UNDER SIEGE
+          </span>
+        )}
+        <div className={styles['block']}>
+          <span className={styles['cap']}>YOUR DISTRICTS</span>
+          {own.map((d) => (
+            <Button
+              key={d.id}
+              onClick={() => {
+                onFly(d.id);
+              }}
+            >
+              {d.name}
+            </Button>
+          ))}
+        </div>
+        <small className={styles['hint']}>
+          Pick a district on the map or in the feed for details.
+        </small>
+      </div>
+    </Panel>
   );
 }

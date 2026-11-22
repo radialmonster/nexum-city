@@ -224,6 +224,16 @@ export class Store {
     this.q('UPDATE bots SET retired_ms = ? WHERE player_id = ?').run(nowMs, playerId);
   }
 
+  /** Public crew names by player id: usernames, overridden by bot crew names. */
+  crewNames(): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const r of this.q('SELECT player_id, username FROM accounts').all() as Row[]) {
+      out[String(r['player_id'])] = String(r['username']);
+    }
+    for (const b of this.allBots()) out[b.playerId] = b.name;
+    return out;
+  }
+
   countAccounts(): number {
     return Number((this.q('SELECT COUNT(*) AS n FROM accounts').get() as Row)['n']);
   }

@@ -1,3 +1,4 @@
+import type { CrewNames } from './derive';
 import type { FeedItem, PlayerView } from '@nexum/contracts';
 import { useContext, useSyncExternalStore, createContext } from 'react';
 import type { Tone } from '../ui';
@@ -31,6 +32,8 @@ export interface GameState {
   readonly view: PlayerView | null;
   /** Wall-clock time (ms) when `view` arrived, to keep the game clock moving between updates. */
   readonly viewAt: number;
+  /** Crew display names by player id, from the server. */
+  readonly names: CrewNames;
   /** Oldest first, deduplicated by `seq`. */
   readonly feed: readonly FeedItem[];
   readonly cursor: number;
@@ -49,6 +52,7 @@ export const initialState: GameState = {
   account: null,
   view: null,
   viewAt: 0,
+  names: {},
   feed: [],
   cursor: 0,
   lastSeenMs: 0,
@@ -61,8 +65,15 @@ export const initialState: GameState = {
 
 export type GameAction =
   | { type: 'anon' }
-  | { type: 'session'; account: Account; view: PlayerView; at: number; lastSeenMs: number }
-  | { type: 'view'; view: PlayerView; at: number }
+  | {
+      type: 'session';
+      account: Account;
+      view: PlayerView;
+      at: number;
+      lastSeenMs: number;
+      names?: CrewNames;
+    }
+  | { type: 'view'; view: PlayerView; at: number; names?: CrewNames }
   | { type: 'feed'; items: readonly FeedItem[] }
   | { type: 'link'; link: LinkState }
   | { type: 'toast'; toast: ToastMessage }
@@ -97,9 +108,15 @@ export function reduce(state: GameState, action: GameAction): GameState {
         view: action.view,
         viewAt: action.at,
         lastSeenMs: action.lastSeenMs,
+        names: action.names ?? state.names,
       };
     case 'view':
-      return { ...state, view: action.view, viewAt: action.at };
+      return {
+        ...state,
+        view: action.view,
+        viewAt: action.at,
+        names: action.names ?? state.names,
+      };
     case 'feed': {
       const feed = mergeFeed(state.feed, action.items);
       if (feed === state.feed) return state;

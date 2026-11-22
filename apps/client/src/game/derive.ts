@@ -152,3 +152,43 @@ export function formatHours(h: number): string {
 
 /** Short wire id shown to players, e.g. a rival's name. */
 export const shortName = (id: string): string => (id.length > 14 ? `${id.slice(0, 12)}..` : id);
+
+/** Crew names by player id, as sent by `/me` and `/standings`. */
+export type CrewNames = Readonly<Record<string, string>>;
+
+/** A crew's display name: the server's name for it, else a shortened id. */
+export const crewName = (names: CrewNames, id: string): string => names[id] ?? shortName(id);
+
+/** "You" for the player, a crew name for everyone else. */
+export const whoIs = (names: CrewNames, me: string, id: string): string =>
+  id === me ? 'You' : crewName(names, id);
+
+export interface EmpireSummary {
+  readonly districts: number;
+  readonly crews: number;
+  readonly carriers: number;
+  /** Units per hour by good, from your built districts. */
+  readonly perHour: Goods;
+  readonly totalPerHour: number;
+  readonly besieged: number;
+}
+
+/** What you hold at a glance: districts, crews, carriers and goods made per hour. */
+export function empireSummary(view: PlayerView): EmpireSummary {
+  const own = ownDistricts(view);
+  const perHour: Goods = { parts: 0, power: 0, data: 0, supplies: 0 };
+  for (const d of own) {
+    const good = KIND_GOOD[d.kind];
+    if (good) perHour[good] += productionPerHour(d);
+  }
+  const mine = <T extends { owner: string }>(xs: Record<string, T>): number =>
+    Object.values(xs).filter((x) => x.owner === view.playerId).length;
+  return {
+    districts: own.length,
+    crews: mine(view.crews),
+    carriers: mine(view.carriers),
+    perHour,
+    totalPerHour: GOOD_KEYS.reduce((n, g) => n + perHour[g], 0),
+    besieged: own.filter((d) => d.siege !== null).length,
+  };
+}

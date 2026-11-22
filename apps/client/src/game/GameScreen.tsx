@@ -18,7 +18,7 @@ import { Timeline } from './Timeline';
 import { TopBar } from './TopBar';
 import { isOwn } from './derive';
 
-type Drawer = 'map' | 'feed' | 'district';
+type Drawer = 'map' | 'feed' | 'orders' | 'district';
 
 /** The playing field: top bar, feed, map, district panel and an empty slot for the timeline. */
 export function GameScreen() {
@@ -27,7 +27,7 @@ export function GameScreen() {
   const state = useGame((s) => s);
   const wall = useWallClock();
   const compact = useCompact();
-  const [drawer, setDrawer] = useState<Drawer>('map');
+  const [chosenDrawer, setDrawer] = useState<Drawer>('map');
   const [route, setRoute] = useState<readonly string[] | null>(null);
   const [panel, setPanel] = useState<
     | { kind: 'market'; hub: string; good?: GoodName }
@@ -67,12 +67,16 @@ export function GameScreen() {
   const closePanel = () => {
     setPanel(null);
   };
-  const report = panel?.kind === 'report' ? buildReport(state.feed, view, panel.seq) : null;
+  const report =
+    panel?.kind === 'report' ? buildReport(state.feed, view, panel.seq, state.names) : null;
+  /** Panels render over the map, so on a phone they pull the map tab to the front. */
+  const drawer: Drawer = panel && compact ? 'map' : chosenDrawer;
 
   const feed = (
     <FeedPanel
       view={view}
       feed={state.feed}
+      names={state.names}
       lastSeenMs={state.lastSeenMs}
       nowMs={nowMs}
       onFly={fly}
@@ -84,6 +88,7 @@ export function GameScreen() {
   const side = (
     <DistrictPanel
       view={view}
+      names={state.names}
       districtId={state.selected}
       nowMs={nowMs}
       onStance={(districtId, stance) => {
@@ -106,6 +111,7 @@ export function GameScreen() {
     <div className={styles['game']} data-compact={compact}>
       <TopBar
         view={view}
+        names={state.names}
         nowMs={nowMs}
         username={account.username}
         alerts={alerts}
@@ -164,6 +170,7 @@ export function GameScreen() {
             {report && (
               <BattleReport
                 report={report}
+                names={state.names}
                 me={view.playerId}
                 nowMs={nowMs}
                 onRival={(playerId) => {
@@ -178,7 +185,7 @@ export function GameScreen() {
             )}
             {panel.kind === 'dossier' && (
               <Dossier
-                dossier={buildDossier(view, state.feed, panel.playerId)}
+                dossier={buildDossier(view, state.feed, panel.playerId, 8, state.names)}
                 nowMs={nowMs}
                 onFly={(id) => {
                   closePanel();
@@ -213,7 +220,7 @@ export function GameScreen() {
         )}
       </div>
       {(!compact || drawer === 'district') && <div className={styles['side']}>{side}</div>}
-      <div className={styles['timeline']}>
+      <div className={styles['timeline']} hidden={compact && drawer !== 'orders'}>
         <Timeline
           view={view}
           feed={state.feed}
@@ -230,11 +237,12 @@ export function GameScreen() {
           label="Screen"
           value={drawer}
           onChange={(id) => {
-            setDrawer(id === 'feed' || id === 'district' ? id : 'map');
+            setDrawer(id === 'feed' || id === 'orders' || id === 'district' ? id : 'map');
           }}
           tabs={[
             { id: 'feed', label: 'FEED' },
             { id: 'map', label: 'MAP' },
+            { id: 'orders', label: 'ORDERS' },
             { id: 'district', label: 'DISTRICT' },
           ]}
         />
