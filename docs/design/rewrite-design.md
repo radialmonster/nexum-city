@@ -1,0 +1,314 @@
+# Nexum City rewrite: game design draft
+
+Status: approved direction, 2026-11-22. This is the design for the rewrite (see ADR 0030 and `docs/rewrite/plan.md`). The prototype's docs live in the private archive repo and are history only.
+
+## Why a rewrite
+
+The concept works:
+
+- rival crews fighting over districts of a cyberpunk city;
+- an economy that creates conflict;
+- logistics that take real time;
+- a season race.
+
+The prototype is not fun to play:
+
+- Almost everything is text and lists, so the map never shows the war.
+- About 20 systems each sit on their own screen and rarely visibly affect each other.
+- A visit spends 3 actions in 10 minutes, then there are 12 hours of nothing.
+- A capture takes about 8 days and runs on autopilot.
+- Bots stood still for months.
+
+The rewrite keeps the concept and its deliberate depth: troops and goods take time to move, and markets are real. It rebuilds everything around a visual city map.
+
+## Pillars (kept from the prototype's game vision)
+
+1. **Meaningful short sessions.** A visit is a few high-consequence choices. You come back later to see their effects.
+2. **Economy creates conflict.** Production, prices and supply lines give everyone reasons to fight, trade and raid.
+3. **A visible persistent world.** Ownership, routes, convoys, sieges and prices are all on the map.
+4. **Strategy over reflexes.** The game is asynchronous. Nothing requires being online at the same moment as anyone else.
+5. **Fairness.** Being online more often lets you react sooner and see more. It must not let you do more per day.
+
+## The shape of play
+
+**Who plays:** a player logs in 2–4 times a day for about 15 minutes. Each visit they:
+
+- catch up on what happened;
+- make their decisions: build, defend, trade, attack;
+- issue orders and leave.
+
+The world, including the other players and the bots, keeps running while they're away.
+
+### Two kinds of action
+
+|                | Orders                                                                                          | Instant actions                                                                                                                                                                    |
+| -------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| What they are  | Commitments that take time and can be seen or interrupted                                       | Immediate changes with no travel and no waiting                                                                                                                                    |
+| Typical length | 15 minutes to 8 hours                                                                           | Instant                                                                                                                                                                            |
+| Examples       | Move a crew, send a convoy, haul goods, siege a district, build or upgrade, scout, raid a route | Buy or sell at a market where you have goods present, set a district's stance, set prices on your listings, recall an order, assign a crew to guard, read reports, message a rival |
+| Risk           | Can be intercepted, raided, defended against, or arrive too late                                | None. Their effects play out through orders                                                                                                                                        |
+
+**What limits a day.** There's no "3 actions per 12 hours" budget. Your assets are the limit:
+
+- Each crew and each carrier can do one order at a time.
+- Each district builds one thing at a time.
+- Orders take real time.
+
+A player who checks in twice a day and queues sensible orders gets about as much done as one who checks in eight times. The frequent visitor can react faster, for example by rerouting a convoy, but has no extra capacity. This replaces the old action budget with something that's visible and makes sense.
+
+### A typical 15-minute visit
+
+1. **Catch up (1–2 minutes).** The "While you were away" panel plays back the last few hours on the map:
+   - your hauler reached the Docks market;
+   - Rival 3's convoy was spotted heading for Glass Ward;
+   - your siege on Relay East is at 70%;
+   - the price of parts in the Docks rose 30%.
+2. **Respond (5 minutes).**
+   - Glass Ward is threatened, so you move a crew from Civic Core to reinforce it (an order, 25 minutes).
+   - You set Glass Ward's stance to Hold (instant).
+3. **Economy (5 minutes).**
+   - Sell the parts your hauler delivered to the Docks while the price is high (instant).
+   - Send the empty hauler home with power cells bought cheaply there (an order, 40 minutes).
+   - Choose the longer route that avoids Rival 3's streets.
+4. **Grow (3 minutes).**
+   - Queue a Workshop upgrade in Ember Market (an order, 3 hours).
+   - Send a scout to look at Halide Docks before attacking it next visit (an order, 30 minutes).
+5. **Leave.** Every order shows an ETA on the map, and you'll be notified about anything urgent.
+
+## Look and feel: a cyberpunk command interface
+
+**The rule:** graphics first, text second. The map is the game screen, and every action starts there. Text is only for short labels, numbers and reports. If something can be shown as a shape, colour, bar, icon or animation, it should be.
+
+**The city map**
+
+- A dark, top-down tactical city. Districts are neon-outlined zones in the owner's colour, and neutral districts are a dim grey.
+- Districts have their own silhouettes, building textures and landmarks, so the city reads as a place and not a grid of identical tiles. The Sound (water), a waterfront maglev line and a bridge give it edges and texture.
+- Streets glow faintly, and traffic pulses along routes that are in use.
+- Convoys are small glowing icons moving along the streets, each showing an ETA tag. Each carrier type has its own silhouette, coloured by owner: a cluster of dots for On foot, a short wedge for a Van, a cab and trailer for a Hauler, a chevron with speed streaks for a Runner.
+- An incoming enemy convoy shows its remaining route as a red dotted line ending in an ETA tag on the district it is heading for. The threatened district's outline pulses red.
+- A raid in progress shows on the street where it happens: the stopped carrier, the raiders, a red pulse and a short callout naming both sides and the cargo at risk.
+- A siege is a ring around the district that fills clockwise, with a spark at its leading end.
+- Production shows as small particles flowing into each district's warehouse gauge. A full warehouse blinks amber.
+- Fog of war has three levels:
+  - **In sight:** full detail. The edge of your sight is drawn as a dashed line.
+  - **Out of sight:** dimmed under scan-line static. You still see the last known owner. Rival convoys fade as they cross the edge.
+  - **No signal:** never seen. Static only, until you scout it. Scouting "decrypts" an area with a sweep effect.
+- Markets are hubs with a holographic price panel on them. Each good has a bar that rises green or falls red against the city average, so price pressure is readable at a glance. A hub with a shortage pulses outward.
+- City broadcasts are public and always visible, even in fog: a new crew arriving on the frontier, and the plots that are opening.
+
+**Moving around the map**
+
+The city is bigger than one screen (see "The world"), so the map is a window you pan and zoom. Districts carry on past every edge of the window.
+
+- **Three zoom levels:**
+  1. **City:** every district is a coloured territory blob. It shows who holds what, where the frontier is, and pings for your alerts and the newest arrival.
+  2. **Tactical (the default):** streets, convoys, siege rings, prices and fog. Orders are given here.
+  3. **District:** a close view of one district, showing building slots, walls under construction, the warehouse level, crews at the gates and parked carriers.
+- **Navigation cluster** in the bottom-left corner of the map:
+  - a minimap of the whole city with coloured territories, your viewport rectangle and alert pings;
+  - zoom + and − buttons and the three level buttons;
+  - a "recentre on my districts" button;
+  - a jump-to list of your districts and current alerts;
+  - a sector and coordinate readout.
+- **Off-screen indicators:** anything that needs you outside the window gets an arrow tab on the nearest edge of the map, with what it is and how far away, for example "Cold Harbor under siege, 4 blocks west". Tapping it jumps there.
+
+**The interface (the HUD)**
+
+- Translucent glass panels with thin cyan and magenta edges, angled corners and a slight glow. Panels slide in over the map instead of replacing it.
+- Panels stay off the districts. Cards sit over the water at the bottom of the map, alerts are a thin ribbon under the legend, and the HUD scale steps down on short or narrow windows.
+- A monospace "terminal" font for numbers and a clean condensed font for labels. HUD text scales up with the screen so it stays readable on a large monitor.
+- Tap a district for a radial menu: Attack, Reinforce, Build, Haul, Scout. Choosing one draws the route on the map with the ETA and risk before you confirm. The confirm card lets you pick the carrier and shows each one's ETA.
+- Orders in progress sit in a timeline strip along the bottom: one bar per crew, carrier or building, filling until it completes. It also shows incoming threats as red bars and an unconfirmed order as a dashed preview bar.
+- "While you were away" plays as a short map replay with event cards, like a security-camera feed. A scrubber shows the whole time away with a coloured tick per event. During replay the map turns amber, live units are hidden and past movements are drawn as ghost trails.
+- The season race is always in the top bar as a bar split by each crew's share of district-hours, with your rank beside it.
+- The district panel shows production flowing into the warehouse, the warehouse split by good, building slots with level pips, and the crews and carriers stationed there.
+- Notifications come in five styles by colour: urgent (red), warning (amber), information (cyan), success (lime) and city news (blue).
+- Small effects make it feel alive: glitch transitions, scanning sweeps, a soft chime when a convoy arrives, a warning pulse when you're under attack. Effects must be readable and can be turned down. Nothing flashes for no reason.
+- Phone first: big touch targets, with the map always visible behind panels. The phone has a bottom sheet for the selected district, a tab bar (Map, Orders, Market, Feed, Rank), a small minimap, zoom buttons, and the same edge arrows for off-screen alerts.
+
+**Art approach:** most of this is drawn by code (shapes, glows, particles, shaders), so the first version needs very little hand-made art. District icons, faction emblems and bot portraits can be added as image assets later, either commissioned or generated, without changing the code.
+
+## The world
+
+- **City:** Meridian, a city of districts joined by streets. The streets are an actual network: travel follows them, and districts block or protect them.
+- **The city grows as players join.** It isn't a fixed board:
+  - A season starts with about 20–30 districts. It can reach dozens or hundreds, and a player only ever sees part of it at once.
+  - The city's outer edge is a **frontier** of plots that are surveyed, then opened. To the south the city ends at the Sound.
+  - **Placing new players:** each new player gets one protected first district on a newly opened frontier plot, with unclaimed plots and neutral districts nearby to expand into. Protection lasts about 48 hours.
+  - There's no permanent privileged home district. After protection ends, a first district can be besieged like any other.
+  - A new arrival is announced to the whole city and marked on the map.
+  - The mockup shows a city of 123 districts and 11 crews with 35 open frontier plots.
+- **District types:** each district produces one main good and has its own character, for example the Docks make parts, the Grid makes power and the Archive makes data. Holding a type gives you that production and a reason to trade.
+- **Hubs:** 2–3 public market hubs nobody owns. Prices differ between them.
+- **Neutral districts:** held by a weak faction garrison (for example the Helix Combine). New players expand into them first.
+- **Fog of war:** you see your districts, your crews, and what they can see. Public hubs are always visible. Rival convoys are visible while inside your sight range. Outside it you see only a district's last known owner. Scouting reveals the rest for a while.
+
+## Districts
+
+Each district you own has:
+
+- **Production:** goods per hour into the district's warehouse. Goods are physically there and must be hauled to be sold or used elsewhere.
+- **Warehouse:** a capacity limit. When it's full, production is wasted, which gives you a reason to haul and trade.
+- **3 building slots** to start, for example:
+  - Workshop: more production.
+  - Walls: siege progress against this district is slower.
+  - Depot: bigger warehouse, and hauls from here load faster.
+  - Watchtower: wider sight, and incoming convoys are spotted earlier.
+  - Garage: build and repair carriers here.
+    Each takes 1–8 hours and costs goods that must be in that district's warehouse.
+- **Garrison:** crews stationed there defend automatically.
+- **Stance:** an instant setting.
+  - **Hold:** fight sieges, slower capture progress.
+  - **Pull back:** your crews leave before capture and the goods are evacuated.
+
+Losing a district hurts but isn't the end. Its goods may be looted, buildings are damaged, and you keep your score. You can win it back. A player who loses everything gets a new protected district elsewhere.
+
+## Units
+
+**Crews** fight and capture. Each one has:
+
+- strength;
+- a home district;
+- one order at a time.
+
+You recruit them with credits and supplies.
+
+**Carriers** move crews and goods. They are visible on the map while moving.
+
+| Carrier | Speed  | Cargo  | Toughness | Notes                                         |
+| ------- | ------ | ------ | --------- | --------------------------------------------- |
+| On foot | Slow   | Tiny   | —         | Always available, very hard to spot           |
+| Van     | Medium | Medium | Medium    | All-rounder                                   |
+| Hauler  | Slow   | Large  | High      | The trade workhorse; a juicy raid target      |
+| Runner  | Fast   | Small  | Low       | Hard to catch; quick strikes and urgent goods |
+
+Carriers take wear and need repair at a Garage. Upgrades come later, kept simple: one upgrade slot per carrier, such as armour or a bigger engine.
+
+## Orders in detail
+
+- **Move:** take crews and/or goods from A to B along a route you choose or accept. Shows the ETA and the risk along the route, for example "passes Rival 3's Glass Ward".
+- **Haul and trade:** move goods to a hub to sell, or buy at a hub and bring them home. An order can be a round trip: go, sell, buy, return.
+- **Siege:** a convoy with crews arrives at a target district and starts filling its capture bar. The speed depends on attacking strength against garrison, walls and stance. A capture takes about 6–12 hours of sustained siege, so it plays out over 2–3 visits by both sides. Either side can send reinforcements, which arrive by order with travel time. When the bar is full, the district changes hands, and both players get a readable battle report.
+- **Raid:** send crews to wait on a street. Enemy convoys passing through may be intercepted, depending on your strength against their escort and the carrier's toughness. Cargo is stolen or destroyed.
+- **Scout:** reveals a district or area for a few hours: garrison, warehouse, buildings, incoming convoys.
+- **Build:** start a building or upgrade in a district (described above).
+
+All combat resolves automatically from strengths plus some randomness, and produces a short report. Nobody has to be online for a fight.
+
+## Markets
+
+- Every hub has a real order book. Players and bots post buy and sell offers, and the city's civic traders (the old market custodians) provide a baseline so the market is never empty.
+- Prices move with supply and demand, and with events: raids on routes into the Docks make parts scarce there, so the price rises.
+- To use a market you must have goods physically at that hub. Hauling them there is the order; trading once there is instant.
+- Player listings sit in escrow at the hub. A buyer collects them at the hub and hauls them home.
+- **Contracts** let you post or take a delivery job: "bring 50 power cells to Ember Market by tonight for 900 credits". Bots post contracts too, which gives new players early income.
+
+## Bots
+
+Bots play by exactly the same rules and on the same clock. They also visit periodically and issue orders. Each bot has a personality:
+
+| Bot      | Style                                                              |
+| -------- | ------------------------------------------------------------------ |
+| Raider   | Fast strikes on weak targets; raids trade routes                   |
+| Turtle   | Builds walls, defends, expands slowly into neutral land            |
+| Merchant | Trades and hauls; takes high-production districts; posts contracts |
+| Hunter   | Goes after whoever is leading, and after whoever last attacked it  |
+
+Bots announce their intentions in readable language ("Rival 4 is moving on the city leader"), they avoid piling onto the same target, and they defend their own districts. When real players join, they take empty bot slots or join alongside them.
+
+## Seasons and winning
+
+- A season lasts 4 weeks.
+- **Score:** district-hours (each district you hold earns points every hour), plus a smaller score for trade volume and completed contracts. Merchants can compete without being the biggest army.
+- **Catch-up:** players below the median get faster recruitment, and the leader's districts are slightly cheaper to besiege.
+- **Final 48 hours:** this is announced; no new players join mid-finale.
+- At season end there's a final leaderboard, then the city resets. Accounts, cosmetics and history carry over.
+
+## Away from the game
+
+- The **"While you were away" replay** is the heart of each visit: a short animated playback on the map plus a list of events.
+- **Notifications** (browser push, and later on Android) only for things that matter:
+  - your district is under siege;
+  - your convoy was raided;
+  - a contract is due;
+  - a siege bar has passed 75%.
+
+## What we cut from the prototype
+
+- The action budget, replaced by asset-limited orders.
+- Five concentric rings, ring holding windows and assault caps, replaced by one capture bar per siege with clear modifiers.
+- Influence percentage gates, alertness, signal and public-front pressure.
+- Separate delivery, scouting and faction job boards, replaced by one contracts board.
+- Per-item container and ledger accounting, backpacks and caches, replaced by district warehouses and carrier cargo.
+- Multi-step blueprint, fabrication, fragment and socket chains. Crafting can return later as one building type.
+- Text-first screens. Every action starts from the map.
+
+## First playable version (milestone 1, roughly 2 weeks)
+
+- **Map:** Meridian starts with about 20 districts and 2 hubs and grows at the frontier as players join; streets; fog of war; pan, zoom (city, tactical and district levels), minimap and off-screen alerts.
+- **Districts:** production, warehouses, 3 building types (Workshop, Walls, Depot).
+- **Units:** crews, plus three carriers (On foot, Van, Hauler).
+- **Orders:** move, haul and trade, siege, build, scout.
+- **Markets:** one market per hub with civic baseline traders and player listings.
+- **Bots:** 3 bots with 3 personalities.
+- **Season:** a 7-day test season with a leaderboard.
+- **Catching up:** the "While you were away" event list (the animated replay comes in milestone 2).
+- **Accounts:** username and password, like today.
+
+**Milestone 2:**
+
+- Raids and escorts.
+- Runner carrier.
+- Contracts.
+- Watchtower and Garage.
+- The animated replay.
+- Push notifications.
+- The fourth bot.
+
+**Milestone 3:**
+
+- Carrier upgrades.
+- Catch-up rules tuned on replays.
+- A diplomacy and messaging layer.
+- Then clans and cartels (still future scope, as in the original vision).
+
+## Engineering rules (owner-set)
+
+1. **Theme system, no hard-coded styles.**
+   - Every colour, font, size step, spacing value, glow, border and animation timing is a named design token, defined in one theme module.
+   - The token source is a TypeScript object. It generates the CSS custom properties for the HUD and supplies the colour and number values for the canvas map renderer, so the panels and the map can never drift apart.
+   - Components never contain raw hex colours or pixel values. A lint rule fails the build on raw colour literals outside the theme module.
+   - Faction colours are theme tokens keyed by faction role, not by a specific bot, so a new rival or a recoloured faction is a one-line change.
+   - Text and panel scale is a single token (the mockup's `--s`), driven by viewport size and a user setting.
+   - Alternate themes, such as high contrast, colour-blind-safe faction colours and reduced motion, are just different token sets.
+   - A UI kit is built once from the mockup (Panel, Chip, Bar, Button, Tag, Toast, TimelineRow, RadialMenu, and so on). Screens are composed from the kit, not styled ad hoc.
+
+## Technology plan
+
+- **Language:** TypeScript on both the server and the browser. One language means rules can be shared between client previews (ETAs, odds) and the server.
+- **Client:**
+  - React for panels and menus.
+  - PixiJS (or Phaser) for the map: districts, streets, moving convoys, capture bars, fog.
+  - Works on mobile browsers; an Android wrapper later.
+- **Server:**
+  - A Node service holds the authoritative game state and runs a simulation tick every few seconds. The tick resolves arrivals, sieges, production, markets and bot decisions.
+  - The browser uses a normal HTTP API.
+  - Live map updates use server-sent events or polling while the page is open. There are no permanent sockets, consistent with the vision.
+- **Database:** SQLite (see Hosting); Postgres only if we outgrow one process.
+- **Simulation:** a deterministic core that can run at any speed. This lets us replay a whole season in seconds to test balance and bots, which is what the old replay harness tried to do.
+- **Hosting:** the owner's own server, which has spare disk space but limited RAM. That means keeping the footprint small:
+  - **One Node process** (Fastify or Hono) serves the built static client, the HTTP API and the simulation tick together. There's no separate web container and no SSR framework. Nuxt, Astro and NestJS add memory and solve problems this game doesn't have: the game screen is a client-side canvas app, and public pages can be static files.
+  - **Database:** SQLite (one file, no extra process, about 0 MB extra RAM) is the default for a single-server game at this scale. Postgres is the upgrade path if we ever need more than one server process; it adds about 100–200 MB.
+  - **Docker Compose:** one `app` service plus a volume for the SQLite file and backups. The target server is managed by FlyWP, which supports a "Docker Compose App" site type. FlyWP's Nginx proxy provides the domain and HTTPS, so we don't add our own proxy. The server is small and shared with other sites, so keep the container small and set a memory limit.
+  - **Rough memory budget:** about 100–200 MB for the app. Rust could bring that down to about 20 MB, but asynchronous ticks don't need the speed.
+  - Identical on a development PC and on the server. Moves off Cloudflare.
+- **Visual mockup:** `docs/design/rewrite-mockup.html` is a static, plain HTML/CSS/SVG mockup of the map screen and UI pieces. Open it in a browser. It has no JavaScript, but the zoom buttons, the replay button, the stance toggle, the market tabs and the build picker respond to clicks.
+- **Repository:** this public repo, as npm workspaces (`packages/theme`, `packages/sim`, `packages/contracts`, `apps/server`, `apps/client`). The prototype lives in a separate private archive repo. See `docs/rewrite/plan.md` and ADR 0030.
+
+## Open questions for the owner
+
+1. Do the timer lengths look right? Travel 15–90 minutes, captures 6–12 hours, builds 1–8 hours.
+2. Are the goods right? Parts, power, data and supplies, plus credits.
+3. Should trade volume count toward season score, or only territory?
+4. Do the bot names and personalities need flavour (real rival gang names and faces)?
+5. ~~Should this live in this repo or a new one?~~ Decided 2026-11-22: this repo (ADR 0030).

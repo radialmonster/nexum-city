@@ -1,0 +1,35 @@
+# dependencies and build output
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# local data and secrets
+.env
+.env.*
+!.env.example
+.dev.vars
+data/
+*.sqlite
+*.sqlite-*
+*.db
+
+# editors / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# owner's local agent tooling (never publish)
+.claude/
+loop.bat
+loop.ps1
+loop.*.bak-*
+steer-loop.ps1
+nextsessionprompt.md
+nextsessionprompt.md.bak
+.loop-tmp/
+run.log
+run.log.*
