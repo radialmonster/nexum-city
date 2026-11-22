@@ -1,6 +1,8 @@
 import type { DatabaseSync, StatementSync } from 'node:sqlite';
 import type { BotKind, GameState, Input, Order, SimEvent } from '@nexum/sim';
+import type { SeasonStats, Standing } from '@nexum/contracts';
 import { transaction } from './db.js';
+import { RULES_VERSION, SNAPSHOT_VERSION, upgradeSnapshot } from './snapshot.js';
 
 export interface StoredInput {
   readonly seq: number;
@@ -14,7 +16,25 @@ export interface StoredSnapshot {
   readonly atMs: number;
   readonly lastSeq: number;
   readonly hash: string;
+  /** Upgraded to the current shape when it was written by an older server. */
   readonly state: GameState;
+  /** Shape version the row was written with (before upgrading). */
+  readonly version: number;
+  /** Sim rules version the row was written under. */
+  readonly rulesVersion: number;
+}
+
+export interface SeasonRow {
+  readonly number: number;
+  readonly startMs: number;
+  readonly endMs: number;
+  readonly archivedMs: number;
+  readonly reason: 'ended' | 'rules_change';
+  readonly seed: number;
+  readonly rulesVersion: number;
+  readonly standings: Standing[];
+  readonly names: Record<string, string>;
+  readonly stats: SeasonStats;
 }
 
 export interface StoredEvent {
@@ -94,8 +114,8 @@ export class Store {
 
   insertSnapshot(state: GameState, hash: string, lastSeq: number, keep = 3): number {
     const r = this.q(
-      'INSERT INTO snapshots (at_ms, last_seq, hash, state) VALUES (?, ?, ?, ?)',
-    ).run(state.nowMs, lastSeq, hash, JSON.stringify(state));
+      'INSERT INTO snapshots (at_ms, last_seq, hash, state, version, rules_version) VALUES (?, ?, ?, ?, ?, ?)',
+    ).run(state.nowMs, lastSeq, hash, JSON.stringify(state), SNAPSHOT_VERSION, RULES_VERSION);
     const id = Number(r.lastInsertRowid);
     this.q('DELETE FROM snapshots WHERE id <= ?').run(id - keep);
     return id;
@@ -104,13 +124,88 @@ export class Store {
   latestSnapshot(): StoredSnapshot | undefined {
     const r = this.q('SELECT * FROM snapshots ORDER BY id DESC LIMIT 1').get() as Row | undefined;
     if (!r) return undefined;
+    const version = Number(r['version']);
     return {
       id: Number(r['id']),
       atMs: Number(r['at_ms']),
       lastSeq: Number(r['last_seq']),
       hash: String(r['hash']),
-      state: JSON.parse(String(r['state'])) as GameState,
+      state: upgradeSnapshot(JSON.parse(String(r['state'])), version),
+      version,
+      rulesVersion: Number(r['rules_version']),
     };
+  }
+
+  // ---- seasons
+
+  /** Freezes a finished season. Idempotent: an already archived number is left untouched. */
+  archiveSeason(row: SeasonRow): boolean {
+    const r = this.q(
+      `INSERT OR IGNORE INTO seasons
+         (number, started_ms, ended_ms, archived_ms, reason, seed, rules_version, standings, names, stats)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      row.number,
+      row.startMs,
+      row.endMs,
+      row.archivedMs,
+      row.reason,
+      row.seed,
+      row.rulesVersion,
+      JSON.stringify(row.standings),
+      JSON.stringify(row.names),
+      JSON.stringify(row.stats),
+    );
+    return Number(r.changes) > 0;
+  }
+
+  seasonArchived(number: number): boolean {
+    return this.q('SELECT 1 AS x FROM seasons WHERE number = ?').get(number) !== undefined;
+  }
+
+  private static season(r: Row): SeasonRow {
+    return {
+      number: Number(r['number']),
+      startMs: Number(r['started_ms']),
+      endMs: Number(r['ended_ms']),
+      archivedMs: Number(r['archived_ms']),
+      reason: String(r['reason']) as SeasonRow['reason'],
+      seed: Number(r['seed']),
+      rulesVersion: Number(r['rules_version']),
+      standings: JSON.parse(String(r['standings'])) as Standing[],
+      names: JSON.parse(String(r['names'])) as Record<string, string>,
+      stats: JSON.parse(String(r['stats'])) as SeasonStats,
+    };
+  }
+
+  /** Finished seasons, newest first. */
+  listSeasons(): SeasonRow[] {
+    return (this.q('SELECT * FROM seasons ORDER BY number DESC').all() as Row[]).map(Store.season);
+  }
+
+  /** Clears everything that belongs to one world, ready for the next season's. Accounts stay. */
+  clearWorldData(): void {
+    this.db.exec(
+      'DELETE FROM event_actors; DELETE FROM events; DELETE FROM inputs; DELETE FROM bots;',
+    );
+  }
+
+  /**
+   * Points every account at its player in a new world (`null` leaves it without one, as
+   * `pending:<id>`). Two phases, because `player_id` is UNIQUE and new ids reuse old ones.
+   */
+  relinkAccounts(links: ReadonlyMap<number, string | null>): void {
+    this.q("UPDATE accounts SET player_id = 'moving:' || id").run();
+    for (const [accountId, playerId] of links) {
+      this.q('UPDATE accounts SET player_id = ? WHERE id = ?').run(
+        playerId ?? `pending:${String(accountId)}`,
+        accountId,
+      );
+    }
+  }
+
+  allAccounts(): AccountRow[] {
+    return (this.q('SELECT * FROM accounts ORDER BY id').all() as Row[]).map(Store.account);
   }
 
   // ---- inputs

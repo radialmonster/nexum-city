@@ -37,13 +37,19 @@ export function createApp(options: AppOptions): Hono {
     });
   });
 
-  app.get('/api/health', (c) =>
-    c.json({
-      ok: true,
+  app.get('/api/health', (c) => {
+    const base = {
       version: options.version,
       uptimeS: Math.floor((now() - startedAt) / 1000),
-    }),
-  );
+    };
+    if (!options.game) return c.json({ ok: true, ...base });
+    // Counts and timings only: never names, tokens, paths or configuration.
+    const status = options.game.status();
+    // A tick loop that has stopped completing ticks is unhealthy, so Docker restarts the container.
+    const stale = Math.max(30_000, options.game.options.tickMs * 10);
+    const ok = status.tickLagMs === null || status.tickLagMs <= stale;
+    return c.json({ ok, ...base, ...status }, ok ? 200 : 503);
+  });
 
   if (options.game) app.route('/api', gameRoutes(options.game));
 

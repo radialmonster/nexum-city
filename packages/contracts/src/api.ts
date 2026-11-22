@@ -12,6 +12,7 @@ export const API_ERROR_CODES = [
   'username_taken',
   'rate_limited',
   'world_full',
+  'season_over',
   'not_found',
   'no_route',
   'internal',
@@ -123,3 +124,49 @@ export type StandingsResponse = z.infer<typeof standingsResponseSchema>;
 export type PlaceOrderResponse = z.infer<typeof placeOrderResponseSchema>;
 export type EtaResponse = z.infer<typeof etaResponseSchema>;
 export type FeedResponse = z.infer<typeof feedResponseSchema>;
+
+/** Headline numbers frozen with a finished season. */
+export const seasonStatsSchema = z.object({
+  players: z.number().int(),
+  districtsHeld: z.number().int(),
+  topTraderId: idSchema.nullable(),
+  topTradeScore: z.number(),
+});
+
+/** One row of the hall of fame: a finished season, frozen. */
+export const seasonSummarySchema = z.object({
+  number: z.number().int(),
+  startMs: z.number(),
+  endMs: z.number(),
+  /** `ended` when the clock ran out, `rules_change` when a new rules version closed it early. */
+  reason: z.enum(['ended', 'rules_change']),
+  standings: z.array(standingSchema),
+  /** Crew names as they were at the end of that season. */
+  names: crewNamesSchema,
+  stats: seasonStatsSchema,
+});
+
+/** The season being played (or just finished and waiting out its break). */
+export const currentSeasonSchema = z.object({
+  number: z.number().int(),
+  startMs: z.number(),
+  endMs: z.number(),
+  finaleStartMs: z.number(),
+  /** True once the clock has run out: scoring has stopped and orders are refused. */
+  over: z.boolean(),
+  /** When the next season starts, or null while this one is still running. */
+  nextStartMs: z.number().nullable(),
+});
+
+export const seasonsResponseSchema = z.object({
+  ok: z.literal(true),
+  nowMs: z.number(),
+  current: currentSeasonSchema,
+  /** Finished seasons, newest first. */
+  seasons: z.array(seasonSummarySchema),
+});
+
+export type SeasonStats = z.infer<typeof seasonStatsSchema>;
+export type SeasonSummary = z.infer<typeof seasonSummarySchema>;
+export type CurrentSeason = z.infer<typeof currentSeasonSchema>;
+export type SeasonsResponse = z.infer<typeof seasonsResponseSchema>;

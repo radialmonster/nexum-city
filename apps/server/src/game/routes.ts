@@ -22,6 +22,7 @@ import type {
   FeedResponse,
   MeResponse,
   PlaceOrderResponse,
+  SeasonsResponse,
   StandingsResponse,
 } from '@nexum/contracts';
 import type { ZodType } from 'zod';
@@ -213,6 +214,24 @@ export function gameRoutes(game: Game): Hono<Env> {
       nowMs: state.nowMs,
       standings: standings(state),
       names: store.crewNames(),
+    };
+    return c.json(res);
+  });
+
+  api.get('/seasons', requireAuth, (c) => {
+    const res: SeasonsResponse = {
+      ok: true,
+      nowMs: engine.current.nowMs,
+      current: game.seasons.current(),
+      seasons: store.listSeasons().map((r) => ({
+        number: r.number,
+        startMs: r.startMs,
+        endMs: r.endMs,
+        reason: r.reason,
+        standings: r.standings,
+        names: r.names,
+        stats: r.stats,
+      })),
     };
     return c.json(res);
   });

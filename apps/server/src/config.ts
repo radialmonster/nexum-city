@@ -10,6 +10,20 @@ const schema = z.object({
   SNAPSHOT_MS: z.coerce.number().int().min(1000).default(300_000),
   /** Seed for the world created on first boot. Ignored once a database exists. */
   WORLD_SEED: z.coerce.number().int().default(20261122),
+  /** Season length in days. */
+  SEASON_DAYS: z.coerce.number().min(0.01).max(60).default(7),
+  /** Pause between a season ending and the next starting, in hours. */
+  SEASON_BREAK_HOURS: z.coerce
+    .number()
+    .min(0)
+    .max(24 * 30)
+    .default(0),
+  /** Minutes between tick summary log lines (0 turns them off). */
+  TICK_LOG_MINUTES: z.coerce
+    .number()
+    .min(0)
+    .max(24 * 60)
+    .default(15),
   /** Mark the session cookie `Secure`; set true behind HTTPS. */
   COOKIE_SECURE: z.enum(['true', 'false']).default('false'),
   /** Trust `X-Forwarded-For` for rate limiting; set true only behind a reverse proxy. */
@@ -35,6 +49,9 @@ export interface Config {
   readonly tickMs: number;
   readonly snapshotMs: number;
   readonly worldSeed: number;
+  readonly seasonDays: number;
+  readonly seasonBreakHours: number;
+  readonly tickLogMinutes: number;
   readonly cookieSecure: boolean;
   readonly trustProxy: boolean;
   readonly backupHourUtc: number;
@@ -59,6 +76,9 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     tickMs: parsed.data.TICK_MS,
     snapshotMs: parsed.data.SNAPSHOT_MS,
     worldSeed: parsed.data.WORLD_SEED,
+    seasonDays: parsed.data.SEASON_DAYS,
+    seasonBreakHours: parsed.data.SEASON_BREAK_HOURS,
+    tickLogMinutes: parsed.data.TICK_LOG_MINUTES,
     cookieSecure: parsed.data.COOKIE_SECURE === 'true',
     trustProxy: parsed.data.TRUST_PROXY === 'true',
     backupHourUtc: parsed.data.BACKUP_HOUR_UTC,

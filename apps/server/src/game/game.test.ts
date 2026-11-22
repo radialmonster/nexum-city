@@ -496,11 +496,20 @@ describe('persistence', () => {
     a.close();
     const b = openDatabase(join(dir, 'x.db'));
     const rows = b.prepare('SELECT id FROM schema_migrations').all();
-    expect(rows).toEqual([{ id: 1 }, { id: 2 }]);
+    expect(rows).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
     const tables = (
       b.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]
     ).map((t) => t.name);
-    for (const t of ['meta', 'snapshots', 'inputs', 'events', 'accounts', 'sessions', 'bots']) {
+    for (const t of [
+      'meta',
+      'snapshots',
+      'inputs',
+      'events',
+      'accounts',
+      'sessions',
+      'bots',
+      'seasons',
+    ]) {
       expect(tables).toContain(t);
     }
     expect((b.prepare('PRAGMA journal_mode').get() as { journal_mode: string }).journal_mode).toBe(

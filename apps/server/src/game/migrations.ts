@@ -92,4 +92,28 @@ export const migrations: readonly Migration[] = [
       ) WITHOUT ROWID;
     `,
   },
+  {
+    id: 3,
+    name: 'seasons',
+    sql: `
+      -- Which shape and which sim rules a snapshot was written under (see snapshot.ts).
+      -- Rows written before this migration are version 0 of both.
+      ALTER TABLE snapshots ADD COLUMN version INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE snapshots ADD COLUMN rules_version INTEGER NOT NULL DEFAULT 0;
+
+      -- One frozen row per finished season: the hall of fame. Written once, never edited.
+      CREATE TABLE seasons (
+        number        INTEGER PRIMARY KEY,
+        started_ms    INTEGER NOT NULL,
+        ended_ms      INTEGER NOT NULL,
+        archived_ms   INTEGER NOT NULL,
+        reason        TEXT NOT NULL,
+        seed          INTEGER NOT NULL,
+        rules_version INTEGER NOT NULL,
+        standings     TEXT NOT NULL,
+        names         TEXT NOT NULL,
+        stats         TEXT NOT NULL
+      );
+    `,
+  },
 ];

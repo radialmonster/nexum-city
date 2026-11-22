@@ -149,6 +149,7 @@ export class BotRunner {
   /** Reconciles the roster, then lets every bot whose check-in time has come act once. */
   run(): void {
     const { engine, store, now } = this.o;
+    if (engine.seasonOver) return; // the season is frozen; the next one re-staffs the roster
     this.reconcile();
     const nowMs = now();
     for (const bot of this.active()) {

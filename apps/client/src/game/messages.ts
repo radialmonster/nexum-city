@@ -9,6 +9,7 @@ const MESSAGES: Record<ApiErrorCode, string> = {
   username_taken: 'That username is taken. Pick another.',
   rate_limited: 'Too many tries. Wait a moment, then try again.',
   world_full: 'The city is full for now. Try again later.',
+  season_over: 'This season has ended. The next one starts soon.',
   not_found: 'The game could not find that.',
   no_route: 'There is no street route there.',
   internal: 'Something broke on the server. Try again in a moment.',
