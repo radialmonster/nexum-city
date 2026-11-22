@@ -75,6 +75,8 @@ A player who checks in twice a day and queues sensible orders gets about as much
    - Send a scout to look at Halide Docks before attacking it next visit (an order, 30 minutes).
 5. **Leave.** Every order shows an ETA on the map, and you'll be notified about anything urgent.
 
+**The very first visit.** A new player gets a newcomer rush: for the first 24 game hours, builds and settles run 10 times faster, so the first Workshop is finished within minutes. One civic contract on the nearest hub is reserved for them, and a personal list of three street jobs (courier, salvage, patrol; 3 to 10 minutes each, small pay, almost no score) gives something to do while bigger orders run. A new job turns up every 30 minutes up to three, so logging off costs nothing. Scripted, this gives about 8 actions and 4 completions in the first 15 minutes (3 and 1 before). Siege, travel and raids are not sped up.
+
 ## Look and feel: a cyberpunk command interface
 
 **The rule:** graphics first, text second. The map is the game screen, and every action starts there. Text is only for short labels, numbers and reports. If something can be shown as a shape, colour, bar, icon or animation, it should be.
