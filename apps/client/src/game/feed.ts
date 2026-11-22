@@ -1,6 +1,6 @@
 import type { FeedItem, PlayerView } from '@nexum/contracts';
 import type { Tone } from '../ui';
-import { whoIs, type CrewNames } from './derive';
+import { streetEnds, whoIs, type CrewNames } from './derive';
 
 /** One line of the "While you were away" column. */
 export interface FeedEntry {
@@ -72,7 +72,7 @@ export function describeEvent(
     return view.districts[id]?.name ?? id;
   };
   const streetName = (a: string | null | undefined, b: string | null | undefined): string =>
-    a && b ? `the ${name(a)} - ${name(b)} street` : 'a street';
+    a && b ? `between ${streetEnds(name(a), name(b))}` : 'on a street';
   const who = (id: string | undefined): string => (id ? whoIs(names, me, id) : 'Someone');
   const base = { seq: item.seq, at: event.at, districtId: placeId, eventKind: event.kind };
 
@@ -143,7 +143,7 @@ export function describeEvent(
         kind: 'AMBUSH',
         glyph: '!',
         tone: 'accent',
-        text: `Your crews are waiting in ambush on ${street}.`,
+        text: `Your crews are waiting in ambush ${street}.`,
       };
     }
     case 'raid.hit': {
@@ -157,7 +157,7 @@ export function describeEvent(
           kind: 'RAID',
           glyph: '!',
           tone: 'danger',
-          text: `Raiders hit your haul on ${street}: lost ${stolen}.`,
+          text: `Raiders hit your haul ${street}: lost ${stolen}.`,
         };
       }
       return {
@@ -167,8 +167,8 @@ export function describeEvent(
         tone: raider === me ? 'ok' : 'news',
         text:
           raider === me
-            ? `Your ambush on ${street} stole ${stolen}.`
-            : `${who(raider)} raided ${who(victim)}'s haul on ${street}.`,
+            ? `Your ambush ${street} stole ${stolen}.`
+            : `${who(raider)} raided ${who(victim)}'s haul ${street}.`,
       };
     }
     case 'raid.repelled': {
@@ -182,10 +182,10 @@ export function describeEvent(
         tone: raider === me ? 'warn' : victim === me ? 'ok' : 'news',
         text:
           raider === me
-            ? `Your ambush on ${street} was beaten off by an escort.`
+            ? `Your ambush ${street} was beaten off by an escort.`
             : victim === me
-              ? `Your escort beat off raiders on ${street}.`
-              : `${who(victim)}'s escort beat off ${who(raider)} on ${street}.`,
+              ? `Your escort beat off raiders ${street}.`
+              : `${who(victim)}'s escort beat off ${who(raider)} ${street}.`,
       };
     }
     case 'raid.ended': {
@@ -205,7 +205,7 @@ export function describeEvent(
         kind: 'AMBUSH',
         glyph: '!',
         tone: loot ? 'ok' : 'warn',
-        text: `Your ambush on ${street} ${why}${loot ? `, carrying home ${loot}` : ' with no loot'}.`,
+        text: `Your ambush ${street} ${why}${loot ? `, carrying home ${loot}` : ' with no loot'}.`,
       };
     }
     case 'arrived': {
@@ -384,6 +384,7 @@ const num2 = (v: unknown): number => (typeof v === 'number' ? v : 0);
  * The feed column's entries, newest first. Combat rounds are not lines of their own: the latest
  * round of a siege that is still running is folded into its `siege.started` card, which then
  * sits at the top as one running entry. A card is "running" until a capture or break closes it.
+ * Likewise an ambush's end card is folded into its hit or repelled card unless loot came home.
  */
 export function buildFeedEntries(
   view: PlayerView,
@@ -419,6 +420,10 @@ export function buildFeedEntries(
     }
     if (event.kind === 'siege.captured' || event.kind === 'siege.broken') {
       if (place !== undefined) open.delete(place);
+    }
+    if (event.kind === 'raid.ended') {
+      // a hit or repelled card already told the story: only loot coming home adds news
+      if ((num(event.data, 'struck') ?? 0) > 0 && !goodsText(event.data, 'loot')) continue;
     }
     const entry = describeEvent(item, view, names);
     if (!entry) continue;

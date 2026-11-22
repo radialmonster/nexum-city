@@ -162,10 +162,10 @@ describe('raid events', () => {
   it('words a hit from the victim, the raider and a bystander', () => {
     const victim = describeEvent(hit(['rival', 'me']), view);
     expect(victim?.tone).toBe('danger');
-    expect(victim?.text).toContain('Raiders hit your haul on');
+    expect(victim?.text).toContain('Raiders hit your haul between');
     expect(victim?.text).toContain('lost 12 parts');
     const raider = describeEvent(hit(['me', 'rival']), view);
-    expect(raider?.text).toContain('Your ambush on');
+    expect(raider?.text).toContain('Your ambush between');
     expect(raider?.text).toContain('stole 12 parts');
     expect(describeEvent(hit(['x', 'y']), view)?.text).toContain('raided');
   });
@@ -188,10 +188,30 @@ describe('raid events', () => {
       feedItem(4, 'raid.ended', {
         ...at,
         actors: ['me'],
-        data: { loot: { parts: 7 }, reason: 'expired', struck: true },
+        data: { loot: { parts: 7 }, reason: 'expired', struck: 1 },
       }),
       view,
     );
     expect(ended?.text).toContain('7 parts');
+  });
+
+  it('folds the ambush end card into the strike card unless loot came home', () => {
+    const rep = feedItem(3, 'raid.repelled', {
+      ...at,
+      actors: ['me', 'rival'],
+      data: { raiderStrength: 3, guard: 6, raiderLost: 1 },
+    });
+    const end = (seq: number, data: Record<string, string | number | Record<string, number>>) =>
+      feedItem(seq, 'raid.ended', { ...at, actors: ['me'], data });
+    const kinds = (items: ReturnType<typeof feedItem>[]) =>
+      buildFeedEntries(view, items).map((e) => e.eventKind);
+    expect(kinds([rep, end(4, { reason: 'repelled', struck: 1, loot: {} })])).toEqual([
+      'raid.repelled',
+    ]);
+    expect(kinds([end(4, { reason: 'expired', struck: 0, loot: {} })])).toEqual(['raid.ended']);
+    expect(kinds([rep, end(4, { reason: 'full', struck: 1, loot: { parts: 7 } })])).toEqual([
+      'raid.ended',
+      'raid.repelled',
+    ]);
   });
 });

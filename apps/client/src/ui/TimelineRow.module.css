@@ -45,6 +45,9 @@
   bottom: var(--space-3xs);
   left: var(--from);
   width: var(--size);
+
+  /* wide enough for the whole label, but never past the end of the track */
+  min-width: min(max-content, calc(100% - var(--from)));
   z-index: var(--z-base);
   overflow: hidden;
   border: var(--border-thin) solid var(--k);
@@ -71,6 +74,7 @@
   display: block;
   padding: 0 var(--space-xs);
   overflow: hidden;
+  text-overflow: ellipsis;
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   line-height: var(--line-height-none);

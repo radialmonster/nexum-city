@@ -1,4 +1,5 @@
 import type { FeedItem, PlayerView } from '@nexum/contracts';
+import { streetEnds } from './derive';
 
 /** The raid events that open a short report when their feed card is clicked. */
 export const RAID_REPORT_KINDS = ['raid.hit', 'raid.repelled'] as const;
@@ -55,7 +56,7 @@ export function buildRaidReport(
   const raiderId = e.actors[0] ?? '';
   const victimId = e.actors[1] ?? '';
   const nameOf = (id: string | undefined): string => view.districts[id ?? '']?.name ?? id ?? '?';
-  const street = `${nameOf(e.districts[0])} - ${nameOf(e.districts[1])}`;
+  const street = streetEnds(nameOf(e.districts[0]), nameOf(e.districts[1]));
   const role = raiderId === me ? 'raider' : victimId === me ? 'victim' : 'witness';
   const outcome = e.kind === 'raid.hit' ? 'hit' : 'repelled';
   const stolen = goods(d, 'stolen');

@@ -1,7 +1,7 @@
 import type { FeedItem, PlayerView } from '@nexum/contracts';
 import { balance, buildDurationMs } from '@nexum/sim';
 import type { Faction } from '../ui/util';
-import { isOwn } from './derive';
+import { isOwn, streetEnds } from './derive';
 
 /** The time axis of the bottom band runs from now to this far ahead. */
 export const TIMELINE_SPAN_MS = 4 * 3_600_000;
@@ -119,9 +119,9 @@ export function timelineEntries(
       progress: frac(nowMs - m.departMs, m.arriveMs - m.departMs),
       text:
         m.kind === 'ambush' && m.raid
-          ? `AMBUSH on ${name(m.raid.a)} - ${name(m.raid.b)}  ends in ${shortDuration(m.arriveMs - nowMs)}`
+          ? `AMBUSH ${streetEnds(name(m.raid.a), name(m.raid.b))}, ends in ${shortDuration(m.arriveMs - nowMs)}`
           : m.kind === 'raid' && m.raid
-            ? `RAID to ${name(m.raid.a)} - ${name(m.raid.b)}  ETA ${shortDuration(m.arriveMs - nowMs)}`
+            ? `RAID ${streetEnds(name(m.raid.a), name(m.raid.b))}, ETA ${shortDuration(m.arriveMs - nowMs)}`
             : `${returning ? 'RETURN' : (verb[m.kind] ?? 'MOVE')} to ${name(target)}  ETA ${shortDuration(m.arriveMs - nowMs)}`,
       state: m.kind === 'siege' && !returning ? 'hot' : 'running',
       recallId: returning ? null : m.id,

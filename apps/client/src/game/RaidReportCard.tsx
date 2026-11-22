@@ -27,7 +27,7 @@ export function RaidReport({ report: r, me, names = {}, onFly, onClose }: RaidRe
         <p className={styles['summary']}>{r.summary}</p>
         <dl className={styles['facts']}>
           <div>
-            <dt>WHERE</dt>
+            <dt>BETWEEN</dt>
             <dd>
               {r.districtId ? (
                 <button

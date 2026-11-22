@@ -206,7 +206,7 @@ describe('raid timeline text', () => {
       },
     });
     const text = timelineEntries(view, [], now).map((e) => e.text);
-    expect(text.some((t) => t.startsWith('RAID to Alpha Docks - Beta Stacks'))).toBe(true);
-    expect(text.some((t) => t.startsWith('AMBUSH on Alpha Docks - Beta Stacks'))).toBe(true);
+    expect(text.some((t) => t.startsWith('RAID Alpha Docks and Beta Stacks'))).toBe(true);
+    expect(text.some((t) => t.startsWith('AMBUSH Alpha Docks and Beta Stacks'))).toBe(true);
   });
 });

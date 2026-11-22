@@ -36,7 +36,7 @@ describe('buildRaidReport', () => {
       stolen: { parts: 12 },
       escortLost: 1,
     });
-    expect(r?.street).toBe('Alpha Docks - Beta Stacks');
+    expect(r?.street).toBe('Alpha Docks and Beta Stacks');
   });
 
   it('reads a repelled raid from the raider side', () => {

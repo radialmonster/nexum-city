@@ -68,6 +68,7 @@ export function TimelineRow({
             state === 'hot' && styles['hot'],
           )}
           style={vars({ '--from': pct(s), '--size': pct(e - s), '--p': pct(progress) })}
+          title={typeof children === 'string' ? children : undefined}
         >
           <span className={styles['text']}>{children}</span>
         </div>

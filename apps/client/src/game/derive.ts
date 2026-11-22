@@ -240,3 +240,13 @@ export function empireSummary(view: PlayerView): EmpireSummary {
     besieged: own.filter((d) => d.siege !== null).length,
   };
 }
+
+/**
+ * Two district names as one short phrase for a street: "Sector 1-1 and 2-1" when both names
+ * share their first word, else "A and B".
+ */
+export function streetEnds(a: string, b: string): string {
+  const [wa, ...ra] = a.split(' ');
+  const [wb, ...rb] = b.split(' ');
+  return ra.length > 0 && rb.length > 0 && wa === wb ? `${a} and ${rb.join(' ')}` : `${a} and ${b}`;
+}

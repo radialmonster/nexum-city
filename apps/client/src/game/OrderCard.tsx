@@ -469,8 +469,8 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
                   </div>
                 </div>
                 <p className={styles['line']} data-testid="raid-help">
-                  Crews wait on this street and strike the first enemy haul that passes. Raiders
-                  steal up to 40% of its cargo.
+                  Crews wait between the two plots and strike the first enemy haul that passes.
+                  Raiders steal up to 40% of its cargo.
                 </p>
               </>
             )}
