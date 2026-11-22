@@ -23,6 +23,8 @@ export { isProtected, progressAt, siegeDefence, siegeFraction } from './siege.js
 export { crossingTime } from './raid.js';
 export { estimateClear, pickClearCrews, pickClearCrewsOrWhy, visibleAmbush } from './clear.js';
 export type { ClearEstimate, ClearNone, ClearPick, ClearWorld } from './clear.js';
+export { fuelFor, fuelUnitsFor } from './fuel.js';
+export { isShort } from './shortage.js';
 export { applyOrder, validateOrder } from './orders.js';
 export { boardOf, depositFor, referenceValue } from './contracts.js';
 export { inRush, rushDuration, rushEndsAt, stripNewcomerPerks } from './rush.js';
@@ -59,3 +61,4 @@ export type { AddPlayerOptions, WorldOptions } from './world.js';
 export * from './types.js';
 export { firstSession } from './session.js';
 export type { SessionResult } from './session.js';
+export { feeOn, upkeepDistricts } from './sink.js';

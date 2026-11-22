@@ -112,6 +112,9 @@ describe('street jobs', () => {
     const job = jobOf(s, 'salvage');
     const home = homeOf(s, 'n1');
     const crew = crewsOf(s, 'n1')[0] as Id;
+    // The kit fills the start warehouse to the brim; make room so the payout is not turned away.
+    const stock = s.districts[home]?.warehouse;
+    if (stock) stock.supplies -= toAtoms(20);
     const before = s.districts[home]?.warehouse.parts ?? 0;
     const r = step(
       s,

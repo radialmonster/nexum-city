@@ -7,6 +7,7 @@ import { civicAsk, civicBid } from './market.js';
 import { depositFor, referenceValue } from './contracts.js';
 import { shortestRoute, travelMs } from './routing.js';
 import { validateOrder } from './orders.js';
+import { fuelUnitsFor } from './fuel.js';
 import { isPlayerProtected } from './raid.js';
 import { isProtected } from './siege.js';
 import {
@@ -19,6 +20,7 @@ import {
   type Goods,
   type Id,
   type Movement,
+  type CargoRequest,
   type Order,
 } from './types.js';
 
@@ -139,7 +141,17 @@ function nextWant(s: GameState, me: Id, list: BuildList): Want | null {
 
 /** The goods a bot holds on to instead of selling back: what its next building needs. */
 const keepGoods = (want: Want | null): Set<Good> =>
-  new Set(GOODS.filter((g) => g === 'supplies' || (want ? want.short[g] > 0 : false)));
+  new Set(
+    GOODS.filter((g) => g === 'supplies' || g === 'power' || (want ? want.short[g] > 0 : false)),
+  );
+
+/** Power (units) a bot keeps in its home warehouse to fuel its carriers (sim-spec, "Fuel"). */
+const TRIP_FUEL = fuelUnitsFor('van', 12_000);
+const FUEL_RESERVE = Math.ceil(4 * TRIP_FUEL);
+/** A bot skips a contract whose round-trip fuel would eat more than this share of the pay. */
+const CONTRACT_FUEL_PERCENT = 35;
+/** Fuel is bought a few trips at a time. */
+const FUEL_BUY = Math.max(1, Math.ceil(10 * TRIP_FUEL));
 
 /** Units of room in the district that is building, minus the goods it still has to receive. */
 const roomFor = (want: Want): number =>
@@ -312,7 +324,7 @@ export function ambushOrders(s: GameState, me: Id): Order[] {
       crews.length >= 2 &&
       (crews[0] as Crew).strength + (crews[1] as Crew).strength >= AMBUSH_MIN_STRENGTH;
     if (!full) continue;
-    const edges: { a: Id; b: Id; len: number; hot: boolean; fresh: boolean }[] = [];
+    const edges: { a: Id; b: Id; len: number; hot: boolean; short: boolean; fresh: boolean }[] = [];
     for (const d of Object.values(s.districts)) {
       if (d.kind === 'hub' || d.owner === me || d.owner === 'neutral') continue;
       // Protected players' convoys cannot be struck, and that flag is public, so skip them.
@@ -327,6 +339,8 @@ export function ambushOrders(s: GameState, me: Id): Order[] {
       const hot = Object.values(s.contracts).some(
         (c) => c.status === 'taken' && c.hub === hub.id && c.taker === d.owner,
       );
+      // A shortage at the hub means traders are racing there with loads (sim-spec, "Shortages").
+      const short = s.shortages.some((x) => x.hub === hub.id);
       // Protection ended within the probe window: the owner is still a newcomer.
       const over = d.protectedUntilMs === undefined ? -1 : s.nowMs - d.protectedUntilMs;
       const fresh = over >= 0 && over <= PROBE_WINDOW_HOURS * MS_PER_HOUR;
@@ -335,6 +349,7 @@ export function ambushOrders(s: GameState, me: Id): Order[] {
         b,
         len: Math.min(length(s, base.id, a), length(s, base.id, b)),
         hot,
+        short,
         fresh,
       });
     }
@@ -344,6 +359,7 @@ export function ambushOrders(s: GameState, me: Id): Order[] {
         (x, y) =>
           Number(y.fresh) - Number(x.fresh) ||
           Number(y.hot) - Number(x.hot) ||
+          Number(y.short) - Number(x.short) ||
           x.len - y.len ||
           (x.a < y.a ? -1 : 1),
       )[0];
@@ -378,7 +394,11 @@ export const raider: Bot = (s, me) => {
   // takes it away (shopping runs, staging, fetching) cost more raids than the buildings were
   // worth in the harness (see "Bot building" in the sim spec). So a raider builds from what its
   // districts make and sells the rest.
-  const errands = (): Order[] => sellStash(s, me, keepGoods(want));
+  const errands = (): Order[] => [
+    ...sellStash(s, me, keepGoods(want)),
+    // Out of fuel: fetch the power bought at the hub (only when the van is not out raiding).
+    ...fetchOrders(s, me, new Set<Good>(['power'])),
+  ];
   // One campaign at a time.
   const campaigning =
     Object.values(s.sieges).some((g) => g.attacker === me) ||
@@ -437,16 +457,29 @@ function bringHome(s: GameState, me: Id, want: Want | null): Order[] {
       const order = [...GOODS].sort(
         (x, y) => Number(want?.short[y] ? 1 : 0) - Number(want?.short[x] ? 1 : 0),
       );
+      // The van needs its fuel for the way home: power that is not in a warehouse stays behind.
+      const inWarehouses = mine(s, me).reduce((n, d) => n + toUnits(d.warehouse.power), 0);
+      const tripFuel =
+        Math.ceil(
+          fuelUnitsFor(
+            'van',
+            Math.max(length(s, here.id, home.id), want ? length(s, here.id, want.district.id) : 0),
+          ),
+        ) + 1;
+      const fuelHere = Math.max(0, tripFuel - Math.floor(inWarehouses));
       for (const g of order) {
-        const qty = Math.min(room, Math.floor(toUnits(stash?.[g] ?? 0)));
+        const qty = Math.min(
+          room,
+          Math.floor(toUnits(stash?.[g] ?? 0)) - (g === 'power' ? fuelHere : 0),
+        );
         if (!keep.has(g) || qty < 1) continue;
         cargo[g] = qty;
         room -= qty;
       }
       const forBuilding = !!want && GOODS.some((g) => want.short[g] > 0 && (cargo[g] ?? 0) > 0);
+      // Carry the goods bought here back: to the district that is building, else the warehouse.
+      const to = forBuilding && want ? want.district.id : home.id;
       if (van && Object.keys(cargo).length > 0) {
-        // Carry the goods bought here back: to the district that is building, else the warehouse.
-        const to = forBuilding && want ? want.district.id : home.id;
         orders.push({ type: 'haul', carrierId: van, crewIds: [crew.id], to, cargo });
       } else {
         orders.push({ type: 'move', carrierId: van, crewIds: [crew.id], to: home.id });
@@ -475,7 +508,9 @@ function resupply(
   // Short on supplies for the next settlement: buy a van-load from the civic traders.
   const home = mine(s, me)[0];
   const hasStash = Object.values(player.stash).some((st) =>
-    GOODS.some((g) => keep.has(g) && toUnits(st[g]) >= 1),
+    GOODS.some(
+      (g) => keep.has(g) && toUnits(st[g]) >= (g === 'power' ? Math.max(1, FUEL_RESERVE) : 1),
+    ),
   );
   const inFlight = Object.values(s.movements).some((m) => m.owner === me && m.kind === 'haul');
   const wantsPlot = Object.values(s.districts).some(
@@ -489,7 +524,8 @@ function resupply(
       // Buy a little over the target: crew upkeep eats supplies while the van is on the road.
       const need = Math.ceil(balance.settle.supplies + reserve + BUY_MARGIN - have);
       const price = civicAsk(book);
-      const affordable = Math.floor((toUnits(budget.credits) * 100) / price);
+      const spare = toUnits(budget.credits) - fuelCredits(s, home.id, hub.id);
+      const affordable = Math.floor((Math.max(0, spare) * 100) / price);
       const qty = Math.min(VAN_CARGO, Math.floor(book.askDepth), need, affordable);
       if (qty >= 1 && budget.credits >= toAtoms((price * qty) / 100)) {
         budget.credits -= toAtoms((price * qty) / 100);
@@ -518,7 +554,9 @@ function fetchOrders(s: GameState, me: Id, keep: Set<Good>): Order[] {
   const inFlight = Object.values(s.movements).some((m) => m.owner === me);
   if (inFlight) return [];
   const hub = Object.entries(player.stash).find(([, st]) =>
-    GOODS.some((g) => keep.has(g) && toUnits(st[g]) >= 1),
+    GOODS.some(
+      (g) => keep.has(g) && toUnits(st[g]) >= (g === 'power' ? Math.max(1, FUEL_RESERVE) : 1),
+    ),
   )?.[0];
   if (!hub) return [];
   // Any own district that has a van and a crew standing by can go (the kit's van is not always at home).
@@ -538,8 +576,9 @@ function sellStash(s: GameState, me: Id, keep: Set<Good>): Order[] {
   for (const [hub, stash] of Object.entries(player.stash)) {
     for (const good of GOODS) {
       // Goods bought here for settling or building are not for sale.
-      if (keep.has(good)) continue;
-      const qty = Math.floor(toUnits(stash[good]));
+      // (Power is kept only up to a trip's worth of fuel; the rest is sold.)
+      if (keep.has(good) && good !== 'power') continue;
+      const qty = Math.floor(toUnits(stash[good])) - (keep.has(good) ? FUEL_BUY : 0);
       const book = s.markets[hub]?.[good];
       if (qty >= 1 && book) {
         orders.push({ type: 'market.place', hub, side: 'sell', good, price: civicBid(book), qty });
@@ -616,7 +655,7 @@ function shopOrders(
       continue;
     }
     const price = civicAsk(book);
-    const room = toUnits(budget.credits) - reserve;
+    const room = toUnits(budget.credits) - reserve - fuelCredits(s, home.id, hub.id);
     const qty = Math.min(
       VAN_CARGO,
       short,
@@ -642,10 +681,12 @@ function haulToHub(s: GameState, me: Id, keep: Set<Good>, escort = false): Order
     let best: { good: Good; qty: number } | null = null;
     for (const good of GOODS) {
       // Keep supplies for recruiting, and whatever the next building still needs.
-      if (good !== 'supplies' && keep.has(good)) continue;
+      if (good !== 'supplies' && good !== 'power' && keep.has(good)) continue;
+      // Power above a couple of trips' fuel is surplus (sim-spec, "Fuel").
       const spare =
         Math.floor(toUnits(base.warehouse[good])) -
-        (good === 'supplies' ? balance.settle.supplies + 25 : 0);
+        (good === 'supplies' ? balance.settle.supplies + 25 : 0) -
+        (good === 'power' ? 2 * FUEL_RESERVE : 0);
       if (spare >= 10 && (!best || spare > best.qty)) best = { good, qty: spare };
     }
     if (!best) continue;
@@ -796,6 +837,12 @@ export function contractOrders(s: GameState, me: Id, budget: Budget, plan: Contr
       if (!Number.isFinite(len)) continue;
       const tripMs = travelMs(len, byRunner ? 'runner' : 'van');
       if (tripMs * 100 > c.hours * MS_PER_HOUR * plan.tripPercent) continue;
+      // The van's power for the round trip should leave most of the pay (a runner burns little).
+      const fuelCost =
+        2 *
+        fuelUnitsFor(byRunner ? 'runner' : 'van', len) *
+        (balance.market.baseRefCents.power / 100);
+      if (fuelCost * 100 > c.reward * CONTRACT_FUEL_PERCENT) continue;
       const score = plan.prefer === 'near' ? -len : c.reward / c.qty;
       if (!best || score > best.score) best = { id: c.id, score };
     }
@@ -1028,6 +1075,68 @@ export function clearOrders(s: GameState, me: Id, taken: Order[], nearOwn: boole
   return [];
 }
 
+/**
+ * Keeps a bot in fuel: when the home warehouse runs low on power and none waits in a hub stash,
+ * a load is bought at the nearest hub (fetched like any other shopping). Orders that would still
+ * be refused for lack of fuel are dropped, so a bot never proposes a trip it cannot pay for.
+ */
+export function fuelOrders(s: GameState, me: Id, taken: Order[]): Order[] {
+  const player = s.players[me];
+  const home = mine(s, me)[0];
+  if (!player || !home || FUEL_RESERVE === 0) return [];
+  const pool = mine(s, me).reduce((n, d) => n + toUnits(d.warehouse.power), 0);
+  if (pool >= FUEL_RESERVE) return [];
+  if (Object.values(player.stash).some((st) => toUnits(st.power) >= 1)) return [];
+  if (taken.some((o) => o.type === 'market.place' && o.good === 'power')) return [];
+  const hub = cheapestHubFor(s, home.id, 'power');
+  const book = hub && s.markets[hub.id]?.power;
+  if (!hub || !book) return [];
+  const price = civicAsk(book);
+  // Buys a full load when it can, else whatever the credits stretch to (a broke bot still moves).
+  const afford = Math.floor((toUnits(player.credits) * 100) / price);
+  const qty = Math.min(FUEL_BUY, Math.floor(book.askDepth), afford);
+  if (qty < 1) return [];
+  return [{ type: 'market.place', hub: hub.id, side: 'buy', good: 'power', price, qty }];
+}
+
+/** Credits that keep a van's return trip from `hub` fuelled (a little over what it costs). */
+function fuelCredits(s: GameState, homeId: Id, hubId: Id): number {
+  const book = s.markets[hubId]?.power;
+  if (!book) return 0;
+  return (fuelUnitsFor('van', length(s, hubId, homeId)) + 1) * (civicAsk(book) / 100) + 5;
+}
+
+const withFuel =
+  (bot: Bot): Bot =>
+  (s, me) => {
+    const orders = bot(s, me);
+    const all = [...orders, ...fuelOrders(s, me, orders)];
+    const out: Order[] = [];
+    for (const o of all) {
+      const r = validateOrder(s, { actorId: me, order: o, atMs: s.nowMs });
+      if (r.ok || r.error !== 'no_fuel') out.push(o);
+      else if (o.type === 'move' && o.carrierId !== null) {
+        // Out of fuel everywhere: the crew walks (burning none).
+        const foot: Order = { ...o, carrierId: null };
+        if (validateOrder(s, { actorId: me, order: foot, atMs: s.nowMs }).ok) out.push(foot);
+      } else if (o.type === 'haul' && o.carrierId !== null && !o.contractId) {
+        // Carry what a crew on foot can (sim-spec, "Fuel"), a few units at a time.
+        let room = balance.carriers.foot.cargo;
+        const cargo: CargoRequest = {};
+        for (const g of GOODS) {
+          const qty = Math.min(room, o.cargo[g] ?? 0);
+          if (qty >= 1) {
+            cargo[g] = qty;
+            room -= qty;
+          }
+        }
+        const foot: Order = { ...o, carrierId: null, cargo };
+        if (validateOrder(s, { actorId: me, order: foot, atMs: s.nowMs }).ok) out.push(foot);
+      }
+    }
+    return out;
+  };
+
 const withJobs =
   (bot: Bot, clears?: 'any' | 'near'): Bot =>
   (s, me) => {
@@ -1038,8 +1147,8 @@ const withJobs =
   };
 
 export const BOTS: Record<BotKind, Bot> = {
-  raider: withJobs(raider),
-  turtle: withJobs(turtle, 'near'),
-  merchant: withJobs(merchant),
-  hunter: withJobs(hunter, 'any'),
+  raider: withFuel(withJobs(raider)),
+  turtle: withFuel(withJobs(turtle, 'near')),
+  merchant: withFuel(withJobs(merchant)),
+  hunter: withFuel(withJobs(hunter, 'any')),
 };

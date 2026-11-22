@@ -59,6 +59,9 @@ describe('open frontier plots are public', () => {
     expect(seen).toMatchObject({ relation: 'visible', open: true });
     expect((seen as { siege?: unknown } | undefined)?.siege ?? null).toBeNull();
     const crew = crewsOf(s, 'n1')[0] as Id;
+    // The van burns power for the trip: the far plot needs more than the kit holds.
+    const stock = Object.values(s.districts).find((d) => d.owner === 'n1')?.warehouse;
+    if (stock) stock.power += toAtoms(40);
     const ok = validateOrder(s, {
       actorId: 'n1',
       order: {

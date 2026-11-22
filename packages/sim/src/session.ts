@@ -210,14 +210,15 @@ export function firstSession(seed: number, perks: boolean): SessionResult {
         )[0];
       const settler = spare();
       if (plot && settler) {
-        if (
+        // By van while the start warehouse has the power for it, else the crew walks (no fuel).
+        const settleBy = (carrierId: Id | null): boolean =>
           attempt('settle', 'settle', {
             type: 'settle',
-            carrierId: van && !used.has(van) ? van : null,
+            carrierId,
             crewIds: [settler],
             target: plot.id,
-          })
-        ) {
+          });
+        if (settleBy(van && !used.has(van) ? van : null) || settleBy(null)) {
           result.settleMin ??= minute;
           if (van) used.add(van);
         }

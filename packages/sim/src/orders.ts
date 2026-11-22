@@ -14,6 +14,7 @@ import { emit, type Ctx } from './ctx.js';
 import { jobTaken, resolveJob } from './jobs.js';
 import { cancelOrder, findOrder, placeOrder, validatePlace } from './market.js';
 import { take } from './cost.js';
+import { addFuelCost, burnFuel, fuelFor } from './fuel.js';
 import { afterWarehouseChange, buildingLevel, storeAt, valueStoreAt } from './production.js';
 import { shortestRoute, travelMs, type Route } from './routing.js';
 import { pickClearCrews, visibleAmbush } from './clear.js';
@@ -49,6 +50,8 @@ type Plan =
       carrier: Carrier | null;
       crews: Crew[];
       cargo: Goods;
+      /** Power atoms burned as fuel, drawn from the start store. */
+      fuel: number;
       route: Route;
       durationMs: number;
       raid?: RaidInfo;
@@ -233,6 +236,15 @@ function resolveTravel(state: GameState, req: TravelRequest): Resolved {
 
   const route = jobRun?.route ?? shortestRoute(state.graph, from, to);
   if (!route) return fail('no_route');
+  // Fuel: a carrier needs power in the start store for the whole trip, on top of any power cargo.
+  // Errands and a carrier parked away from any store of its owner's burn nothing.
+  const fuel = req.kind === 'job' ? 0 : fuelFor(kind, route.lengthM);
+  if (fuel > 0) {
+    const store = sourceStore(state, req.actorId, from);
+    if (store && store.power - cargo.power + otherPower(state, req.actorId, from) < fuel) {
+      return fail('no_fuel');
+    }
+  }
   return {
     plan: {
       type: 'travel',
@@ -241,6 +253,7 @@ function resolveTravel(state: GameState, req: TravelRequest): Resolved {
       carrier,
       crews,
       cargo,
+      fuel,
       route,
       durationMs:
         jobRun?.durationMs ?? travelMs(route.lengthM, kind, carrier ? wearOf(carrier) : 0),
@@ -250,6 +263,15 @@ function resolveTravel(state: GameState, req: TravelRequest): Resolved {
       ...(req.job ? { job: req.job } : {}),
     },
   };
+}
+
+/** Power atoms in an owner's district warehouses other than the one at `nodeId` (fuel top-up). */
+function otherPower(state: GameState, owner: Id, nodeId: Id): number {
+  let sum = 0;
+  for (const d of Object.values(state.districts)) {
+    if (d.id !== nodeId && d.kind !== 'hub' && d.owner === owner) sum += d.warehouse.power;
+  }
+  return sum;
 }
 
 /** Read-only view of the goods an actor can load at a node (no ctx needed). */
@@ -462,16 +484,36 @@ export function applyOrder(ctx: Ctx, input: Input): Validation {
   const plan = r.plan;
   switch (plan.type) {
     case 'travel': {
-      const source =
-        plan.kind === 'haul' || plan.kind === 'settle'
-          ? storeAt(ctx, plan.owner, plan.route.route[0] as Id)
-          : null;
-      const sourceValue =
-        source && (plan.kind === 'haul' || plan.kind === 'settle')
-          ? valueStoreAt(ctx, plan.owner, plan.route.route[0] as Id)
-          : null;
-      const carried = source && sourceValue ? take(source, sourceValue, plan.cargo) : undefined;
-      startMovement(ctx, carried ? { ...plan, value: carried } : plan);
+      const origin = plan.route.route[0] as Id;
+      const loads = plan.kind === 'haul' || plan.kind === 'settle';
+      const source = loads || plan.fuel > 0 ? storeAt(ctx, plan.owner, origin) : null;
+      const sourceValue = source ? valueStoreAt(ctx, plan.owner, origin) : null;
+      const carried =
+        source && sourceValue && loads ? take(source, sourceValue, plan.cargo) : undefined;
+      // Burn the fuel; what it cost joins the cargo's cost basis (see `burnFuel`).
+      let burned: number | null = null;
+      if (source && sourceValue && plan.fuel > 0) {
+        // The start store pays first; whatever it lacks comes from the owner's other warehouses
+        // (a carrier tops up from the depots, lowest id first).
+        const own = Math.min(source.power, plan.fuel);
+        burned = burnFuel(source, sourceValue, own);
+        let left = plan.fuel - own;
+        for (const d of Object.values(state.districts).sort((x, y) => (x.id < y.id ? -1 : 1))) {
+          if (left <= 0) break;
+          if (d.id === origin || d.kind === 'hub' || d.owner !== plan.owner) continue;
+          const part = Math.min(d.warehouse.power, left);
+          if (part <= 0) continue;
+          burned += burnFuel(d.warehouse, d.warehouseValue, part);
+          left -= part;
+          afterWarehouseChange(ctx, d);
+        }
+      }
+      if (carried && burned) addFuelCost(carried, plan.cargo, burned);
+      startMovement(ctx, {
+        ...plan,
+        ...(carried ? { value: carried } : {}),
+        ...(burned ? { fuel: plan.fuel } : {}),
+      });
       if (plan.job) jobTaken(ctx, plan.owner, plan.job);
       const from = state.districts[plan.route.route[0] as Id];
       if (source && from && from.kind !== 'hub') afterWarehouseChange(ctx, from);

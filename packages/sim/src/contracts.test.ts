@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MS_PER_HOUR, balance, toAtoms, toUnits } from './balance.js';
+import { ATOMS_PER_UNIT, MS_PER_HOUR, balance, toAtoms, toUnits } from './balance.js';
 import { depositFor } from './contracts.js';
 import { clone, crewsOf, scenario, vanOf } from './fixtures.js';
 import { viewFor } from './fog.js';
@@ -171,11 +171,15 @@ describe('contracts board', () => {
 
   it('expires an untaken contract and refunds the poster', () => {
     const { s, id } = posted(500);
-    const before = credits(s, 'p2');
+    const total = (g: GameState): number => credits(g, 'p1') + credits(g, 'p2');
+    const before = total(s);
     const r = run(s, C.offerHours + 1);
     expect(r.s.contracts[id]).toBeUndefined();
     expect(r.events.find((e) => e.kind === 'contract.expired')?.data['reason']).toBe('untaken');
-    expect(credits(r.s, 'p2')).toBeCloseTo(before + 500);
+    // The daily city levy and upkeep also ran inside this window: with them added back, the
+    // poster's escrow came home and no credits were made or lost.
+    const taken = (r.s.sink.levyAtoms + r.s.sink.upkeepAtoms) / ATOMS_PER_UNIT;
+    expect(total(r.s) + taken).toBeCloseTo(before + 500);
   });
 
   it('lets the poster cancel an open contract only', () => {

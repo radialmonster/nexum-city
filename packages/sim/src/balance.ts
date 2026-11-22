@@ -105,6 +105,49 @@ export const balance = {
     garageRunnerDiscountPercent: 15,
   },
 
+  /**
+   * Fuel (economy plan, stage 4; docs/rewrite/sim-spec.md "Fuel"). A carrier burns power per
+   * kilometre of street, drawn from the start warehouse or stash when the trip is ordered. Crews
+   * on foot burn none. Thousandths of a unit of power per kilometre.
+   */
+  fuel: {
+    milliPerKm: { foot: 0, van: 50, hauler: 100, runner: 20 } satisfies Record<CarrierKind, number>,
+  },
+
+  /**
+   * Shortages (economy plan, stage 3; sim-spec "Shortages"): every so often one hub runs short of
+   * one good for a few hours. Its price reference jumps and the city pays more for it.
+   */
+  shortage: {
+    /** The city considers starting a shortage this often. */
+    everyHours: 6,
+    minHours: 4,
+    maxHours: 8,
+    /** The hub's reference price for the good rises by this percent while it lasts. */
+    refPercent: 40,
+    /** The civic bid depth is multiplied by this while it lasts (the city wants more). */
+    bidDepthFactor: 2,
+    /** At most this many shortages at once. */
+    maxActive: 2,
+  },
+
+  /**
+   * Credit sinks (sim-spec "Credit sinks"): money that leaves the game so total credits do not
+   * run away. The hub keeps a share of every sale, and each district beyond the first costs a
+   * few credits a day to keep up.
+   */
+  sink: {
+    /** Percent of a seller's proceeds the hub keeps. */
+    tradeFeePercent: 0,
+    /** Districts a player holds before upkeep starts. */
+    freeDistricts: 1,
+    /** Credits a day for each district beyond the free ones. */
+    upkeepCreditsPerDay: 20,
+    /** Percent of the credits held above `levyFreeCredits` that the city takes each day. */
+    levyPercent: 40,
+    levyFreeCredits: 300,
+  },
+
   recruit: {
     credits: 150,
     supplies: 20,
@@ -122,7 +165,7 @@ export const balance = {
     /** Defence added to every owned district. */
     militia: 10,
     /** Defence of an unowned plot (task 54: raised from 10 so raiders cannot farm empty land). */
-    neutralGuard: 20,
+    neutralGuard: 23,
     wallsPercentPerLevel: 30,
     pullbackPercent: 50,
     /** The bar falls by 1/12 per hour with no attackers present. */
@@ -196,7 +239,7 @@ export const balance = {
     /** Percent of the raiders' strength lost when they are beaten. */
     raiderLossPercent: 30,
     /** A crew hurt in a raid or a siege round regains 1 strength every this many hours while it rests at a district, up to its starting strength. Was 1.5 before siege rounds mended too; at 1.5 the raider ran away (task 80). */
-    mendHours: 6,
+    mendHours: 7,
     /** Percent of the escort's strength lost when the raiders win. */
     escortLossPercent: 10,
     /** Each side's strength is rolled between 100 minus and 100 plus this percent. */
@@ -224,7 +267,7 @@ export const balance = {
     /** Of those, at most this many are civic, so a slot is always free for players. */
     civicCap: 3,
     /** The city considers posting one contract per hub this often. */
-    civicEveryHours: 3,
+    civicEveryHours: 2,
     /** An offer nobody takes lapses after this many hours. */
     offerHours: 24,
     /** The delivery window, in hours from taking. */
@@ -322,7 +365,7 @@ export const balance = {
     /** The starter civic contract reserved for a newcomer. */
     starter: { good: 'supplies', qty: 5, premiumPercent: 100, graceMinutes: 180 },
     /** Goods a new home district starts with, exactly one level-1 Workshop (so the first build is not a 30 minute haul away) and 30 supplies, which with the 30 bought at the hub make the 60 a first settle needs. */
-    kit: { parts: 30, power: 10, supplies: 30 },
+    kit: { parts: 30, power: 20, supplies: 30 },
   },
 
   /** Street jobs: a personal list of quick errands, one new offer every `refillMinutes`. */

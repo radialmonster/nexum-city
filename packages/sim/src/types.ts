@@ -230,6 +230,8 @@ export interface Movement {
   cargo: Goods;
   /** Cost basis of `cargo` (see `cost.ts`). */
   value: Goods;
+  /** Power atoms burned as fuel at departure (0 for crews on foot). */
+  fuel?: number;
   route: Id[];
   lengthM: number;
   from: Id;
@@ -259,6 +261,9 @@ export type QueuedEvent = { at: number; seq: number } & (
   | { kind: 'siege.check'; districtId: Id }
   | { kind: 'score.tick' }
   | { kind: 'market.tick' }
+  | { kind: 'shortage.check' }
+  | { kind: 'upkeep.day' }
+  | { kind: 'shortage.end'; hub: Id; good: Good }
   | { kind: 'frontier.survey'; districtId: Id }
   | { kind: 'settle.done'; districtId: Id }
   | { kind: 'raid.end'; movementId: Id }
@@ -354,6 +359,8 @@ export interface BaseWhy {
   demand: number;
   /** Added for recent raids on the streets of that haul. */
   raid: number;
+  /** Added while the hub is short of the good (see `shortage.ts`); 0 otherwise. */
+  shortage: number;
 }
 
 /**
@@ -456,8 +463,20 @@ export interface GameState {
   contracts: Record<Id, Contract>;
   /** What each player last saw of each district's owner (fog memory). */
   memory: Record<Id, Record<Id, Owner>>;
+  /** Hubs that are short of a good right now (see `shortage.ts`). */
+  shortages: Shortage[];
+  /** Credits that left the game, in atoms (see `sink.ts`). */
+  sink: { feesAtoms: number; upkeepAtoms: number; levyAtoms: number };
   /** Pending scheduled events, sorted by (at, seq). */
   queue: QueuedEvent[];
+}
+
+/** A hub that is short of one good for a while: its price reference is up and the city bids deep. */
+export interface Shortage {
+  hub: Id;
+  good: Good;
+  startMs: number;
+  endMs: number;
 }
 
 // ---------------------------------------------------------------- orders
@@ -564,6 +583,7 @@ export const ORDER_ERRORS = [
   'too_many_carriers',
   'unknown_job',
   'reserved_contract',
+  'no_fuel',
 ] as const;
 export type OrderError = (typeof ORDER_ERRORS)[number];
 
@@ -581,6 +601,8 @@ export type SimEventKind =
   | 'production.wasted'
   | 'build.done'
   | 'trade.filled'
+  | 'market.shortage'
+  | 'market.shortage.ended'
   | 'player.joined'
   | 'frontier.opened'
   | 'settle.started'

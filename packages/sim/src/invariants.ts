@@ -85,6 +85,12 @@ export function checkInvariants(s: GameState): string[] {
       }
     }
   }
+  for (const [k, v] of Object.entries(s.sink)) {
+    if (!Number.isFinite(v) || v < 0) problems.push(`sink.${k} is ${v}`);
+  }
+  for (const sh of s.shortages) {
+    if (sh.endMs < s.nowMs) problems.push(`shortage at ${sh.hub} has run past its end`);
+  }
   for (const p of Object.values(s.players)) {
     if (p.score < 0) problems.push(`${p.id} has negative score`);
     if (p.credits < 0) problems.push(`${p.id} has negative credits`);

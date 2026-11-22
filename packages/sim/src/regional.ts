@@ -176,6 +176,7 @@ export function refreshRegional(state: GameState): void {
         transport: 0,
         demand: 0,
         raid: 0,
+        shortage: 0,
       };
       if (from !== null) {
         why.transport = Math.floor((global * R.transportPercentPerKm * distM) / 100_000);
@@ -189,7 +190,11 @@ export function refreshRegional(state: GameState): void {
           Math.min(R.demandCapPercent, n * R.demandPercentPerDistrict),
         );
       }
-      book.baseCents = global + why.transport + why.raid + why.demand;
+      const plain = global + why.transport + why.raid + why.demand;
+      if (state.shortages.some((s) => s.hub === hub && s.good === good)) {
+        why.shortage = percentOf(plain, balance.shortage.refPercent);
+      }
+      book.baseCents = plain + why.shortage;
       book.why = why;
     }
   }

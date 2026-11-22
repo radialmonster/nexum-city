@@ -46,6 +46,8 @@ export interface MovementSpec {
   cargo: Goods;
   /** The cost basis that travels with the cargo; defaults to the reference value at the start. */
   value?: Goods;
+  /** Power atoms burned as fuel at departure. */
+  fuel?: number;
   route: Route;
   durationMs: number;
   /** Raids only. */
@@ -81,6 +83,7 @@ export function startMovement(ctx: Ctx, spec: MovementSpec): Movement {
     departMs: state.nowMs,
     arriveMs: state.nowMs + spec.durationMs,
   };
+  if (spec.fuel) movement.fuel = spec.fuel;
   if (spec.raid) movement.raid = spec.raid;
   if (spec.clear) movement.clear = spec.clear;
   if (spec.contractId) movement.contractId = spec.contractId;

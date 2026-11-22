@@ -23,6 +23,11 @@ export function scenario(seed = 7): GameState {
   first.kind = 'docks';
   first.warehouse.parts = toAtoms(40);
   first.warehouse.power = toAtoms(20);
+  // Fuel: every district a test sends a carrier from holds some power.
+  for (const d of Object.values(s.districts)) {
+    if (d.kind !== 'hub' && d.owner !== 'neutral')
+      d.warehouse.power = Math.max(d.warehouse.power, toAtoms(20));
+  }
   const ctx: Ctx = { state: s, events: [] };
   afterWarehouseChange(ctx, first);
   afterWarehouseChange(ctx, second);

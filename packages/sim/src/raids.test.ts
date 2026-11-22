@@ -289,6 +289,8 @@ describe('strikes', () => {
     const lose = clone(win);
     setStrength(lose, 'p1', 10);
     setStrength(lose, 'p2', 500);
+    // A shortage resets the reference for its hours and would hide the nudge: keep the day calm.
+    for (const w of [win, lose]) w.queue = w.queue.filter((e) => e.kind !== 'shortage.check');
     const hit = runHaul(win, w.haul).state.markets['hubW']?.parts.refCents ?? 0;
     const miss = runHaul(lose, w.haul).state.markets['hubW']?.parts.refCents ?? 0;
     expect(hit).toBeGreaterThan(miss);

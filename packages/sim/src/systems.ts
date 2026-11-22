@@ -10,6 +10,8 @@ import { raidSystem } from './raid.js';
 import { rushSystem } from './rush.js';
 import { scoreSystem } from './score.js';
 import { settleSystem } from './settle.js';
+import { shortageSystem } from './shortage.js';
+import { sinkSystem } from './sink.js';
 import { siegeSystem } from './siege.js';
 import { travelSystem } from './travel.js';
 import { wearSystem } from './wear.js';
@@ -47,6 +49,8 @@ export const systems: readonly System[] = [
   scoreSystem,
   marketSystem,
   contractSystem,
+  shortageSystem,
+  sinkSystem,
   jobSystem,
   rushSystem,
   frontierSystem,

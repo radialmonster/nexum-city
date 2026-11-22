@@ -4,6 +4,8 @@ import { put, share, take } from './cost.js';
 import { emptyGoods } from './production.js';
 import { refreshRegional } from './regional.js';
 import { addTradeScore } from './score.js';
+import { bidDepthCap } from './shortage.js';
+import { feeOn } from './sink.js';
 import type { System } from './systems.js';
 import {
   GOODS,
@@ -27,7 +29,15 @@ export function newBook(good: Good): Book {
     asks: [],
     refCents: M.baseRefCents[good],
     baseCents: M.baseRefCents[good],
-    why: { from: null, distM: 0, global: M.baseRefCents[good], transport: 0, demand: 0, raid: 0 },
+    why: {
+      from: null,
+      distM: 0,
+      global: M.baseRefCents[good],
+      transport: 0,
+      demand: 0,
+      raid: 0,
+      shortage: 0,
+    },
     bidDepth: M.civicDepthCap,
     askDepth: M.civicDepthCap,
     lastCents: null,
@@ -168,7 +178,13 @@ function fill(
   }
   if (sell) {
     const seller = state.players[sell.owner];
-    if (seller) seller.credits += price * qty * ATOMS_PER_CENT;
+    if (seller) {
+      // The hub keeps a small cut of what a seller is paid (sim-spec, "Credit sinks").
+      const gross = price * qty * ATOMS_PER_CENT;
+      const fee = feeOn(gross);
+      seller.credits += gross - fee;
+      state.sink.feesAtoms += fee;
+    }
     // The goods leave with their share of the escrowed cost basis.
     const part = share(sell.value, toAtoms(qty), toAtoms(sell.qty));
     sell.value -= part;
@@ -319,7 +335,10 @@ function hourly(ctx: Ctx): void {
     for (const good of GOODS) {
       const book = ctx.state.markets[hub]?.[good];
       if (!book) continue;
-      book.bidDepth = Math.min(M.civicDepthCap, book.bidDepth + M.civicRefillPerHour);
+      book.bidDepth = Math.min(
+        bidDepthCap(ctx.state, hub, good),
+        book.bidDepth + M.civicRefillPerHour,
+      );
       book.askDepth = Math.min(M.civicDepthCap, book.askDepth + M.civicRefillPerHour);
       const base = book.baseCents;
       book.refCents = clampRef(

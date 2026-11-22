@@ -108,7 +108,7 @@ export function createWorld(seed: number, options: WorldOptions = {}): GameState
     seed,
     nowMs: startMs,
     rng,
-    counters: { crew: 0, carrier: 0, movement: 0, event: 0, seq: 3, order: 0, contract: 0, job: 0 },
+    counters: { crew: 0, carrier: 0, movement: 0, event: 0, seq: 4, order: 0, contract: 0, job: 0 },
     world: { cols, rows, soundY: rows },
     graph: { nodes, edges },
     districts,
@@ -130,6 +130,8 @@ export function createWorld(seed: number, options: WorldOptions = {}): GameState
     heat: {},
     contracts: {},
     memory: {},
+    shortages: [],
+    sink: { feesAtoms: 0, upkeepAtoms: 0, levyAtoms: 0 },
     // The first hourly score and market ticks; each tick schedules the next.
     queue: [
       { at: startMs + MS_PER_HOUR, seq: 1, kind: 'score.tick' },
@@ -139,6 +141,12 @@ export function createWorld(seed: number, options: WorldOptions = {}): GameState
         seq: 3,
         kind: 'contract.civic',
       },
+      {
+        at: startMs + balance.shortage.everyHours * MS_PER_HOUR,
+        seq: 4,
+        kind: 'shortage.check',
+      },
+      { at: startMs + 24 * MS_PER_HOUR, seq: 5, kind: 'upkeep.day' },
     ],
   };
   refreshRegional(state);
