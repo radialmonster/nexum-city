@@ -95,3 +95,8 @@
 .timeline[hidden] {
   display: none;
 }
+
+.feed > .steps {
+  flex: 0 0 auto;
+  padding: var(--space-md);
+}

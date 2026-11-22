@@ -18,6 +18,8 @@ import { Timeline } from './Timeline';
 import { TopBar } from './TopBar';
 import { finaleClock, isOwn } from './derive';
 import { SeasonEnd } from './SeasonEnd';
+import { FirstSteps } from './FirstSteps';
+import { loadFirstSteps, saveFirstSteps, type FirstStepsState } from './stepsStore';
 
 type Drawer = 'map' | 'feed' | 'orders' | 'district';
 
@@ -36,6 +38,7 @@ export function GameScreen() {
     | { kind: 'dossier'; playerId: string }
     | null
   >(null);
+  const [steps, setSteps] = useState<FirstStepsState>(() => loadFirstSteps());
   const [endSeen, setEndSeen] = useState<number | null>(null);
   const { view, account } = state;
 
@@ -49,11 +52,20 @@ export function GameScreen() {
     };
   }, [session]);
 
+  const updateSteps = (patch: Partial<FirstStepsState>) => {
+    const next = { ...steps, ...patch };
+    setSteps(next);
+    saveFirstSteps(next);
+  };
+
   if (!view || !account) return null;
   const nowMs = gameNow(state, wall);
   const alerts = Object.values(view.districts).filter((d) => isOwn(d) && d.siege !== null).length;
   const select = (id: string | null) => {
     store.dispatch({ type: 'select', id });
+    if (id !== null && isOwn(view.districts[id]) && !steps.selectedHome) {
+      updateSteps({ selectedHome: true });
+    }
     if (id !== null && compact) setDrawer('district');
   };
   const fly = (id: string) => {
@@ -64,6 +76,7 @@ export function GameScreen() {
   /** The first hub you can see: the resource chips open its market. */
   const firstHub = Object.values(view.districts).find((d) => d.relation === 'hub')?.id;
   const openMarket = (hub: string, good?: GoodName) => {
+    if (!steps.openedMarket) updateSteps({ openedMarket: true });
     setPanel({ kind: 'market', hub, ...(good ? { good } : {}) });
   };
   const closePanel = () => {
@@ -139,7 +152,40 @@ export function GameScreen() {
           void session.logout();
         }}
       />
-      {(!compact || drawer === 'feed') && <div className={styles['feed']}>{feed}</div>}
+      {(!compact || drawer === 'feed') && (
+        <div className={styles['feed']}>
+          {!steps.dismissed && (
+            <div className={styles['steps']}>
+              <FirstSteps
+                steps={[
+                  {
+                    id: 'home',
+                    label: 'Select your district',
+                    hint: 'Click your glowing plot on the map to see its crews and goods.',
+                    done: steps.selectedHome,
+                  },
+                  {
+                    id: 'settle',
+                    label: 'Settle a frontier plot',
+                    hint: 'Send a crew with 60 supplies to an open plot to claim it.',
+                    done: Object.values(view.districts).filter(isOwn).length > 1,
+                  },
+                  {
+                    id: 'market',
+                    label: 'Open a hub market',
+                    hint: 'Click a hub, or a resource chip at the top, to buy and sell.',
+                    done: steps.openedMarket,
+                  },
+                ]}
+                onDismiss={() => {
+                  updateSteps({ dismissed: true });
+                }}
+              />
+            </div>
+          )}
+          {feed}
+        </div>
+      )}
       <div className={styles['map']} hidden={compact && drawer !== 'map'}>
         <MapScreen
           embed={{

@@ -102,7 +102,24 @@ Live status for [`plan.md`](plan.md). Update this file in the same commit as the
 | 63  | Health check, restarts, logs, nightly backups                                                                                                                                                                                                                                                           | done   | 2026-11-22 (a03eb4a)          |
 | 64  | Phone layout pass                                                                                                                                                                                                                                                                                       | done   | 2026-11-22 (c0212e8)          |
 
+## Playtest findings
+
+QA playthrough of the production build as a new player (2026-11-22). Fixed in the same pass: build blocker text names the shortfall, order cards pre-pick the first crew, a first-steps checklist, no favicon 404.
+
+| ID  | Task                                                                                                                                       | Status | Notes                                         |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------ | --------------------------------------------- |
+| P1  | Settle has no UI. The radial menu offers only siege and scout on a neutral plot, and the fogged view hides the frontier flag on seen plots | todo   | Needs sim fog, contracts, menu, card, store   |
+| P2  | Crews show as raw ids like c13 on order cards; use the friendly names                                                                      | todo   |                                               |
+| P3  | Siege odds line reads "About - to capture" when the enemy is fogged                                                                        | todo   | Show an unknown marker instead of a bare dash |
+| P4  | The HUD sector card overlaps the home plot at tactical zoom                                                                                | todo   |                                               |
+| P5  | Login screen has no one-line game blurb                                                                                                    | todo   |                                               |
+| P6  | Market inputs lack placeholders; no hint that bought goods land in the hub stash and must be hauled home                                   | todo   |                                               |
+| P7  | The radial menu stays open behind an order card                                                                                            | todo   |                                               |
+| P8  | The neutral tag style is inconsistent with other tags                                                                                      | todo   |                                               |
+
 ## Log
+
+- 2026-11-22: Playtest pass (new player, 2560/1920/390). Register, login, reload, logout/in, market, build, scout, feed events after a dev clock advance and /hall all work; no console errors beyond the expected logged-out 401. Added the dismissible first-steps checklist (localStorage), clearer build shortfall text, crew pre-pick on order cards and a favicon; the rest is under Playtest findings.
 
 - 2026-11-22: Old repo renamed to the private `nexum-city-prototype`. This public repo was started fresh so Actions minutes are unlimited and the private docs stay private.
 - 2026-11-22: Plan and tracker created. Owner approved: rewrite in this repo, keep docs and ADRs, archive the prototype under a tag, tear down Cloudflare (it has no users), host with Docker Compose on the FlyWP server. FlyWP can deploy a compose app straight from the GitHub repo, so `docker-compose.yml` lives at the repo root.
