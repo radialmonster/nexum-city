@@ -7,6 +7,9 @@ import styles from './FeedPanel.module.css';
 import { hasReport } from './report';
 import { hasRaidReport } from './raidReport';
 import { clearUnderway, findAmbush } from './clearAmbush';
+import { isOwn } from './derive';
+import type { OrderDraft } from './store';
+import { surplusHaulDraft } from './surplus';
 
 export interface FeedPanelProps {
   readonly view: PlayerView;
@@ -20,6 +23,8 @@ export interface FeedPanelProps {
   readonly onReport?: ((seq: number) => void) | undefined;
   /** Opens the Break it up card for a spotted ambush. */
   readonly onBreakUp?: ((ambushId: string) => void) | undefined;
+  /** Opens a prefilled haul that sells a full plot's surplus at the nearest hub. */
+  readonly onHaulSurplus?: ((draft: OrderDraft) => void) | undefined;
   /** Entries to show, newest first. */
   readonly limit?: number;
 }
@@ -44,10 +49,17 @@ export function FeedPanel({
   onFly,
   onReport,
   onBreakUp,
+  onHaulSurplus,
   limit = 40,
 }: FeedPanelProps) {
   const entries = feedEntries(view, feed, limit, names);
   const away = lastSeenMs > 0 ? ago(nowMs, lastSeenMs) : null;
+  /** A full-warehouse entry offers a prefilled sell haul while that plot is still overflowing. */
+  const surplusFor = (e: FeedEntry): OrderDraft | null => {
+    if (e.eventKind !== 'production.wasted' || e.districtId === null) return null;
+    const d = view.districts[e.districtId];
+    return isOwn(d) && d.overflowing ? surplusHaulDraft(view, d) : null;
+  };
   const fresh = entries.filter((e) => e.at > lastSeenMs).length;
   return (
     <Panel
@@ -101,6 +113,18 @@ export function FeedPanel({
                     </Button>
                   </div>
                 )}
+              {onHaulSurplus && surplusFor(e) && (
+                <div className={styles['actions']}>
+                  <Button
+                    onClick={() => {
+                      const draft = surplusFor(e);
+                      if (draft) onHaulSurplus(draft);
+                    }}
+                  >
+                    HAUL SURPLUS TO THE NEAREST HUB
+                  </Button>
+                </div>
+              )}
             </li>
           ))}
         </ul>

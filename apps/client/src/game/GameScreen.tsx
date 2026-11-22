@@ -19,7 +19,7 @@ import { FeedPanel } from './FeedPanel';
 import styles from './GameScreen.module.css';
 import { OrderCard } from './OrderCard';
 import { useCompact, useSession, useWallClock } from './sessionContext';
-import { gameNow, useGame, useStore } from './store';
+import { gameNow, useGame, useStore, type OrderDraft } from './store';
 import { Timeline } from './Timeline';
 import { RushBanner } from './RushBanner';
 import { TopBar } from './TopBar';
@@ -27,7 +27,7 @@ import type { JobOffer } from './streetJobs';
 import { finaleClock, isOwn, ownDistricts, readyNodes } from './derive';
 import { SeasonEnd } from './SeasonEnd';
 import { FirstSteps } from './FirstSteps';
-import { loadFirstSteps, saveFirstSteps, type FirstStepsState } from './stepsStore';
+import { loadFirstSteps, mergeSteps, saveFirstSteps, type FirstStepsState } from './stepsStore';
 
 type Drawer = 'map' | 'feed' | 'orders' | 'district';
 
@@ -47,7 +47,7 @@ export function GameScreen() {
     | { kind: 'clear'; ambushId: string }
     | null
   >(null);
-  const [steps, setSteps] = useState<FirstStepsState>(() => loadFirstSteps());
+  const [steps, setSteps] = useState<FirstStepsState>(() => loadFirstSteps(state.view?.playerId));
   const [endSeen, setEndSeen] = useState<number | null>(null);
   const { view, account } = state;
 
@@ -63,18 +63,30 @@ export function GameScreen() {
 
   // Any way of landing on your own plot (click, jump list, fly, auto-select) completes step one.
   const selectedIsOwn = !!view && state.selected !== null && isOwn(view.districts[state.selected]);
-  const homeDone = steps.selectedHome || selectedIsOwn;
+  const ownCount = view ? Object.values(view.districts).filter(isOwn).length : 0;
+  const tookContract =
+    !!view && Object.values(view.contracts).some((c) => c.taker === view.playerId);
+  const playerId = view?.playerId;
+  // Steps are sticky and saved per player: a step seen done never goes back to TODO.
+  const shown = useMemo(
+    () =>
+      mergeSteps(playerId ? mergeSteps(steps, loadFirstSteps(playerId)) : steps, {
+        selectedHome: selectedIsOwn,
+        settled: ownCount > 1,
+        tookContract,
+      }),
+    [steps, playerId, selectedIsOwn, ownCount, tookContract],
+  );
   useEffect(() => {
-    if (selectedIsOwn && !steps.selectedHome) saveFirstSteps({ ...steps, selectedHome: true });
-  }, [selectedIsOwn, steps]);
+    if (playerId) saveFirstSteps(shown, playerId);
+  }, [shown, playerId]);
 
   const updateSteps = (patch: Partial<FirstStepsState>) => {
-    const next = { ...steps, selectedHome: homeDone, ...patch };
+    const next = { ...shown, ...patch };
     setSteps(next);
-    saveFirstSteps(next);
+    saveFirstSteps(next, playerId);
   };
 
-  const playerId = view?.playerId;
   // Raid hits that arrive while the screen is open flash on the map; older history does not.
   const [flashFrom] = useState(() => Math.max(0, ...state.feed.map((f) => f.seq)));
   const flashes = useMemo(
@@ -129,11 +141,18 @@ export function GameScreen() {
   /** The first hub you can see: the resource chips open its market. */
   const firstHub = Object.values(view.districts).find((d) => d.relation === 'hub')?.id;
   const openPlots = Object.values(view.districts).filter((d) => 'open' in d && d.open).length;
+  // Open plots the feed announced that the view does not show as open (out of sight).
+  const announcedOpen = new Set(
+    state.feed
+      .filter((f) => f.event.kind === 'frontier.opened')
+      .map((f) => f.event.districts[0])
+      .filter((id): id is string => !!id && view.districts[id]?.relation === 'remembered'),
+  ).size;
   const starter = Object.values(view.contracts).find(
     (c) => c.reservedFor === view.playerId && c.taker === null,
   );
   const openMarket = (hub: string, good?: GoodName) => {
-    if (!steps.openedMarket) updateSteps({ openedMarket: true });
+    if (!shown.openedMarket) updateSteps({ openedMarket: true });
     setPanel({ kind: 'market', hub, ...(good ? { good } : {}) });
   };
   /** Opens a haul card for a contract you took: its hub, its good, and what is still owed. */
@@ -177,6 +196,11 @@ export function GameScreen() {
     setPanel({ kind: 'clear', ambushId });
   };
 
+  const haulSurplus = (draft: OrderDraft) => {
+    setPanel(null);
+    store.dispatch({ type: 'draft', draft });
+  };
+
   const feed = (
     <FeedPanel
       view={view}
@@ -189,6 +213,7 @@ export function GameScreen() {
         setPanel({ kind: 'report', seq });
       }}
       onBreakUp={breakUp}
+      onHaulSurplus={haulSurplus}
     />
   );
   const side = (
@@ -219,6 +244,10 @@ export function GameScreen() {
         setPanel({ kind: 'dossier', playerId });
       }}
       onBreakUp={breakUp}
+      onHaulSurplus={haulSurplus}
+      onSettle={(districtId) => {
+        session.openDraft({ kind: 'settle', districtId });
+      }}
     />
   );
 
@@ -255,7 +284,7 @@ export function GameScreen() {
       <RushBanner view={view} nowMs={nowMs} />
       {(!compact || drawer === 'feed') && (
         <div className={styles['feed']}>
-          {!steps.dismissed && (
+          {!shown.dismissed && (
             <div className={styles['steps']}>
               <FirstSteps
                 steps={[
@@ -263,24 +292,26 @@ export function GameScreen() {
                     id: 'home',
                     label: 'Select your district',
                     hint: 'Click your glowing plot on the map to see its crews and goods.',
-                    done: homeDone,
+                    done: shown.selectedHome,
                   },
                   {
                     id: 'settle',
                     label: 'Settle a frontier plot',
                     hint:
                       openPlots > 0
-                        ? 'Send a crew to an open plot to claim it. Keep 60 supplies in your home warehouse: settling spends them.'
-                        : view.self.rushUntilMs > view.nowMs
-                          ? `No plot is open right now: the next one opens about ${String(balance.frontier.rushSurveyMinutes)} min after the last is claimed. Keep 60 supplies in your home warehouse: settling spends them.`
-                          : 'No plot is open yet: the city surveys new ones for about 4 h. Keep 60 supplies in your home warehouse for then: settling spends them.',
-                    done: Object.values(view.districts).filter(isOwn).length > 1,
+                        ? `${String(openPlots)} open ${openPlots === 1 ? 'plot' : 'plots'} in sight: click one, pick SETTLE and send a crew. Keep 60 supplies in your home warehouse: settling spends them.`
+                        : announcedOpen > 0
+                          ? 'The feed reports a new open plot, but it is out of your sight. Scout it or move a crew nearby, then pick SETTLE on it. Keep 60 supplies in your home warehouse: settling spends them.'
+                          : view.self.rushUntilMs > view.nowMs
+                            ? `No plot is open right now: the next one opens about ${String(balance.frontier.rushSurveyMinutes)} min after the last is claimed. Keep 60 supplies in your home warehouse: settling spends them.`
+                            : 'No plot is open yet: the city surveys new ones for about 4 h. Keep 60 supplies in your home warehouse for then: settling spends them.',
+                    done: shown.settled,
                   },
                   {
                     id: 'market',
                     label: 'Open a hub market',
                     hint: 'Click a hub, or a resource chip at the top, to buy and sell.',
-                    done: steps.openedMarket,
+                    done: shown.openedMarket,
                   },
                   {
                     id: 'contract',
@@ -288,7 +319,7 @@ export function GameScreen() {
                     hint: starter
                       ? `A starter contract is reserved for you: open a hub market, pick CONTRACTS and take the one marked Reserved for you. ${starterHookCopy(view, starter) ?? ''}`.trim()
                       : 'Open a hub market, pick the CONTRACTS tab and take a job.',
-                    done: Object.values(view.contracts).some((c) => c.taker === view.playerId),
+                    done: shown.tookContract,
                   },
                 ]}
                 onDismiss={() => {

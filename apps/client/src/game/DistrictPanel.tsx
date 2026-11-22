@@ -26,6 +26,8 @@ import { formatUnits } from './feed';
 import { JobsPanel } from './JobsPanel';
 import { MyContracts } from './MyContracts';
 import type { JobOffer } from './streetJobs';
+import { fullInMs, surplusHaulDraft } from './surplus';
+import type { OrderDraft } from './store';
 import { buyRunnerBlocker, RUNNER_PITCH } from './runner';
 import { maxLevelFor, runnerCreditsAt } from './wear';
 import { WearMeter } from './WearMeter';
@@ -60,6 +62,10 @@ export interface DistrictPanelProps {
   readonly onTakeJob?: ((job: JobOffer) => void) | undefined;
   /** Opens the Break it up card for a rival ambush you can see. */
   readonly onBreakUp?: ((ambushId: string) => void) | undefined;
+  /** Opens a prefilled haul that sells a full warehouse's surplus at the nearest hub. */
+  readonly onHaulSurplus?: ((draft: OrderDraft) => void) | undefined;
+  /** Opens the settle card for an open frontier plot. */
+  readonly onSettle?: ((districtId: string) => void) | undefined;
 }
 
 const relationLabel = (d: DistrictView, me: string): string => {
@@ -85,6 +91,8 @@ export function DistrictPanel({
   onBoard,
   onTakeJob,
   onBreakUp,
+  onHaulSurplus,
+  onSettle,
 }: DistrictPanelProps) {
   const d = districtId ? view.districts[districtId] : undefined;
   if (!d)
@@ -113,6 +121,7 @@ export function DistrictPanel({
           onBuild={onBuild}
           onBuyRunner={onBuyRunner}
           onTakeJob={onTakeJob}
+          onHaulSurplus={onHaulSurplus}
         />
       ) : d.relation === 'remembered' ? (
         <p className={styles['empty']}>
@@ -127,7 +136,14 @@ export function DistrictPanel({
           . Send a scout to see it now.
         </p>
       ) : (
-        <Seen d={d} me={view.playerId} names={names} onMarket={onMarket} onRival={onRival} />
+        <Seen
+          d={d}
+          me={view.playerId}
+          names={names}
+          onMarket={onMarket}
+          onRival={onRival}
+          onSettle={onSettle}
+        />
       )}
       {onBreakUp && <Ambushes view={view} id={d.id} nowMs={nowMs} onBreakUp={onBreakUp} />}
       <Nearby view={view} id={d.id} onFly={onFly} />
@@ -156,9 +172,10 @@ function Own({
   onBuild,
   onBuyRunner,
   onTakeJob,
+  onHaulSurplus,
 }: Pick<
   DistrictPanelProps,
-  'view' | 'nowMs' | 'onStance' | 'onBuild' | 'onBuyRunner' | 'onTakeJob'
+  'view' | 'nowMs' | 'onStance' | 'onBuild' | 'onBuyRunner' | 'onTakeJob' | 'onHaulSurplus'
 > & {
   d: OwnDistrict;
 }) {
@@ -171,6 +188,8 @@ function Own({
   const maxed =
     d.buildings.length >= d.slots && d.buildings.every((b) => b.level >= maxLevelFor(b.type));
   const empty = Math.max(0, d.slots - d.buildings.length);
+  const fullEta = fullInMs(d);
+  const surplus = d.overflowing || storageFill(d) >= NEARLY_FULL ? surplusHaulDraft(view, d) : null;
   return (
     <div className={styles['stack']}>
       <div className={styles['chips']}>
@@ -202,6 +221,20 @@ function Own({
           tone: GOOD_TONE[g],
         }))}
       />
+      {fullEta !== null && (
+        <small className={styles['hint']} data-testid="full-eta">
+          Warehouse full in {formatEta(fullEta)}.
+        </small>
+      )}
+      {surplus && onHaulSurplus && (
+        <Button
+          onClick={() => {
+            onHaulSurplus(surplus);
+          }}
+        >
+          HAUL SURPLUS TO THE NEAREST HUB
+        </Button>
+      )}
       <div className={styles['goods']}>
         {GOOD_KEYS.map((g) => (
           <Chip key={g} label={g.toUpperCase()} value={formatUnits(toUnits(d.warehouse[g]))} />
@@ -332,12 +365,14 @@ function Seen({
   names,
   onMarket,
   onRival,
+  onSettle,
 }: {
   names: CrewNames;
   d: Exclude<DistrictView, { relation: 'own' | 'remembered' }>;
   me: string;
   onMarket: DistrictPanelProps['onMarket'];
   onRival: DistrictPanelProps['onRival'];
+  onSettle: DistrictPanelProps['onSettle'];
 }) {
   const presence = Object.entries(d.presence);
   const unclaimed = d.owner === '' || d.owner === 'neutral';
@@ -406,6 +441,15 @@ function Seen({
           <small className={styles['hint']}>
             Open frontier. Send a crew to settle it for {balance.settle.supplies} supplies.
           </small>
+        )}
+        {d.open && !d.settling && onSettle && (
+          <Button
+            onClick={() => {
+              onSettle(d.id);
+            }}
+          >
+            SETTLE
+          </Button>
         )}
         {!unclaimed && (
           <small className={styles['hint']}>Warehouse and buildings are hidden by fog.</small>

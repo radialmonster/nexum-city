@@ -1,3 +1,4 @@
+import type { PlayerView } from '@nexum/contracts';
 import { balance } from '@nexum/sim';
 
 /** What the attackers bring and the best guess at what they face. */
@@ -45,4 +46,31 @@ export function siegeOdds(input: SiegeOddsInput): SiegeOdds {
   const bonus = 100 + (input.leader === true ? s.leaderBonusPercent : 0);
   const hoursToCapture = a > 0 ? (s.baseHoursToFill * (a + d) * 100) / (a * bonus) : Infinity;
   return { edge, hoursToCapture, estimated };
+}
+
+/**
+ * Hours left on a siege you are running, from the same odds the order card shows: the full-bar time
+ * for the crews at the plot, scaled by how much of the bar is still empty. Null when it cannot be
+ * worked out (no crews of yours there), so the caller can fall back to the observed pace.
+ */
+export function attackHoursLeft(
+  view: PlayerView,
+  districtId: string,
+  progress: number,
+): number | null {
+  const d = view.districts[districtId];
+  if (!d || d.relation === 'remembered') return null;
+  const attackers = Object.values(view.crews)
+    .filter((c) => c.owner === view.playerId && 'at' in c.loc && c.loc.at === districtId)
+    .map((c) => c.strength);
+  if (attackers.length === 0) return null;
+  const defenderCount =
+    d.relation === 'visible' || d.relation === 'hub'
+      ? Object.values(d.presence).reduce((n, v) => n + v, 0)
+      : 0;
+  const owner = 'owner' in d ? d.owner : '';
+  const leader = view.standings.find((s) => s.rank === 1)?.playerId === owner;
+  const { hoursToCapture } = siegeOdds({ attackers, defenderCount, leader });
+  if (!Number.isFinite(hoursToCapture)) return null;
+  return hoursToCapture * (1 - Math.min(1, Math.max(0, progress)));
 }

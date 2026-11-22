@@ -240,6 +240,14 @@ How the server runs them (tasks 51 to 53): bots are real players with a row in `
 - At season end there's a final leaderboard, then the city resets. Accounts, cosmetics and history carry over.
 - **As built (tasks 61 and 63):** the test season is 7 days (`SEASON_DAYS`). At the end the server freezes the standings into a `seasons` archive and starts a new world with a new seed, re-adding every account (`SEASON_BREAK_HOURS`, default 0, sets a pause). The client shows a season-end screen, a `/hall` hall-of-fame route and a finale countdown in the top bar. Snapshots are versioned; a sim rules change closes the running season and starts a new one rather than replaying old inputs under new rules. `/api/health`, JSON logs, `npm run backup` and the Docker limits are described in `apps/server/src/game/README.md`.
 
+### Playtest fixes (client)
+
+- A haul for a contract warns on the card when the trip outlasts the deadline, naming the deposit only when there is one.
+- The first-steps checklist is sticky and saved per player; a step seen done never returns to TODO.
+- A full warehouse offers a prefilled haul to the nearest hub, and the district panel shows how long until it is full.
+- The clock shows the season day with the time (`D3 23:46`). The order bar and the order card share one siege estimate.
+- The radial menu closes once an order is launched; clicking the plot again reopens it.
+
 ## Away from the game
 
 - The **"While you were away" replay** is the heart of each visit: a short animated playback on the map plus a list of events.

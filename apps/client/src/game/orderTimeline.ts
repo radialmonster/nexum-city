@@ -2,6 +2,7 @@ import type { FeedItem, PlayerView } from '@nexum/contracts';
 import { balance, buildDurationMs } from '@nexum/sim';
 import type { Faction } from '../ui/util';
 import { isOwn, rushed, streetEnds } from './derive';
+import { attackHoursLeft } from './odds';
 import { JOB_NAMES } from './streetJobs';
 
 /** The time axis of the bottom band runs from now to this far ahead. */
@@ -246,7 +247,14 @@ function siegeEntry(
   const p = Math.min(1, Math.max(0, progress));
   const elapsed = started === undefined ? 0 : nowMs - started;
   // No rate in the view: pace is progress over the time since the siege began.
-  const estimated = p > 0 && elapsed > 0 ? nowMs + (elapsed / p) * (1 - p) : null;
+  // Your own attack uses the order card's odds, so the two always agree; otherwise the observed pace.
+  const left = verb === 'ATTACK' ? attackHoursLeft(view, districtId, p) : null;
+  const estimated =
+    left !== null
+      ? nowMs + left * 3_600_000
+      : p > 0 && elapsed > 0
+        ? nowMs + (elapsed / p) * (1 - p)
+        : null;
   const end = estimated ?? nowMs + 3_600_000;
   const name = view.districts[districtId]?.name ?? districtId;
   return {

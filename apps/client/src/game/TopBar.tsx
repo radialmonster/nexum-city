@@ -26,6 +26,10 @@ export interface TopBarProps {
 /** Rival segments cycle through these so each player reads as a distinct colour. */
 const SEGMENT_ROLES: readonly Faction[] = ['merchant', 'raider', 'turtle', 'rival', 'hunter'];
 
+/** The clock chip: the season day with the time of day, e.g. "D3 23:46". */
+export const clockText = (c: { day: number; hhmm: string }): string =>
+  `D${String(c.day)} ${c.hhmm}`;
+
 /** The top bar: logo, season, race bar, resource chips, alerts, clock. */
 export function TopBar({
   view,
@@ -139,7 +143,7 @@ export function TopBar({
       >
         ! ALERTS {alerts > 0 ? alerts : ''}
       </Button>
-      <Chip value={clock.hhmm} label="CLOCK" />
+      <Chip value={clockText(clock)} label="CLOCK" />
       {!compact && (
         <span
           className={cx(styles['link'], styles[link])}
