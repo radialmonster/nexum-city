@@ -2,6 +2,7 @@ import { ATOMS_PER_UNIT, MS_PER_HOUR, MS_PER_MINUTE, PROGRESS_SCALE, balance } f
 import { emit, schedule, unschedule, type Ctx } from './ctx.js';
 import { afterWarehouseChange, buildingLevel, emptyGoods } from './production.js';
 import { nextFloat } from './rng.js';
+import { scheduleMend } from './raid.js';
 import { shortestRoute, travelMs } from './routing.js';
 import { wearOf } from './wear.js';
 import type { System } from './systems.js';
@@ -287,6 +288,9 @@ function runRound(ctx: Ctx, s: Siege): void {
   const defenderLoss = strengthOf(defenders) * k * 2 * (attack / share) * noise();
   const lostA = applyLoss(attackers, Math.floor(attackerLoss + nextFloat(state.rng)));
   const lostD = applyLoss(defenders, Math.floor(defenderLoss + nextFloat(state.rng)));
+  // Every crew that lost strength here heals back over time, like raid losses.
+  scheduleMend(ctx, attackers);
+  scheduleMend(ctx, defenders);
   s.stats.attackerLost += lostA;
   s.stats.defenderLost += lostD;
   s.stats.rounds += 1;

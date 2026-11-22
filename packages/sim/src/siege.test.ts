@@ -272,6 +272,24 @@ describe('breaking a siege', () => {
   });
 });
 
+describe('mending after siege losses', () => {
+  it('schedules a crew.mend for every crew that lost strength in a round', () => {
+    const s0 = duel();
+    const r = run(s0, [attack(s0)], 12, (e) =>
+      of(e, 'combat.round').some(
+        (x) => Number(x.data['attackerLost']) + Number(x.data['defenderLost']) > 0,
+      ),
+    );
+    const hurt = Object.values(r.state.crews).filter(
+      (c) => c.strength < balance.recruit.startStrength,
+    );
+    expect(hurt.length).toBeGreaterThan(0);
+    for (const c of hurt) {
+      expect(r.state.queue.some((e) => e.kind === 'crew.mend' && e.crewId === c.id)).toBe(true);
+    }
+  });
+});
+
 describe('capturing a neutral district', () => {
   it('works against the guard and leaves nothing behind', () => {
     const s = duel();
