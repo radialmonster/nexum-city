@@ -637,3 +637,65 @@ A defender's active answer to a street ambush. Order `ambush.clear {ambushId, cr
 #### Results (seeds 1 to 16, invariants 0)
 
 Before (no clear) and after are within noise: merchant 3.06 districts, score 563; turtle 5.41, 700; raider 4.31, 596; hunter 2.88, 531 (529 after). Raider lead 0.85x, limit 1.4x and floor 0.85x. Raid success 47 percent (241 of 511), per seed min 16, max 83. Success against hunters 37 percent, merchants 53 percent, turtles 66 percent. Only 4 clears were attempted in 16 seasons (hunter: 2 won, 1 held, 1 gone) because bots rarely have a spare crew and a visible ambush at the same moment. No raider hold reward was added: the raider did not drop, so the balance floor is not threatened. If players start clearing often, add a small credit or score reward for an ambush that lasts its full duration (see the balance notes above), and watch the raider lead. `RULES_VERSION` stays 3; `SNAPSHOT_VERSION` is unchanged (the view is not persisted).
+
+## Economy stage 1: cost basis and the trade log (task 79)
+
+### Rules
+
+- Every pile of goods (a district warehouse, a hub stash, a movement's cargo, a resting sell order) carries a parallel `value` record. The value is atoms times centi-credits per unit, an exact integer, so the average cost is `value / atoms` (`cost.ts`, `costCents`). Storing the total, not the average, makes merging a plain sum with no drift. Rounding happens only when part of a pile leaves (floor, exact BigInt) or when a cost is shown.
+- A buy sets the cost to the fill price. Production sets it to the local hub reference at the moment of settling. A move carries the cost with the goods and a merge is a weighted average. Contract escrow, stash deposits and withdrawals and raid loot all carry value. A `raid.hit` loss event reports the value lost.
+- `checkInvariants` checks that every value is a non-negative safe integer and is 0 for an empty pile.
+- The view shows the player's own costs (`self.costs`: stash, districts, cargo). Rivals' costs are never sent.
+
+### Price history is a server trade log, not a sim buffer
+
+The sim keeps no history. The server writes every `trade.filled` event to a SQLite `trades` table (migration 4) and clears it at season reset. `GET /api/market/history?hub=&good=` returns one bucket per game hour, at most 168 (a week): `{ t, open, low, high, close, qty, n }` in centi-credits per unit, plus the hub's current civic quote `{ refCents, baseCents, lastCents }`. The chart is trade prices plus the current civic quote. An hour with no trades has no bucket.
+
+### Versioning
+
+`RULES_VERSION` stays 3 (nothing deployed under 3 must replay). `SNAPSHOT_VERSION` is 4: the upgrade fills every missing value record from the hub reference, so an old save loads with sensible costs.
+
+### Plain-language pros and cons
+
+- Pro: you can see what you paid, so a haul or a sale shows a profit or a loss, and a raid loss has a price.
+- Pro: the log is a record, so a trend shows what players actually did, not a smoothed guess.
+- Con: a made good is "worth" the hub price, not what the plot cost to run, so early profit looks high.
+- Con: a quiet hub has a sparse chart.
+
+## Economy stage 2: regional prices (task 80)
+
+### Rules
+
+- Each hub and good has a `baseCents` and a `why` that adds up to it: `global + transport + raid + demand`.
+  - `global = round(baseRefCents[good] x producerPercent / 100)` (60 percent): the price at the source. The old reference prices stay the starting and reverting values of the civic book, so the market tests keep their 1800, 1400, 2400 and 1000.
+  - `transport = floor(global x transportPercentPerKm x metres / 100000)` (32 percent per km) from the cheapest producing district of any owner, by street distance. Districts under survey do not produce.
+  - `raid`: heat on the streets of that path, 1 per ambush and 3 per hit, kept 85 percent each hour, at 1 percent per point and capped at 25 percent.
+  - `demand`: 1 percent per neutral residential district nearer this hub, for supplies and power only, capped at 15 percent. Players pay no upkeep.
+- `refreshRegional` runs inside `hourly()` and once at world creation. The civic reference reverts 5 percent an hour toward the hub's own base, and drift pulls toward it too. Everything is integer and uses sorted ids, so it is deterministic.
+- `raid.mendHours` is 6: a crew weakened in a siege round is scheduled to mend (commit f5f38b1), which stopped raiders running away with the game once prices moved.
+- Bots: a bot hauling to sell picks the hub by bid minus the transport charge, or the nearest hub when its warehouse is at least 85 percent full or cash is short. Supplies and shopping buy at the hub with the lowest ask plus transport. Merchant trade runs between hubs were tried and removed: they lowered merchant districts (2.47 against 2.66) because a van on a trade run is a van not hauling contracts.
+
+### Plain-language pros and cons
+
+- Pro: where a good is made now matters. Hauling parts to the far hub pays a little more.
+- Pro: raids hurt the whole region's prices for a day, not just the victim.
+- Pro: neutral districts give supplies and power a real buyer.
+- Con: the map has only two hubs, nearly the same distance from the producers of parts and supplies, so only data and power differ much between them.
+- Con: raising the transport rate makes trade runs pay, but it also makes bot economies poorer.
+
+### Results (seeds 1 to 16, before on origin/main, after with this change)
+
+| Target                            | Before | After | Met                             |
+| --------------------------------- | ------ | ----- | ------------------------------- |
+| Parts cheaper at the nearest hub  | 56%    | 81%   | yes                             |
+| Median hub gap within 50% of cost | 0.06   | 0.05  | no (two near-symmetric hubs)    |
+| Hours with a 1.25 hub ratio       | 0%     | 92%   | yes (target 50%)                |
+| Van trade run vs contract pay     | none   | 0.81  | yes (0.7 to 1.3)                |
+| Money growth day 1 to 7           | 11.9x  | 13.9x | no (flag 3x; was already 11.9x) |
+| Raid success                      | 47%    | 49%   | yes (40 to 70)                  |
+| Raider lead                       | 0.85   | 1.14  | yes (at most 1.4)               |
+| Invariant problems                | 0      | 0     | yes                             |
+
+Credits per player per day, after: 1423, 4019, 7080, 10711, 13173, 16612, 19713. Districts (16 seeds): merchant 3.09, raider 6.38, turtle 4.72, hunter 2.0 (before 3.06, 4.31, 5.41, 2.88). On seeds 1 to 8, which the harness test uses, every type is at least 2.4 (hunter 2.63, merchant 2.50). The harness floors were not lowered, but the hunter's 16-seed average dropped and the results swing by about 0.3 districts for tiny parameter changes.
+
+Honest misses: the hub gap is a map-geometry limit (two hubs), and the money supply was already far above 3x before this change; fixing it is a sink job for stage 5.

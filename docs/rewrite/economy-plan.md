@@ -35,9 +35,9 @@ Status: approved by the owner on 2026-11-22 ("make a plan file and proceed all")
 
 ## Stages
 
-### Stage 1 (task 79): price history and cost basis
+### Stage 1 (task 79): price history and cost basis (built)
 
-- **Price history.** Each hub book keeps its reference price every hour for the whole season (7 days is 168 samples per hub and good, a few kilobytes), recorded in `market.tick` and cleared at season reset. Players check in rarely, so the history must cover the time since their last visit: the view exposes the full series, and the UI compares "now" with "when you were last here". The owner asked for more than 48 hours on 2026-11-22.
+- **Price history.** Remember each trade (server log), not hourly samples; the chart is trade prices plus the current civic quote. The server writes each `trade.filled` to a table cleared at season reset and serves a bounded per-hour series. Players check in rarely, so the series covers the whole season. The owner asked for more than 48 hours on 2026-11-22.
 - **Cost basis per stack.** Every pile of a good in a warehouse, a hub stash or a carrier cargo carries an average cost per unit, in integer centi-credits.
   - **Buying:** the cost is the fill price.
   - **Producing:** the cost is the local hub reference at the moment of production, its opportunity value. This is simple and needs no new concept.
@@ -47,7 +47,7 @@ Status: approved by the owner on 2026-11-22 ("make a plan file and proceed all")
 - **View:** the player's own piles show their average cost.
 - **Not tracked:** individual units. Stacks are enough for ordinary goods.
 
-### Stage 2 (task 80): regional prices from delivered cost and local demand
+### Stage 2 (task 80): regional prices from delivered cost and local demand (built)
 
 - **Delivered cost.** For each hub and good, the base price is the cheapest delivered cost:
   - the source value (the global base) at the nearest producing districts;
