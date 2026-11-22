@@ -210,3 +210,30 @@ describe('raid timeline text', () => {
     expect(text.some((t) => t.startsWith('AMBUSH Alpha Docks and Beta Stacks'))).toBe(true);
   });
 });
+
+describe('clear timeline text', () => {
+  it('labels a clear movement as breaking up the ambush', () => {
+    const view = makeView({
+      movements: {
+        k1: {
+          id: 'k1',
+          owner: 'me',
+          kind: 'clear',
+          carrierId: null,
+          carrierKind: 'foot',
+          crewIds: ['c1'],
+          cargo: { parts: 0, power: 0, data: 0, supplies: 0 },
+          route: ['a', 'b'],
+          lengthM: 500,
+          from: 'a',
+          to: 'b',
+          departMs: now - 60_000,
+          arriveMs: now + 600_000,
+          clear: { ambushId: 'am1', a: 'a', b: 'b', near: 'a', home: 'a' },
+        },
+      } as never,
+    });
+    const e = timelineEntries(view, [], now).find((x) => x.id === 'k1');
+    expect(e?.text.startsWith('BREAK UP AMBUSH Alpha Docks and Beta Stacks')).toBe(true);
+  });
+});

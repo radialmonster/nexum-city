@@ -1,0 +1,67 @@
+.card {
+  width: min(100%, var(--size-column));
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.cap {
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--letter-spacing-widest);
+  color: var(--color-text-dim);
+}
+
+.line {
+  margin: 0;
+  font-size: var(--font-size-md);
+}
+
+.soft {
+  font-size: var(--font-size-sm);
+  color: var(--color-warn);
+}
+
+/* The read on the fight: green when likely, amber when even, red when risky. */
+.estimate {
+  align-self: flex-start;
+  padding: var(--space-xs) var(--space-md);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-md);
+  color: var(--k);
+  border: var(--border-thin) solid var(--k);
+}
+
+.estimate[data-label='likely'] {
+  --k: var(--color-ok);
+}
+
+.estimate[data-label='even'] {
+  --k: var(--color-warn);
+}
+
+.estimate[data-label='risky'] {
+  --k: var(--color-danger);
+}
+
+.blocker {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-md);
+  color: var(--color-warn);
+  border: var(--border-thin) solid var(--color-warn);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-md);
+}

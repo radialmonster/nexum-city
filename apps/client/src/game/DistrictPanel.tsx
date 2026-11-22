@@ -20,7 +20,8 @@ import {
   warehouseCapacity,
   type OwnDistrict,
 } from './derive';
-import { crewName, empireSummary, formatEta, type CrewNames } from './derive';
+import { crewName, empireSummary, formatEta, streetEnds, type CrewNames } from './derive';
+import { ambushesAt } from './clearAmbush';
 import { formatUnits } from './feed';
 import { JobsPanel } from './JobsPanel';
 import { MyContracts } from './MyContracts';
@@ -57,6 +58,8 @@ export interface DistrictPanelProps {
   readonly onBoard?: ((hubId: string) => void) | undefined;
   /** Opens the order card for a street job. */
   readonly onTakeJob?: ((job: JobOffer) => void) | undefined;
+  /** Opens the Break it up card for a rival ambush you can see. */
+  readonly onBreakUp?: ((ambushId: string) => void) | undefined;
 }
 
 const relationLabel = (d: DistrictView, me: string): string => {
@@ -81,6 +84,7 @@ export function DistrictPanel({
   onDeliver,
   onBoard,
   onTakeJob,
+  onBreakUp,
 }: DistrictPanelProps) {
   const d = districtId ? view.districts[districtId] : undefined;
   if (!d)
@@ -125,6 +129,7 @@ export function DistrictPanel({
       ) : (
         <Seen d={d} me={view.playerId} names={names} onMarket={onMarket} onRival={onRival} />
       )}
+      {onBreakUp && <Ambushes view={view} id={d.id} nowMs={nowMs} onBreakUp={onBreakUp} />}
       <Nearby view={view} id={d.id} onFly={onFly} />
     </Panel>
   );
@@ -406,6 +411,44 @@ function Seen({
           <small className={styles['hint']}>Warehouse and buildings are hidden by fog.</small>
         )}
       </div>
+    </div>
+  );
+}
+
+/** Rival ambushes you can see on a street that ends here, each with the Break it up button. */
+function Ambushes({
+  view,
+  id,
+  nowMs,
+  onBreakUp,
+}: {
+  view: PlayerView;
+  id: string;
+  nowMs: number;
+  onBreakUp: (ambushId: string) => void;
+}) {
+  const seen = ambushesAt(view, id, nowMs);
+  if (seen.length === 0) return null;
+  const name = (x: string): string => view.districts[x]?.name ?? x;
+  return (
+    <div className={styles['block']} data-testid="ambush-list">
+      <span className={styles['cap']}>SPOTTED AMBUSHES</span>
+      {seen.map((a) => (
+        <div key={a.id} className={styles['ambush']}>
+          <span className={styles['line']}>
+            Between {streetEnds(name(a.edge[0]), name(a.edge[1]))}, ends in{' '}
+            {formatEta(a.untilMs - nowMs)}
+          </span>
+          <Button
+            variant="danger"
+            onClick={() => {
+              onBreakUp(a.id);
+            }}
+          >
+            BREAK IT UP
+          </Button>
+        </div>
+      ))}
     </div>
   );
 }

@@ -233,6 +233,15 @@ export function MapScreen({
     };
   }, []);
 
+  // the renderer keeps its own-ambush tags clear of the HUD card
+  useEffect(() => {
+    if (!ready) return;
+    rendererRef.current?.setHudBox(() => {
+      const i = hudInset();
+      return { w: i.x * 2, h: i.y * 2 };
+    });
+  }, [ready, hudInset]);
+
   const mineBounds = useCallback((s: Scene) => {
     const mine = s.districts.filter((d) => d.mine);
     if (mine.length === 0) return s.bounds;

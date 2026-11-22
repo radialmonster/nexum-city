@@ -89,3 +89,10 @@
   padding: var(--space-lg);
   color: var(--color-text-dim);
 }
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: var(--space-xs) var(--space-md);
+  border-left: var(--border-thick) solid var(--color-line);
+}

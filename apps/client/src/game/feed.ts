@@ -15,6 +15,8 @@ export interface FeedEntry {
   readonly text: string;
   /** The district to fly the map to when the entry is clicked. */
   readonly districtId: string | null;
+  /** A spotted ambush's id: the card offers Break it up while it is still in sight. */
+  readonly ambushId?: string;
   /** The sim event kind, so the column can open a battle report for siege events. */
   readonly eventKind: string;
   /** A running siege: rounds fought so far and the latest strengths. */
@@ -149,6 +151,7 @@ export function describeEvent(
         kind: 'WATCHTOWER',
         glyph: '!',
         tone: 'warn',
+        ...(str(d, 'movementId') ? { ambushId: str(d, 'movementId') as string } : {}),
         text: `Your watchtower${tower ? ` at ${name(tower.districtId)}` : ''} spotted an ambush ${streetName(a, b)}${until === undefined ? '' : `, until ${clockOf(until)}`}.`,
       };
     }
@@ -236,6 +239,40 @@ export function describeEvent(
         text: `You bought a ${cap(kind)}${placeId ? ` at ${name(placeId)}` : ''}.`,
       };
     }
+    case 'ambush.cleared':
+    case 'ambush.held': {
+      const street = streetName(placeId, event.districts[1]);
+      const cleared = event.kind === 'ambush.cleared';
+      if (event.actors[0] === me) {
+        return {
+          ...base,
+          kind: 'BREAK IT UP',
+          glyph: cleared ? '+' : '!',
+          tone: cleared ? 'ok' : 'warn',
+          text: cleared
+            ? `Your crew broke up the ambush ${street}.`
+            : `The ambush ${street} held; your crew is walking home hurt.`,
+        };
+      }
+      const clearer = event.actors[0];
+      return {
+        ...base,
+        kind: 'AMBUSH',
+        glyph: cleared ? '!' : '+',
+        tone: cleared ? 'danger' : 'ok',
+        text: cleared
+          ? `Your ambush ${street} was broken up by ${who(clearer)}.`
+          : `Your ambush ${street} held against ${who(clearer)}'s crew.`,
+      };
+    }
+    case 'ambush.gone':
+      return {
+        ...base,
+        kind: 'BREAK IT UP',
+        glyph: '?',
+        tone: 'news',
+        text: `The ambush ${streetName(placeId, event.districts[1])} was already gone; your crew is walking home.`,
+      };
     case 'raid.ended': {
       const street = streetName(placeId, event.districts[1]);
       const loot = goodsText(d, 'loot');

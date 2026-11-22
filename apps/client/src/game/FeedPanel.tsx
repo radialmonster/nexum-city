@@ -1,11 +1,12 @@
 import type { FeedItem, PlayerView } from '@nexum/contracts';
-import { Panel } from '../ui';
+import { Button, Panel } from '../ui';
 import { cx, toneColor, vars } from '../ui/util';
 import { ago, buildFeedEntries, siegeProgress, type FeedEntry } from './feed';
 import type { CrewNames } from './derive';
 import styles from './FeedPanel.module.css';
 import { hasReport } from './report';
 import { hasRaidReport } from './raidReport';
+import { clearUnderway, findAmbush } from './clearAmbush';
 
 export interface FeedPanelProps {
   readonly view: PlayerView;
@@ -17,6 +18,8 @@ export interface FeedPanelProps {
   readonly onFly: (districtId: string) => void;
   /** Opens the battle report for a siege event (by feed seq). */
   readonly onReport?: ((seq: number) => void) | undefined;
+  /** Opens the Break it up card for a spotted ambush. */
+  readonly onBreakUp?: ((ambushId: string) => void) | undefined;
   /** Entries to show, newest first. */
   readonly limit?: number;
 }
@@ -40,6 +43,7 @@ export function FeedPanel({
   names,
   onFly,
   onReport,
+  onBreakUp,
   limit = 40,
 }: FeedPanelProps) {
   const entries = feedEntries(view, feed, limit, names);
@@ -82,6 +86,21 @@ export function FeedPanel({
                   {siegeProgress(e) && <span className={styles['text']}>{siegeProgress(e)}</span>}
                 </span>
               </button>
+              {onBreakUp &&
+                e.ambushId !== undefined &&
+                findAmbush(view, e.ambushId, nowMs) !== undefined &&
+                !clearUnderway(view, e.ambushId) && (
+                  <div className={styles['actions']}>
+                    <Button
+                      variant="danger"
+                      onClick={() => {
+                        onBreakUp(e.ambushId as string);
+                      }}
+                    >
+                      BREAK IT UP
+                    </Button>
+                  </div>
+                )}
             </li>
           ))}
         </ul>

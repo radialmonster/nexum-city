@@ -11,6 +11,7 @@ import { buildReport } from './report';
 import { buildRaidReport } from './raidReport';
 import { RaidReport } from './RaidReportCard';
 import { goodsText } from './feed';
+import { ClearCard } from './ClearCard';
 import { Dossier } from './Dossier';
 import { MarketPanel } from './MarketPanel';
 import { DistrictPanel } from './DistrictPanel';
@@ -43,6 +44,7 @@ export function GameScreen() {
     | { kind: 'market'; hub: string; good?: GoodName; tab?: 'contracts' }
     | { kind: 'report'; seq: number }
     | { kind: 'dossier'; playerId: string }
+    | { kind: 'clear'; ambushId: string }
     | null
   >(null);
   const [steps, setSteps] = useState<FirstStepsState>(() => loadFirstSteps());
@@ -171,6 +173,10 @@ export function GameScreen() {
   const seasonEndOpen = finaleClock(view, nowMs).phase === 'over' && endSeen !== view.season.endMs;
   const drawer: Drawer = panel && compact ? 'map' : chosenDrawer;
 
+  const breakUp = (ambushId: string) => {
+    setPanel({ kind: 'clear', ambushId });
+  };
+
   const feed = (
     <FeedPanel
       view={view}
@@ -182,6 +188,7 @@ export function GameScreen() {
       onReport={(seq) => {
         setPanel({ kind: 'report', seq });
       }}
+      onBreakUp={breakUp}
     />
   );
   const side = (
@@ -211,6 +218,7 @@ export function GameScreen() {
       onRival={(playerId) => {
         setPanel({ kind: 'dossier', playerId });
       }}
+      onBreakUp={breakUp}
     />
   );
 
@@ -382,6 +390,15 @@ export function GameScreen() {
                   fly(id);
                 }}
                 onClose={closePanel}
+              />
+            )}
+            {panel.kind === 'clear' && (
+              <ClearCard
+                view={view}
+                ambushId={panel.ambushId}
+                nowMs={nowMs}
+                onClose={closePanel}
+                onConfirm={(order) => session.placeOrder(order)}
               />
             )}
             {panel.kind === 'dossier' && (
