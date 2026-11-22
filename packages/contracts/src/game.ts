@@ -75,7 +75,17 @@ export const carrierSchema = z.object({
 export const movementSchema = z.object({
   id: idSchema,
   owner: idSchema,
-  kind: z.enum(['move', 'haul', 'scout', 'siege', 'reinforce', 'settle']),
+  kind: z.enum([
+    'move',
+    'haul',
+    'scout',
+    'siege',
+    'reinforce',
+    'settle',
+    'raid',
+    'ambush',
+    'return',
+  ]),
   carrierId: idSchema.nullable(),
   carrierKind: carrierKindSchema,
   crewIds: z.array(idSchema),
@@ -88,6 +98,18 @@ export const movementSchema = z.object({
   arriveMs: z.number(),
   recalledAtMs: z.number().optional(),
   recallFraction: z.number().optional(),
+  sent: z.number().optional(),
+  raid: z
+    .object({
+      a: idSchema,
+      b: idSchema,
+      near: idSchema,
+      home: idSchema,
+      windowMs: z.number(),
+      untilMs: z.number(),
+      struck: z.array(idSchema),
+    })
+    .optional(),
 });
 
 export const SIM_EVENT_KINDS = [
@@ -108,6 +130,10 @@ export const SIM_EVENT_KINDS = [
   'protection.ended',
   'score.tick',
   'order.rejected',
+  'raid.set',
+  'raid.hit',
+  'raid.repelled',
+  'raid.ended',
 ] as const;
 
 export const simEventSchema = z.object({
@@ -181,6 +207,13 @@ export const seenConvoySchema = z.object({
   segment: z.tuple([idSchema, idSchema]),
 });
 
+export const seenAmbushSchema = z.object({
+  id: idSchema,
+  owner: idSchema,
+  edge: z.tuple([idSchema, idSchema]),
+  untilMs: z.number(),
+});
+
 const levelSchema = z.object({ price: z.number().int(), qty: z.number().int() });
 
 /** A hub's public book for one good (prices in centi-credits per unit). */
@@ -230,6 +263,7 @@ export const playerViewSchema = z.object({
   carriers: z.record(idSchema, carrierSchema),
   movements: z.record(idSchema, movementSchema),
   convoys: z.array(seenConvoySchema),
+  ambushes: z.array(seenAmbushSchema),
   reveals: z.record(idSchema, z.number()),
   markets: z.record(idSchema, z.record(goodSchema, marketBookViewSchema)),
   orders: z.array(marketOrderSchema),

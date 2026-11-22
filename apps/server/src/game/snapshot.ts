@@ -20,8 +20,9 @@ export const SNAPSHOT_VERSION = 1;
  *
  * - 0: unversioned snapshots (before task 61).
  * - 1: settle order, tougher neutrals, trade score (task 54).
+ * - 2: raids and escorts (task 71): raid order, ambush strikes, raider and merchant bot changes.
  */
-export const RULES_VERSION = 1;
+export const RULES_VERSION = 2;
 
 type Json = Record<string, unknown>;
 

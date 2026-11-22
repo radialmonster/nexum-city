@@ -48,6 +48,7 @@ export function makeView(over: Partial<PlayerView> = {}): PlayerView {
     carriers: {},
     movements: {},
     convoys: [],
+    ambushes: [],
     reveals: {},
     markets: {},
     orders: [],

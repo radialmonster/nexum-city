@@ -63,6 +63,14 @@ export const orderSchema = z.discriminatedUnion('type', [
     target: idSchema,
   }),
   z.strictObject({
+    type: z.literal('raid'),
+    carrierId: idSchema.nullable(),
+    crewIds,
+    a: idSchema,
+    b: idSchema,
+    hours: z.number().int().min(1).max(8),
+  }),
+  z.strictObject({
     type: z.literal('reinforce'),
     carrierId: idSchema.nullable(),
     crewIds,
@@ -130,6 +138,9 @@ export const ORDER_ERROR_CODES = [
   'too_many_orders',
   'not_open_plot',
   'already_settling',
+  'bad_edge',
+  'bad_window',
+  'too_many_raids',
 ] as const;
 export const orderErrorCodeSchema = z.enum(ORDER_ERROR_CODES);
 export type OrderErrorCode = z.infer<typeof orderErrorCodeSchema>;

@@ -55,6 +55,7 @@ describe('contracts mirror the sim', () => {
       { type: 'recall', movementId: 'm1' },
       { type: 'recruit', districtId: 'd0_0' },
       { type: 'settle', carrierId: 'v1', crewIds: ['c1'], target: 'd3_0' },
+      { type: 'raid', carrierId: 'v1', crewIds: ['c1', 'c2'], a: 'n1', b: 'n2', hours: 6 },
     ];
     for (const o of orders) expect(orderSchema.parse(o)).toEqual(o);
     expect(orderSchema.safeParse({ type: 'nuke', districtId: 'x' }).success).toBe(false);

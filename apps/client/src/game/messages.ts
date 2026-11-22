@@ -46,6 +46,9 @@ const MESSAGES: Record<ApiErrorCode, string> = {
   too_many_orders: 'You have too many open market orders.',
   not_open_plot: 'That plot is not open for settling.',
   already_settling: 'Someone is already settling that plot.',
+  bad_edge: 'That is not a street you can ambush.',
+  bad_window: 'An ambush lasts from 1 to 8 hours.',
+  too_many_raids: 'You already have the most ambushes allowed out.',
 };
 
 /** Words for any rejection code; unknown ones fall back to a generic line. */
