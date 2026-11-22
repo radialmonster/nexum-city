@@ -74,15 +74,15 @@ Live status for [`plan.md`](plan.md). Update this file in the same commit as the
 
 ## Phase 4: HUD and first playable loop
 
-| ID  | Task                                             | Status | Notes |
-| --- | ------------------------------------------------ | ------ | ----- |
-| 41  | Top bar and season race                          | todo   |       |
-| 42  | "While you were away" feed                       | todo   |       |
-| 43  | District panel                                   | todo   |       |
-| 44  | Order confirm card, with carrier picker and odds | todo   |       |
-| 45  | Active orders timeline                           | todo   |       |
-| 46  | Market panel                                     | todo   |       |
-| 47  | Battle report and rival dossier                  | todo   |       |
+| ID  | Task                                             | Status | Notes                |
+| --- | ------------------------------------------------ | ------ | -------------------- |
+| 41  | Top bar and season race                          | done   | 2026-11-22 (b7c350b) |
+| 42  | "While you were away" feed                       | done   | 2026-11-22 (b7c350b) |
+| 43  | District panel                                   | done   | 2026-11-22 (b7c350b) |
+| 44  | Order confirm card, with carrier picker and odds | done   | 2026-11-22 (b7c350b) |
+| 45  | Active orders timeline                           | todo   |                      |
+| 46  | Market panel                                     | todo   |                      |
+| 47  | Battle report and rival dossier                  | todo   |                      |
 
 ## Phase 5: Bots and a living city
 
@@ -120,3 +120,4 @@ Live status for [`plan.md`](plan.md). Update this file in the same commit as the
 - 2026-11-22: Phase 1 task 1B done (`039e74d`). Scripted raider, turtle and merchant bots, `runSeason` and `replay`, `checkInvariants`, `npm run sim:season`. A 7-day season with 6 actors runs in about 170 ms with 12 captures, 84 fills and no invariant problems; the hash matches as one jump and in 60 s ticks (2 s ticks for the first 6 h). Balance findings (raiders dominate, no peaceful growth) are in sim-spec.
 - 2026-11-22: sim perf. The deep JSON clone was about 95% of a no-event `step`. Quiet steps now copy only the districts and players that settle changes and share the rest, taking a no-event step on a 38-district, 6-player world from 0.055 ms to 0.004 ms with identical hashes (season `120411304821eb`, bench `034db79abb0362`). The siege determinism test is back on the default timeout. `npm run sim:bench`.
 - 2026-11-22: Map polish toward the mockup. Tactical zoom frames about 35 plots at 1920 wide (minimum on-screen plot width tokens); the demo has six rival crews, neutral plots and is revealed by default; plots get faction borders and tints, chamfered corners, an inner glow, per-kind detail patterns (`detail.ts`) and an owner sub-label; the city level draws territory blobs with the Sound; labels follow on-screen size; phones get a compact layout with a districts drawer and a minimap toggle; the jump list scrollbar is themed and labels scale with `--s`.
+- 2026-11-22: Phase 2 tasks 41 to 44 done (`b7c350b`). `/` is now the playable game: sign-in and register, typed API client parsed with the contract schemas, a game store, live updates over SSE with polling fallback, the top bar with the season race, the "While you were away" feed (fly to place, last-seen stored), the district panel (own detail, reduced view for others, stance, build) and the order confirm card (carrier and crew pickers, ETA, siege odds, plain-language rejections). Checked end to end with two players, a move and a siege, and at 2560, 1920 and 390 wide. The bottom timeline is still an empty slot.
