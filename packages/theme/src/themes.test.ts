@@ -14,6 +14,17 @@ function keyPaths(value: unknown, prefix = ''): string[] {
 const allThemes: [string, Theme][] = Object.entries(themes);
 
 describe('themes', () => {
+  it.each(allThemes)(
+    '%s: panelSolid (radial, hub fills) stays dark so white labels read',
+    (_n, t) => {
+      // regression: the radial menu once rendered as pale discs with unreadable labels
+      const hex = t.color.panelSolid.replace('#', '');
+      const lum =
+        [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16)).reduce((a, b) => a + b, 0) / 3;
+      expect(lum).toBeLessThan(40);
+    },
+  );
+
   it('highContrast has exactly the same keys as the default theme', () => {
     expect(keyPaths(highContrast)).toEqual(keyPaths(neon));
   });
