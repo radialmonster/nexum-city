@@ -48,3 +48,12 @@
   background: var(--color-panel-solid);
   border: var(--border-thin) solid var(--color-line);
 }
+
+.blurb {
+  max-width: var(--size-column);
+  margin: calc(var(--space-2xl) * -1) 0 0;
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-normal);
+  text-align: center;
+  color: var(--color-text-dim);
+}

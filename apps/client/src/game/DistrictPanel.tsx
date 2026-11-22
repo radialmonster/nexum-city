@@ -254,11 +254,18 @@ function Seen({
   onRival: DistrictPanelProps['onRival'];
 }) {
   const presence = Object.entries(d.presence);
+  const unclaimed = d.owner === '' || d.owner === 'neutral';
   return (
     <div className={styles['stack']}>
       <div className={styles['chips']}>
-        <Tag faction="rival">
-          {d.owner && onRival ? (
+        <Tag faction={unclaimed ? 'neutral' : 'rival'}>
+          {unclaimed ? (
+            d.open ? (
+              'OPEN PLOT'
+            ) : (
+              'UNCLAIMED'
+            )
+          ) : d.owner && onRival ? (
             <RivalLink id={d.owner} me={me} names={names} onRival={onRival} />
           ) : d.owner ? (
             crewName(names, d.owner)
@@ -275,6 +282,11 @@ function Seen({
           >
             OPEN MARKET
           </Button>
+        )}
+        {d.settling && (
+          <span className={styles['status']} data-tone="special">
+            {d.settling.owner === me ? 'YOU ARE SETTLING' : 'BEING SETTLED'}
+          </span>
         )}
         {d.protected && (
           <span className={styles['status']} data-tone="ok">
@@ -304,7 +316,14 @@ function Seen({
             </span>
           ))
         )}
-        <small className={styles['hint']}>Warehouse and buildings are hidden by fog.</small>
+        {d.open && !d.settling && (
+          <small className={styles['hint']}>
+            Open frontier. Send a crew to settle it for {balance.settle.supplies} supplies.
+          </small>
+        )}
+        {!unclaimed && (
+          <small className={styles['hint']}>Warehouse and buildings are hidden by fog.</small>
+        )}
       </div>
     </div>
   );

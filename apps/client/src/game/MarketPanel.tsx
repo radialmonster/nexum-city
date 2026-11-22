@@ -3,7 +3,7 @@ import { toUnits } from '@nexum/sim';
 import type { GoodName, PlayerView, FeedItem } from '@nexum/contracts';
 import { Button, Panel, Sparkline, Tabs } from '../ui';
 import { vars } from '../ui/util';
-import { GOOD_KEYS } from './derive';
+import { crewsAt, GOOD_KEYS } from './derive';
 import { GOOD_TONE } from './DistrictPanel';
 import { formatUnits } from './feed';
 import styles from './MarketPanel.module.css';
@@ -36,6 +36,8 @@ export interface MarketPanelProps {
   }) => Promise<boolean>;
   readonly onCancel: (orderId: string) => void;
   readonly onClose: () => void;
+  /** Opens a haul order that carries your stash from this hub to one of your districts. */
+  readonly onHaulHome?: ((hub: string) => void) | undefined;
 }
 
 function Rows({ rows, side, max }: { rows: readonly BookRow[]; side: Side; max: number }) {
@@ -68,6 +70,7 @@ export function MarketPanel({
   onPlace,
   onCancel,
   onClose,
+  onHaulHome,
 }: MarketPanelProps) {
   const [good, setGood] = useState<GoodName>(initial ?? 'parts');
   const [side, setSide] = useState<Side>('buy');
@@ -81,6 +84,8 @@ export function MarketPanel({
   const check = checkLimit(view, { hub, good, side, price, qty });
   const hubName = view.districts[hub]?.name ?? hub;
   const empty = price.trim() === '' && qty.trim() === '';
+  const stashed = GOOD_KEYS.reduce((n, g) => n + stashUnits(view, hub, g), 0);
+  const crewHere = crewsAt(view, hub).some((c) => c.readyAtMs <= view.nowMs);
 
   const submit = async () => {
     setShown(true);
@@ -150,6 +155,22 @@ export function MarketPanel({
           Your stash here: <b>{formatUnits(stashUnits(view, hub, good))}</b> {good}. Your credits:{' '}
           <b>{formatUnits(toUnits(view.self.credits))}</b>.
         </p>
+        <p className={styles['hint']}>
+          Goods you buy land in your stash at this hub. Haul them home to use them.
+        </p>
+        {onHaulHome && stashed > 0 && (
+          <div className={styles['actions']}>
+            <Button
+              disabled={!crewHere}
+              onClick={() => {
+                onHaulHome(hub);
+              }}
+            >
+              HAUL HOME
+            </Button>
+            {!crewHere && <small>Park a ready crew at this hub first.</small>}
+          </div>
+        )}
         <form
           className={styles['form']}
           onSubmit={(e) => {
@@ -172,6 +193,7 @@ export function MarketPanel({
             <span className={styles['cap']}>PRICE (CREDITS EACH)</span>
             <input
               inputMode="decimal"
+              placeholder="e.g. 1.50"
               value={price}
               onChange={(e) => {
                 setPrice(e.target.value);
@@ -182,6 +204,7 @@ export function MarketPanel({
             <span className={styles['cap']}>QUANTITY</span>
             <input
               inputMode="numeric"
+              placeholder="e.g. 10"
               value={qty}
               onChange={(e) => {
                 setQty(e.target.value);

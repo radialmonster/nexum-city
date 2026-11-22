@@ -30,6 +30,11 @@ export function LoginScreen({ onLogin, onRegister }: LoginScreenProps) {
       <div className={styles['logo']}>
         NEXUM<span>//</span>CITY
       </div>
+      <p className={styles['blurb']}>
+        A city of rival crews, played a few minutes at a time. Settle open ground, build up your
+        districts, trade at the hubs and lay siege to your neighbours. Orders keep running while you
+        are away, so nobody has to be online at the same time.
+      </p>
       <Panel title={mode === 'login' ? 'Sign in' : 'New account'} className={styles['card']}>
         <form
           className={styles['form']}
