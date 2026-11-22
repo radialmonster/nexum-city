@@ -64,12 +64,11 @@ export function orderMenu(d: {
     ? ['move', 'haul', 'reinforce', 'build', 'raid']
     : d.isHub
       ? ['move', 'haul', 'raid']
-      : d.remembered
-        ? d.open
-          ? ['settle', 'scout']
-          : ['scout']
-        : d.open
-          ? ['settle', 'siege', 'scout', 'raid']
+      : d.open
+        ? // nothing there to raid or besiege: an open plot is only settled or scouted
+          ['settle', 'scout']
+        : d.remembered
+          ? ['scout']
           : ['siege', 'scout', 'raid'];
   return [
     ...kinds.map((k) => ORDER_ITEMS[k]),
@@ -774,6 +773,10 @@ export function MapScreen({
                 items={embed ? orderMenu({ ...sel, details: embed.onDetails !== undefined }) : MENU}
                 title={sel.name.toUpperCase()}
                 facing={menuAt.facing}
+                // SETTLE is the one sensible order on an open plot: draw the eye to it
+                selected={
+                  embed && sel.open === true && !sel.mine && !sel.isHub ? 'settle' : undefined
+                }
                 onSelect={menuAction}
               />
             </div>

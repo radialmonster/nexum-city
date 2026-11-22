@@ -87,4 +87,14 @@ describe('orderMenu', () => {
       'close',
     ]);
   });
+  it('offers only SETTLE and SCOUT on a visible open plot, and keeps SIEGE for other neutrals', () => {
+    const plot = { mine: false, isHub: false, remembered: false };
+    expect(orderMenu({ ...plot, open: true, details: true }).map((i) => i.id)).toEqual([
+      'settle',
+      'scout',
+      'details',
+      'close',
+    ]);
+    expect(orderMenu(plot).map((i) => i.id)).toEqual(['siege', 'scout', 'raid', 'close']);
+  });
 });

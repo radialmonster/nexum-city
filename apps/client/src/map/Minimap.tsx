@@ -19,7 +19,8 @@ export function Minimap({ scene, camera, viewport, pitch, onJump }: MinimapProps
   const x0 = b.minX - pitch;
   const y0 = b.minY - pitch;
   const w = b.maxX - b.minX + pitch * 2;
-  const h = scene.waterTop + pitch * 1.2 - y0;
+  // the Sound is only a slim shoreline: a deep slab of water read as a blank strip
+  const h = scene.waterTop + pitch * 0.4 - y0;
   const view = visibleRect(camera, viewport);
 
   const jump = (e: PointerEvent<SVGSVGElement>) => {

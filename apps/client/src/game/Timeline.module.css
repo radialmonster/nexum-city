@@ -4,9 +4,10 @@
 
   /*
    * A fixed height, so the map above never resizes as orders start and finish and click
-   * targets stay put. Room for about 4 orders; more scroll.
+   * targets stay put. Room for the title bar, the time axis and about 3 order rows (all token
+   * sized, so it scales with the HUD at 2560x1440); more orders scroll inside the panel.
    */
-  height: 24vh;
+  height: calc(var(--size-row) * 3 + var(--space-xl) * 6);
 }
 
 .timeline > div:last-child {
