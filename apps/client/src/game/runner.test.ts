@@ -30,15 +30,39 @@ const contract = (over: Partial<ContractView> = {}): ContractView => ({
 describe('buyRunnerBlocker', () => {
   it('needs 300 credits and stops at two Runners', () => {
     const poor = makeView({
-      self: { credits: toAtoms(299), stash: {}, score: 0, rushUntilMs: 0, jobs: [], jobNextMs: 0 },
+      self: {
+        credits: toAtoms(299),
+        stash: {},
+        costs: { stash: {}, districts: {}, cargo: {} },
+        score: 0,
+        rushUntilMs: 0,
+        jobs: [],
+        jobNextMs: 0,
+      },
     });
     expect(buyRunnerBlocker(poor)).toContain('300 credits');
     const rich = makeView({
-      self: { credits: toAtoms(300), stash: {}, score: 0, rushUntilMs: 0, jobs: [], jobNextMs: 0 },
+      self: {
+        credits: toAtoms(300),
+        stash: {},
+        costs: { stash: {}, districts: {}, cargo: {} },
+        score: 0,
+        rushUntilMs: 0,
+        jobs: [],
+        jobNextMs: 0,
+      },
     });
     expect(buyRunnerBlocker(rich)).toBeNull();
     const full = makeView({
-      self: { credits: toAtoms(900), stash: {}, score: 0, rushUntilMs: 0, jobs: [], jobNextMs: 0 },
+      self: {
+        credits: toAtoms(900),
+        stash: {},
+        costs: { stash: {}, districts: {}, cargo: {} },
+        score: 0,
+        rushUntilMs: 0,
+        jobs: [],
+        jobNextMs: 0,
+      },
       carriers: { r1: carrier('r1', 'runner'), r2: carrier('r2', 'runner') },
     });
     expect(buyRunnerBlocker(full)).toContain('2 Runners');

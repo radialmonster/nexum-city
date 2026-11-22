@@ -7,7 +7,15 @@ export function makeView(over: Partial<PlayerView> = {}): PlayerView {
     playerId: 'me',
     nowMs: 1_000_000,
     season: { startMs: 0, endMs: 10_000_000_000, finaleStartMs: 9_000_000_000, finale: false },
-    self: { credits: 0, stash: {}, score: 0, rushUntilMs: 0, jobs: [], jobNextMs: 0 },
+    self: {
+      credits: 0,
+      stash: {},
+      costs: { stash: {}, districts: {}, cargo: {} },
+      score: 0,
+      rushUntilMs: 0,
+      jobs: [],
+      jobNextMs: 0,
+    },
     standings: [
       { rank: 1, playerId: 'rival', score: 10 },
       { rank: 2, playerId: 'me', score: 5 },

@@ -46,6 +46,7 @@ describe('street jobs text', () => {
       self: {
         credits: 0,
         stash: {},
+        costs: { stash: {}, districts: {}, cargo: {} },
         score: 0,
         rushUntilMs: 0,
         jobs: [courier],
@@ -57,6 +58,7 @@ describe('street jobs text', () => {
       self: {
         credits: 0,
         stash: {},
+        costs: { stash: {}, districts: {}, cargo: {} },
         score: 0,
         rushUntilMs: 0,
         jobs: [courier, patrol, { ...patrol, id: 'j3' }],
@@ -71,7 +73,15 @@ describe('rush helpers', () => {
   it('divides build times only while the rush runs', () => {
     const now = 1_000_000;
     const on = makeView({
-      self: { credits: 0, stash: {}, score: 0, rushUntilMs: now + 1000, jobs: [], jobNextMs: 0 },
+      self: {
+        credits: 0,
+        stash: {},
+        costs: { stash: {}, districts: {}, cargo: {} },
+        score: 0,
+        rushUntilMs: now + 1000,
+        jobs: [],
+        jobNextMs: 0,
+      },
     });
     const off = makeView();
     expect(rushed(on, now, 120 * 60_000)).toBe((120 * 60_000) / balance.rush.factor);

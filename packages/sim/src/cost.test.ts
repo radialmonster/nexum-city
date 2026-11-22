@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { describe, expect, it } from 'vitest';
 import { MS_PER_HOUR, toAtoms } from './balance.js';
 import { costCents, share, take, put, emptyValue } from './cost.js';

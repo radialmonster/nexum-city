@@ -106,6 +106,8 @@ export const movementSchema = z.object({
   carrierKind: carrierKindSchema,
   crewIds: z.array(idSchema),
   cargo: goodsSchema,
+  /** Cost basis of the cargo (atoms times centi-credits per unit); use `self.costs.cargo` for the average. */
+  value: goodsSchema.optional(),
   route: z.array(idSchema),
   lengthM: z.number(),
   from: idSchema,
@@ -306,6 +308,16 @@ export const marketBookViewSchema = z.object({
   }),
   refCents: z.number().int(),
   lastCents: z.number().int().nullable(),
+  /** The hub's own long-run price and the parts that make it up (economy stage 2). */
+  baseCents: z.number().int(),
+  why: z.object({
+    from: idSchema.nullable(),
+    distM: z.number(),
+    global: z.number().int(),
+    transport: z.number().int(),
+    demand: z.number().int(),
+    raid: z.number().int(),
+  }),
 });
 
 /** A resting market order. */
@@ -333,6 +345,12 @@ export const playerViewSchema = z.object({
   self: z.object({
     credits: z.number(),
     stash: z.record(z.string(), goodsSchema),
+    /** Your average cost per unit (centi-credits) of each pile you own (economy stage 1). */
+    costs: z.object({
+      stash: z.record(z.string(), goodsSchema),
+      districts: z.record(idSchema, goodsSchema),
+      cargo: z.record(idSchema, goodsSchema),
+    }),
     score: z.number(),
     /** The newcomer rush ends at this time (0 or in the past: no rush). */
     rushUntilMs: z.number(),

@@ -21,6 +21,8 @@ const book = {
   civic: { bid: 92, ask: 108, bidDepth: 60, askDepth: 60 },
   refCents: 100,
   lastCents: 101,
+  baseCents: 100,
+  why: { from: null, distM: 0, global: 100, transport: 0, demand: 0, raid: 0 },
 };
 
 function view(over: { credits?: number; stash?: number } = {}) {
@@ -28,6 +30,7 @@ function view(over: { credits?: number; stash?: number } = {}) {
     self: {
       credits: over.credits ?? 1000 * ATOMS_PER_CENT,
       stash: { h: { parts: (over.stash ?? 10) * ATOMS_PER_UNIT, power: 0, data: 0, supplies: 0 } },
+      costs: { stash: {}, districts: {}, cargo: {} },
       score: 0,
       rushUntilMs: 0,
       jobs: [],

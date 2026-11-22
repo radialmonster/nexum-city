@@ -41,7 +41,15 @@ describe('contract helpers', () => {
 
   it('blocks taking your own job, a taken job, and a broke taker', () => {
     const view = makeView({
-      self: { credits: cr(100), stash: {}, score: 0, rushUntilMs: 0, jobs: [], jobNextMs: 0 },
+      self: {
+        credits: cr(100),
+        stash: {},
+        costs: { stash: {}, districts: {}, cargo: {} },
+        score: 0,
+        rushUntilMs: 0,
+        jobs: [],
+        jobNextMs: 0,
+      },
     });
     expect(takeBlocker(view, contract())).toBeNull();
     expect(takeBlocker(view, contract({ poster: 'me' }))).toMatch(/own job/);
@@ -51,7 +59,15 @@ describe('contract helpers', () => {
 
   it('checks a posting like the server does', () => {
     const view = makeView({
-      self: { credits: cr(10_000), stash: {}, score: 0, rushUntilMs: 0, jobs: [], jobNextMs: 0 },
+      self: {
+        credits: cr(10_000),
+        stash: {},
+        costs: { stash: {}, districts: {}, cargo: {} },
+        score: 0,
+        rushUntilMs: 0,
+        jobs: [],
+        jobNextMs: 0,
+      },
     });
     const base = { hub: 'a', good: 'power', qty: '30', reward: '420', hours: '12' } as const;
     const bad = checkPost(view, { ...base, qty: '2' });

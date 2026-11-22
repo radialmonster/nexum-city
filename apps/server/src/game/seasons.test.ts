@@ -149,7 +149,7 @@ describe('snapshot upgrades', () => {
       players: { p1: { id: 'p1', credits: 5, stash: { h1: { parts: 2 } } } },
       markets: { h1: { parts: { refCents: 900, lastCents: null, asks: [{ qty: 1 }], bids: [] } } },
     };
-    const up = upgradeSnapshot(old, 3) as unknown as Record<string, any>;
+    const up = upgradeSnapshot(old, 3) as unknown as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
     expect(up['heat']).toEqual({});
     expect(up['districts'].d1.warehouseValue.parts).toBe(10 * base);
     expect(up['players'].p1.stashValue.h1.parts).toBe(2 * base);
