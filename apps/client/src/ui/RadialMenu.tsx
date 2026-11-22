@@ -23,6 +23,8 @@ const CENTRE = VIEW / 2;
 const RING = 138;
 const BUTTON = 30;
 const HUB = 44;
+// opaque backdrop around each button, so map detail never shows beside it
+const BACKDROP = 10;
 // label backdrop: about this many viewBox units per letter, plus padding
 const LABEL_GAP = 18;
 const LABEL_CHAR = 10;
@@ -70,6 +72,7 @@ export function RadialMenu({ items, selected, onSelect, title, className }: Radi
               activate(e, item.id);
             }}
           >
+            <circle className={styles['button-bg']} cx={x} cy={y} r={BUTTON + BACKDROP} />
             <circle className={styles['button']} cx={x} cy={y} r={BUTTON} />
             <text className={styles['glyph']} x={x} y={y} dy="0.35em">
               {item.glyph}

@@ -127,6 +127,10 @@
   flex-direction: column;
   align-items: flex-end;
   gap: var(--space-sm);
+  padding: var(--space-sm);
+  background: var(--color-panel-solid);
+  border: var(--border-thin) solid var(--color-line);
+  box-shadow: var(--glow-panel);
 }
 
 .row {
@@ -260,6 +264,10 @@
 }
 
 .screen[data-compact='true'] .controls {
+  padding: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
   align-items: stretch;
 }
 

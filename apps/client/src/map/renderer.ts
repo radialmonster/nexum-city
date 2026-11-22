@@ -96,6 +96,8 @@ export class MapRenderer {
   private readonly cb: RendererCallbacks;
   private scene: Scene;
   private selected: Id | null = null;
+  /** A district whose own labels are hidden because the radial menu is drawn over it. */
+  private menuFor: Id | null = null;
   private preview: number[] | null = null;
   private hudScale = 1;
   private dirty = true;
@@ -186,6 +188,12 @@ export class MapRenderer {
   setSelection(id: Id | null): void {
     this.selected = id;
     this.baseDirty = true;
+    this.dirty = true;
+  }
+
+  setMenuFor(id: Id | null): void {
+    if (this.menuFor === id) return;
+    this.menuFor = id;
     this.dirty = true;
   }
 
@@ -812,6 +820,8 @@ export class MapRenderer {
         d.cy > view.y + view.h + pad
       )
         continue;
+      // the radial menu's hub already names this district
+      if (d.id === this.menuFor) continue;
       const s = worldToScreen(cam, vp, d.cx, d.cy);
       const dim = d.remembered;
       const colour = dim ? pal.color.textDim : d.isHub ? pal.color.accent : pal.color.text;

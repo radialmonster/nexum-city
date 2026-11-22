@@ -35,6 +35,11 @@
   outline: none;
 }
 
+.button-bg {
+  fill: var(--color-panel-solid);
+  stroke: none;
+}
+
 .button {
   fill: var(--color-panel-solid);
   stroke: var(--color-accent);

@@ -399,7 +399,31 @@ export function MapScreen({
   const col = Math.round(cam.x / palette.map.pitchX);
   const row = Math.round(cam.y / palette.map.pitchY);
   const across = vp.w / cam.zoom / palette.map.pitchX;
-  const menuAt = sel && ready && !embed?.menuHidden ? worldToHud(sel, cam, vp) : null;
+  const [menuEl, setMenuEl] = useState<HTMLDivElement | null>(null);
+  // measured after layout: the menu's half-size and the HUD card's corner, in screen pixels
+  const [menuBox, setMenuBox] = useState({ half: 0, x: 0, y: 0 });
+  const wantMenu = sel !== null && ready && !embed?.menuHidden;
+  useEffect(() => {
+    if (!wantMenu || !menuEl) return;
+    const measure = (): void => {
+      const half = menuEl.offsetWidth / 2;
+      const inset = hudInset();
+      setMenuBox((m) =>
+        m.half === half && m.x === inset.x && m.y === inset.y ? m : { half, ...inset },
+      );
+    };
+    // the observer fires once on observe and again whenever the menu or the map resizes
+    const ro = new ResizeObserver(measure);
+    ro.observe(menuEl);
+    if (menuEl.parentElement) ro.observe(menuEl.parentElement);
+    return () => ro.disconnect();
+  }, [wantMenu, menuEl, hudInset]);
+  const menuAt =
+    sel && wantMenu ? clampMenu(worldToHud(sel, cam, vp), vp, menuBox.half, menuBox) : null;
+  const menuId = menuAt && sel ? sel.id : null;
+  useEffect(() => {
+    rendererRef.current?.setMenuFor(menuId);
+  }, [menuId, ready]);
   const compact = ready && vp.w < palette.map.compactBelowPx;
 
   const districtList = scene ? (
@@ -456,12 +480,10 @@ export function MapScreen({
               title="SECTOR"
               tag={source === 'demo' ? 'DEMO' : 'LIVE'}
             >
-              <div className={styles['coords']}>
-                {String(col).padStart(2, '0')}-{String(row).padStart(2, '0')}
-              </div>
+              <div className={styles['coords']}>{formatSector(col, row)}</div>
               <div className={styles['sub']}>
-                {level.toUpperCase()} / {across.toFixed(1)} PLOTS / {String(scene.districts.length)}{' '}
-                DISTRICTS
+                {level.toUpperCase()} / {String(Math.max(1, Math.round(across)))} ACROSS /{' '}
+                {String(scene.districts.length)} DISTRICTS
               </div>
             </Panel>
 
@@ -622,6 +644,7 @@ export function MapScreen({
 
           {menuAt && sel && (
             <div
+              ref={setMenuEl}
               className={styles['menu']}
               style={vars({ '--x': `${String(menuAt.x)}px`, '--y': `${String(menuAt.y)}px` })}
             >
@@ -636,6 +659,36 @@ export function MapScreen({
       )}
     </div>
   );
+}
+
+/** Grid position as `col,row`, each padded to two digits with the sign kept in front. */
+export function formatSector(col: number, row: number): string {
+  const part = (n: number) => `${n < 0 ? '-' : ''}${String(Math.abs(n)).padStart(2, '0')}`;
+  return `${part(col)},${part(row)}`;
+}
+
+/**
+ * Keep the radial menu inside the map viewport and out from under the HUD sector card: clamp
+ * its centre by its half-size, and slide it below the card when the two would overlap.
+ * `inset` is half the card's far corner, so the corner itself is twice that.
+ */
+export function clampMenu(
+  at: { x: number; y: number },
+  vp: { w: number; h: number },
+  half: number,
+  inset: { x: number; y: number },
+): { x: number; y: number } {
+  if (half <= 0) return at;
+  const clamp = (v: number, lo: number, hi: number) =>
+    lo > hi ? (lo + hi) / 2 : Math.min(hi, Math.max(lo, v));
+  const x = clamp(at.x, half, vp.w - half);
+  let y = clamp(at.y, half, vp.h - half);
+  const cardRight = inset.x * 2;
+  const cardBottom = inset.y * 2;
+  if (x - half < cardRight && y - half < cardBottom) {
+    y = clamp(cardBottom + half, half, vp.h - half);
+  }
+  return { x, y };
 }
 
 function worldToHud(d: { cx: number; cy: number }, cam: Camera, vp: { w: number; h: number }) {
