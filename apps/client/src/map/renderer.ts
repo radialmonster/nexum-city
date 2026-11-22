@@ -648,6 +648,9 @@ export class MapRenderer {
       const r = Math.min(d.w, d.h) / 2 + m.ringGap;
       g.circle(d.cx, d.cy, r).stroke({ width: m.ringWidth * px * 1.5, ...pal.color.track });
       const a0 = -Math.PI / 2;
+      // start a fresh sub-path: arc() would otherwise join from wherever the last shape ended,
+      // which drew a long straight line across the map to the ring
+      g.moveTo(d.cx + r * Math.cos(a0), d.cy + r * Math.sin(a0));
       g.arc(d.cx, d.cy, r, a0, a0 + Math.PI * 2 * d.siege).stroke({
         width: m.ringWidth * px * 1.5,
         ...pal.color.danger,
