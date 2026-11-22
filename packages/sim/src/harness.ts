@@ -125,7 +125,10 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
         destroyedUnits += destroyed;
         const haul = String(e.data['haulId']);
         taken.set(haul, (taken.get(haul) ?? 0) + stolen + destroyed);
-      } else if (e.kind === 'arrived' && e.data['movement'] === 'haul') {
+      } else if (
+        e.kind === 'arrived' &&
+        (e.data['movement'] === 'haul' || e.data['movement'] === 'settle')
+      ) {
         const sent = Number(e.data['sent']);
         const left = Number(e.data['cargo']);
         const lost = taken.get(String(e.data['movementId'])) ?? 0;

@@ -1,4 +1,4 @@
-import { MS_PER_HOUR, balance } from './balance.js';
+import { MS_PER_HOUR, balance, toAtoms } from './balance.js';
 import { emit, schedule, unschedule, type Ctx } from './ctx.js';
 import { ensureFrontier } from './frontier.js';
 import { deposit } from './production.js';
@@ -13,6 +13,8 @@ import type { Crew, District, Id, Movement } from './types.js';
  *
  * - the first settler to arrive holds the plot; a second settler who arrives later is turned
  *   back (`settle.failed`, reason `taken`), supplies refunded to their nearest district;
+ *   a carrier that raiders have robbed on the way (supplies short on arrival) fails the same way
+ *   with reason `raided`, and what is left of its supplies goes home;
  * - an enemy siege on the plot fights the settlers plus the neutral guard; if the bar fills
  *   first the siege wins the plot and the settlement fails (reason `captured`, handled by
  *   `siege.ts` through `failSettle`); if the timer wins, the siege simply carries on against
@@ -24,7 +26,9 @@ export function beginSettle(ctx: Ctx, m: Movement, crews: readonly Crew[]): void
   const { state } = ctx;
   const d = state.districts[m.to];
   if (!d) return;
-  if (d.owner !== 'neutral' || d.frontier !== 'open' || d.settling) {
+  // A raided supply carrier arrives short: the settlement fails and the rest goes home.
+  const raided = m.cargo.supplies < toAtoms(balance.settle.supplies);
+  if (raided || d.owner !== 'neutral' || d.frontier !== 'open' || d.settling) {
     const home = nearestOwned(ctx, m.owner, d.id, d.id);
     if (home) {
       deposit(ctx, m.owner, home.id, m.cargo);
@@ -32,7 +36,7 @@ export function beginSettle(ctx: Ctx, m: Movement, crews: readonly Crew[]): void
     }
     emit(ctx, 'settle.failed', [m.owner], [d.id], {
       owner: m.owner,
-      reason: 'taken',
+      reason: raided ? 'raided' : 'taken',
       crewIds: m.crewIds,
     });
     return;

@@ -3,9 +3,9 @@ import { emit, schedule, unschedule, type Ctx } from './ctx.js';
 import { nudgeRef } from './market.js';
 import { nextFloat } from './rng.js';
 import { shortestRoute, travelMs } from './routing.js';
-import { applyLoss } from './siege.js';
+import { applyLoss, isProtected } from './siege.js';
 import type { System } from './systems.js';
-import { GOODS, type Crew, type Goods, type Id, type Movement } from './types.js';
+import { GOODS, type Crew, type GameState, type Goods, type Id, type Movement } from './types.js';
 
 /*
  * Raids and escorts (milestone 2). The rules and the reasoning are in
@@ -38,7 +38,25 @@ function edgeLength(ctx: Ctx, x: Id, y: Id): number | null {
   return e ? e.lengthM : null;
 }
 
-/** When a haul crosses the middle of the street a-b, or null if its route never uses it. */
+/** Hauls and settle supply carriers carry goods and can be struck; everything else cannot. */
+const carriesGoods = (m: Movement): boolean => m.kind === 'haul' || m.kind === 'settle';
+
+/**
+ * New-player protection shields a player's convoys: a player is protected while any district it
+ * owns still is. Like sieges, protection is a shield on the target only; a protected player can
+ * still set ambushes of its own.
+ */
+export function isPlayerProtected(state: GameState, player: Id): boolean {
+  return Object.values(state.districts).some(
+    (d) => d.owner === player && isProtected(d, state.nowMs),
+  );
+}
+
+/**
+ * When a convoy crosses the middle of the street a-b, or null if its route never uses it.
+ * A recalled convoy walks its route backwards from where it turned, so it can cross the middle
+ * again (only if it had got past it) and is just as exposed on the way home.
+ */
 export function crossingTime(ctx: Ctx, haul: Movement, a: Id, b: Id): number | null {
   if (haul.lengthM <= 0) return null;
   let walked = 0;
@@ -48,7 +66,13 @@ export function crossingTime(ctx: Ctx, haul: Movement, a: Id, b: Id): number | n
     const len = edgeLength(ctx, x, y) ?? 0;
     if ((x === a && y === b) || (x === b && y === a)) {
       const fraction = (walked + len / 2) / haul.lengthM;
-      return haul.departMs + Math.round(fraction * (haul.arriveMs - haul.departMs));
+      if (haul.recalledAtMs === undefined) {
+        return haul.departMs + Math.round(fraction * (haul.arriveMs - haul.departMs));
+      }
+      const turned = haul.recallFraction ?? 0;
+      if (turned <= 0 || fraction > turned) return null;
+      const back = haul.arriveMs - haul.recalledAtMs;
+      return haul.arriveMs - Math.round((fraction / turned) * back);
     }
     walked += len;
   }
@@ -57,17 +81,23 @@ export function crossingTime(ctx: Ctx, haul: Movement, a: Id, b: Id): number | n
 
 function maybeStrike(ctx: Ctx, ambush: Movement, haul: Movement): void {
   const r = ambush.raid;
-  if (!r || ambush.kind !== 'ambush' || haul.kind !== 'haul') return;
-  if (haul.owner === ambush.owner || haul.recalledAtMs !== undefined) return;
+  if (!r || ambush.kind !== 'ambush' || !carriesGoods(haul)) return;
+  if (haul.owner === ambush.owner) return;
   if (sumGoods(haul.cargo) <= 0 || r.struck.includes(haul.id)) return;
   const at = crossingTime(ctx, haul, r.a, r.b);
   if (at === null || at < ctx.state.nowMs || at >= r.untilMs) return;
   schedule(ctx, at, { kind: 'raid.strike', movementId: ambush.id, targetId: haul.id });
 }
 
-/** A haul has just set out: every enemy ambush on its route gets a strike at the crossing. */
+/**
+ * A convoy has just set out or turned back: every enemy ambush on its route gets a strike at the
+ * crossing. A recall first drops the strikes planned for the outbound walk.
+ */
 export function scheduleStrikes(ctx: Ctx, haul: Movement): void {
-  if (haul.kind !== 'haul') return;
+  if (!carriesGoods(haul)) return;
+  if (haul.recalledAtMs !== undefined) {
+    unschedule(ctx.state, (e) => e.kind === 'raid.strike' && e.targetId === haul.id);
+  }
   for (const id of Object.keys(ctx.state.movements).sort()) {
     const m = ctx.state.movements[id] as Movement;
     if (m.kind === 'ambush') maybeStrike(ctx, m, haul);
@@ -96,7 +126,7 @@ export function beginAmbush(ctx: Ctx, m: Movement): void {
   });
   for (const id of Object.keys(state.movements).sort()) {
     const other = state.movements[id] as Movement;
-    if (other.kind === 'haul') maybeStrike(ctx, m, other);
+    if (carriesGoods(other)) maybeStrike(ctx, m, other);
   }
 }
 
@@ -224,9 +254,11 @@ export const raidSystem: System = {
       const ambush = ctx.state.movements[ev.movementId];
       const haul = ctx.state.movements[ev.targetId];
       if (!ambush || ambush.kind !== 'ambush' || !ambush.raid) return;
-      if (!haul || haul.kind !== 'haul' || haul.recalledAtMs !== undefined) return;
+      if (!haul || !carriesGoods(haul)) return;
       if (haul.owner === ambush.owner || ambush.raid.struck.includes(haul.id)) return;
       if (sumGoods(haul.cargo) <= 0) return;
+      // Checked at the crossing, so protection that ends on the way stops shielding the convoy.
+      if (isPlayerProtected(ctx.state, haul.owner)) return;
       strike(ctx, ambush, haul);
     },
   },

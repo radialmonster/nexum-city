@@ -2,6 +2,7 @@ import { MS_PER_HOUR, balance, toAtoms, toUnits } from './balance.js';
 import { buildCost } from './construction.js';
 import { civicAsk, civicBid } from './market.js';
 import { shortestRoute } from './routing.js';
+import { isProtected } from './siege.js';
 import {
   GOODS,
   type Crew,
@@ -160,7 +161,8 @@ const AMBUSH_HOURS = 6;
 
 /**
  * A street edge on a rival's way to its nearest hub (the last street into the hub, where hauls
- * from that district are most likely to pass). Bots guess; they do not watch convoys.
+ * from that district are most likely to pass). Bots guess; they do not watch convoys. That is
+ * intentional: bots stay fog-honest and never read enemy convoys they could not see.
  */
 function ambushOrders(s: GameState, me: Id): Order[] {
   if (Math.floor(s.nowMs / MS_PER_HOUR) % AMBUSH_EVERY_HOURS !== 0) return [];
@@ -178,6 +180,8 @@ function ambushOrders(s: GameState, me: Id): Order[] {
     const edges: { a: Id; b: Id; len: number }[] = [];
     for (const d of Object.values(s.districts)) {
       if (d.kind === 'hub' || d.owner === me || d.owner === 'neutral') continue;
+      // Protected players' convoys cannot be struck, and that flag is public, so skip them.
+      if (isProtected(d, s.nowMs)) continue;
       const hub = nearestHubTo(s, d.id);
       const route = hub && shortestRoute(s.graph, d.id, hub.id);
       if (!route || route.route.length < 2) continue;

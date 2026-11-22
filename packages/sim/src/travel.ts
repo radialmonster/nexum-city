@@ -66,7 +66,8 @@ export function startMovement(ctx: Ctx, spec: MovementSpec): Movement {
     arriveMs: state.nowMs + spec.durationMs,
   };
   if (spec.raid) movement.raid = spec.raid;
-  if (spec.kind === 'haul') movement.sent = GOODS.reduce((n, g) => n + spec.cargo[g], 0);
+  if (spec.kind === 'haul' || spec.kind === 'settle')
+    movement.sent = GOODS.reduce((n, g) => n + spec.cargo[g], 0);
   for (const crew of spec.crews) {
     const node = 'at' in crew.loc ? crew.loc.at : null;
     leaveGarrison(ctx, crew);
@@ -91,6 +92,7 @@ export function recallMovement(ctx: Ctx, movement: Movement): void {
   movement.to = movement.from;
   movement.arriveMs = state.nowMs + Math.max(1, elapsed);
   schedule(ctx, movement.arriveMs, { kind: 'arrive', movementId: movement.id });
+  scheduleStrikes(ctx, movement);
 }
 
 export const travelSystem: System = {
