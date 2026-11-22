@@ -275,6 +275,12 @@ const AMBUSH_HOURS = 6;
  * out again to lose more (see sim-spec, "Raid balance after task 77").
  */
 const AMBUSH_MIN_STRENGTH = 16;
+/**
+ * A newcomer whose protection ended less than this long ago is probed: the raider's ambush picks
+ * that newcomer's street to the hub before any other, so a new player meets the raiding game
+ * within about a day (sim-spec, "Bots and protection").
+ */
+const PROBE_WINDOW_HOURS = 24;
 
 /**
  * A street edge on a rival's way to its nearest hub (the last street into the hub, where hauls
@@ -302,8 +308,11 @@ export function ambushOrders(s: GameState, me: Id): Order[] {
     );
     const van = vanAt(s, base.id, me);
     if (crews.length < 2 || !van) continue;
-    if ((crews[0] as Crew).strength + (crews[1] as Crew).strength < AMBUSH_MIN_STRENGTH) continue;
-    const edges: { a: Id; b: Id; len: number; hot: boolean }[] = [];
+    const full =
+      crews.length >= 2 &&
+      (crews[0] as Crew).strength + (crews[1] as Crew).strength >= AMBUSH_MIN_STRENGTH;
+    if (!full) continue;
+    const edges: { a: Id; b: Id; len: number; hot: boolean; fresh: boolean }[] = [];
     for (const d of Object.values(s.districts)) {
       if (d.kind === 'hub' || d.owner === me || d.owner === 'neutral') continue;
       // Protected players' convoys cannot be struck, and that flag is public, so skip them.
@@ -318,11 +327,26 @@ export function ambushOrders(s: GameState, me: Id): Order[] {
       const hot = Object.values(s.contracts).some(
         (c) => c.status === 'taken' && c.hub === hub.id && c.taker === d.owner,
       );
-      edges.push({ a, b, len: Math.min(length(s, base.id, a), length(s, base.id, b)), hot });
+      // Protection ended within the probe window: the owner is still a newcomer.
+      const over = d.protectedUntilMs === undefined ? -1 : s.nowMs - d.protectedUntilMs;
+      const fresh = over >= 0 && over <= PROBE_WINDOW_HOURS * MS_PER_HOUR;
+      edges.push({
+        a,
+        b,
+        len: Math.min(length(s, base.id, a), length(s, base.id, b)),
+        hot,
+        fresh,
+      });
     }
     const edge = edges
       .filter((e) => Number.isFinite(e.len) && !shadow.has(e.a) && !shadow.has(e.b))
-      .sort((x, y) => Number(y.hot) - Number(x.hot) || x.len - y.len || (x.a < y.a ? -1 : 1))[0];
+      .sort(
+        (x, y) =>
+          Number(y.fresh) - Number(x.fresh) ||
+          Number(y.hot) - Number(x.hot) ||
+          x.len - y.len ||
+          (x.a < y.a ? -1 : 1),
+      )[0];
     if (!edge) continue;
     return [
       {
