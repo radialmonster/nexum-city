@@ -1,7 +1,9 @@
 import { MS_PER_HOUR, balance, toAtoms } from './balance.js';
 import { afterWarehouseChange, emptyGoods } from './production.js';
 import { createRng, nextRange, shuffle } from './rng.js';
-import type { Ctx } from './ctx.js';
+import { emit, type Ctx } from './ctx.js';
+import { observe } from './fog.js';
+import { placeCrew } from './travel.js';
 import type {
   Carrier,
   Crew,
@@ -21,6 +23,8 @@ export interface WorldOptions {
   /** Shortest and longest street between neighbouring districts, in metres. */
   edgeMinM?: number;
   edgeMaxM?: number;
+  /** Season length in hours. Default `balance.season.lengthHours`. */
+  seasonHours?: number;
 }
 
 export function districtId(x: number, y: number): Id {
@@ -64,6 +68,7 @@ export function createWorld(seed: number, options: WorldOptions = {}): GameState
   const edgeMin = options.edgeMinM ?? balance.world.edgeMinM;
   const edgeMax = options.edgeMaxM ?? balance.world.edgeMaxM;
   const rng = createRng(seed);
+  const seasonMs = (options.seasonHours ?? balance.season.lengthHours) * MS_PER_HOUR;
 
   const mix: DistrictKind[] = [];
   for (const [kind, n] of Object.entries(balance.world.kindMix)) {
@@ -122,7 +127,7 @@ export function createWorld(seed: number, options: WorldOptions = {}): GameState
     seed,
     nowMs: 0,
     rng,
-    counters: { crew: 0, carrier: 0, movement: 0, event: 0, seq: 0 },
+    counters: { crew: 0, carrier: 0, movement: 0, event: 0, seq: 1 },
     world: { cols, rows, soundY: rows },
     graph: { nodes, edges },
     districts,
@@ -131,7 +136,18 @@ export function createWorld(seed: number, options: WorldOptions = {}): GameState
     carriers: {},
     movements: {},
     reveals: {},
-    queue: [],
+    sieges: {},
+    season: {
+      startMs: 0,
+      endMs: seasonMs,
+      finaleStartMs: Math.max(0, seasonMs - balance.season.finaleHours * MS_PER_HOUR),
+      finale: false,
+      leaderId: null,
+      belowMedian: [],
+    },
+    memory: {},
+    // The first hourly score tick; each tick schedules the next.
+    queue: [{ at: MS_PER_HOUR, seq: 1, kind: 'score.tick' }],
   };
 }
 
@@ -158,10 +174,13 @@ export function addPlayer(state: GameState, opts: AddPlayerOptions): GameState {
   if (!d) throw new Error(`unknown district ${opts.districtId}`);
   if (d.kind === 'hub') throw new Error('hubs are never owned');
   if (next.players[opts.id]) throw new Error(`player ${opts.id} already exists`);
+  if (next.season.finale || next.nowMs >= next.season.finaleStartMs)
+    throw new Error('the season finale has begun: no new players');
   next.players[opts.id] = {
     id: opts.id,
     credits: toAtoms(opts.credits ?? balance.player.startCredits),
     stash: {},
+    score: 0,
   };
   d.owner = opts.id;
   d.warehouse.supplies += toAtoms(opts.supplies ?? balance.player.startSupplies);
@@ -192,5 +211,51 @@ export function addPlayer(state: GameState, opts: AddPlayerOptions): GameState {
   // Production and warehouse state depend on ownership; schedule the first overflow check.
   const ctx: Ctx = { state: next, events: [] };
   afterWarehouseChange(ctx, d);
+  observe(ctx);
   return next;
+}
+
+/**
+ * A fresh plot for a player who lost their last district (ADR 0028): the
+ * neutral, unbesieged district farthest from every other player's districts.
+ * Their crews and carriers at `from` move there at once and it is protected.
+ * Returns `null` when no neutral district is left. Task 1A will improve this.
+ */
+export function relocatePlayer(ctx: Ctx, playerId: Id, from: District): District | null {
+  const { state } = ctx;
+  const others = Object.values(state.districts).filter(
+    (d) => d.owner !== 'neutral' && d.owner !== playerId,
+  );
+  let best: District | null = null;
+  let bestScore = -1;
+  for (const d of Object.values(state.districts)) {
+    if (d.kind === 'hub' || d.owner !== 'neutral' || state.sieges[d.id] || d.id === from.id)
+      continue;
+    let nearest = 99;
+    for (const o of others) {
+      nearest = Math.min(nearest, Math.abs(o.pos.x - d.pos.x) + Math.abs(o.pos.y - d.pos.y));
+    }
+    if (nearest > bestScore || (nearest === bestScore && best !== null && d.id < best.id)) {
+      best = d;
+      bestScore = nearest;
+    }
+  }
+  if (!best) return null;
+  best.owner = playerId;
+  best.stance = 'hold';
+  best.warehouse.supplies += toAtoms(balance.player.startSupplies);
+  best.protectedUntilMs = state.nowMs + balance.player.protectedHours * MS_PER_HOUR;
+  const here = (loc: Crew['loc']): boolean => 'at' in loc && loc.at === from.id;
+  for (const crew of Object.values(state.crews)) {
+    if (crew.owner === playerId && here(crew.loc)) {
+      from.garrison = from.garrison.filter((id) => id !== crew.id);
+      placeCrew(ctx, crew, best.id);
+    }
+  }
+  for (const carrier of Object.values(state.carriers)) {
+    if (carrier.owner === playerId && here(carrier.loc)) carrier.loc = { at: best.id };
+  }
+  afterWarehouseChange(ctx, best);
+  emit(ctx, 'player.joined', [playerId], [best.id], { reason: 'relocated' });
+  return best;
 }

@@ -1,6 +1,9 @@
 import type { Ctx } from './ctx.js';
 import { constructionSystem } from './construction.js';
+import { observe } from './fog.js';
 import { productionSystem } from './production.js';
+import { scoreSystem } from './score.js';
+import { siegeSystem } from './siege.js';
 import { travelSystem } from './travel.js';
 import type { QueuedEvent, QueuedKind } from './types.js';
 
@@ -19,10 +22,25 @@ export interface System {
   readonly name: string;
   settle?: (ctx: Ctx, fromMs: number, toMs: number) => void;
   handlers?: Handlers;
+  /** Runs after each queue event and each order, never at the end of a step. */
+  after?: (ctx: Ctx) => void;
 }
 
+const fogSystem: System = { name: 'fog', after: observe };
+
 /** Order matters only for `settle` (all current systems are independent). */
-export const systems: readonly System[] = [travelSystem, productionSystem, constructionSystem];
+export const systems: readonly System[] = [
+  travelSystem,
+  productionSystem,
+  constructionSystem,
+  siegeSystem,
+  scoreSystem,
+  fogSystem,
+];
+
+export function runAfter(ctx: Ctx): void {
+  for (const system of systems) system.after?.(ctx);
+}
 
 export function dispatch(ctx: Ctx, event: QueuedEvent): void {
   for (const system of systems) {

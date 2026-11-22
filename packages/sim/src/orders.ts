@@ -3,6 +3,7 @@ import { buildCost, startConstruction } from './construction.js';
 import { emit, type Ctx } from './ctx.js';
 import { afterWarehouseChange, buildingLevel, storeAt } from './production.js';
 import { shortestRoute, travelMs, type Route } from './routing.js';
+import { isProtected, refreshSiege } from './siege.js';
 import { placeCrew, recallMovement, startMovement } from './travel.js';
 import {
   GOODS,
@@ -90,6 +91,15 @@ function resolveTravel(state: GameState, req: TravelRequest): Resolved {
   if (req.to === from) return fail('invalid_target');
   if (req.kind === 'scout') {
     if (target.kind === 'hub') return fail('invalid_target');
+  } else if (req.kind === 'siege') {
+    if (target.kind === 'hub' || target.owner === req.actorId) return fail('invalid_target');
+    if (isProtected(target, state.nowMs)) return fail('protected');
+    const siege = state.sieges[target.id];
+    if (siege && siege.attacker !== req.actorId && siege.crewIds.length > 0) {
+      return fail('invalid_target');
+    }
+  } else if (req.kind === 'reinforce') {
+    if (target.kind === 'hub' || target.owner !== req.actorId) return fail('invalid_target');
   } else if (target.kind !== 'hub' && target.owner !== req.actorId) {
     return fail('invalid_target');
   }
@@ -166,6 +176,22 @@ function resolve(state: GameState, input: Input): Resolved {
         crewIds: [order.crewId],
         to: order.target,
       });
+    case 'siege':
+      return resolveTravel(state, {
+        kind: 'siege',
+        actorId,
+        carrierId: order.carrierId,
+        crewIds: order.crewIds,
+        to: order.target,
+      });
+    case 'reinforce':
+      return resolveTravel(state, {
+        kind: 'reinforce',
+        actorId,
+        carrierId: order.carrierId,
+        crewIds: order.crewIds,
+        to: order.to,
+      });
     case 'build': {
       const district = state.districts[order.districtId];
       if (!district) return fail('unknown_district');
@@ -241,6 +267,7 @@ export function applyOrder(ctx: Ctx, input: Input): Validation {
       break;
     case 'stance':
       plan.district.stance = plan.stance;
+      refreshSiege(ctx, plan.district.id);
       break;
     case 'recall':
       recallMovement(ctx, plan.movement);
@@ -251,12 +278,16 @@ export function applyOrder(ctx: Ctx, input: Input): Validation {
       player.credits -= toAtoms(balance.recruit.credits);
       district.warehouse.supplies -= toAtoms(balance.recruit.supplies);
       state.counters.crew += 1;
+      const catchUp = state.season.belowMedian.includes(input.actorId);
+      const readyMinutes =
+        balance.recruit.readyMinutes *
+        (catchUp ? balance.season.belowMedianRecruitPercent / 100 : 1);
       const crew: Crew = {
         id: `c${state.counters.crew}`,
         owner: input.actorId,
         strength: balance.recruit.startStrength,
         loc: { at: district.id },
-        readyAtMs: state.nowMs + balance.recruit.readyMinutes * MS_PER_MINUTE,
+        readyAtMs: state.nowMs + Math.round(readyMinutes * MS_PER_MINUTE),
       };
       state.crews[crew.id] = crew;
       placeCrew(ctx, crew, district.id);

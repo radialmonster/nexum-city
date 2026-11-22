@@ -44,7 +44,27 @@ export function checkInvariants(s: GameState): string[] {
         problems.push(`${id} garrisoned in ${d.id} but not there`);
     }
   }
+  for (const siege of Object.values(s.sieges)) {
+    const d = s.districts[siege.districtId];
+    if (!d || d.kind === 'hub') problems.push(`siege on invalid district ${siege.districtId}`);
+    else if (d.owner === siege.attacker) problems.push(`${d.id} is besieged by its own owner`);
+    if (siege.progress < 0 || siege.progress > 1_000_000) {
+      problems.push(`siege on ${siege.districtId} has progress out of range`);
+    }
+    for (const id of siege.crewIds) {
+      const crew = s.crews[id];
+      if (
+        !crew ||
+        crew.owner !== siege.attacker ||
+        !('at' in crew.loc) ||
+        crew.loc.at !== siege.districtId
+      ) {
+        problems.push(`siege crew ${id} is not at ${siege.districtId}`);
+      }
+    }
+  }
   for (const p of Object.values(s.players)) {
+    if (p.score < 0) problems.push(`${p.id} has negative score`);
     if (p.credits < 0) problems.push(`${p.id} has negative credits`);
     for (const [hub, goods] of Object.entries(p.stash)) {
       for (const g of GOODS)

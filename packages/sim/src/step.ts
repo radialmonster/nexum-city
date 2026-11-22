@@ -1,6 +1,6 @@
 import type { Ctx } from './ctx.js';
 import { applyOrder } from './orders.js';
-import { dispatch, systems } from './systems.js';
+import { dispatch, runAfter, systems } from './systems.js';
 import type { GameState, Input, QueuedEvent, StepResult } from './types.js';
 
 function clone(state: GameState): GameState {
@@ -49,9 +49,11 @@ export function step(prev: GameState, inputs: readonly Input[], toMs: number): S
       advanceTo(ctx, evAt);
       state.queue.shift();
       dispatch(ctx, ev as QueuedEvent);
+      runAfter(ctx);
     } else if (inp) {
       advanceTo(ctx, inAt);
       applyOrder(ctx, inp.input);
+      runAfter(ctx);
       next += 1;
     }
   }

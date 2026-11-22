@@ -108,3 +108,21 @@ export function movementPosition(graph: Graph, m: Movement, nowMs: number): Pos 
   }
   return nodePos(m.route[0] as Id);
 }
+
+/**
+ * The two nodes of the street a movement is on at `nowMs` (equal when it is
+ * exactly at a node). Used for sight: a convoy is seen from either end.
+ */
+export function movementSegment(graph: Graph, m: Movement, nowMs: number): [Id, Id] {
+  let target = movementProgress(m, nowMs) * m.lengthM;
+  for (let i = 0; i + 1 < m.route.length; i++) {
+    const a = m.route[i] as Id;
+    const b = m.route[i + 1] as Id;
+    const edge = graph.edges.find((e) => (e.a === a && e.b === b) || (e.a === b && e.b === a));
+    const len = edge?.lengthM ?? 0;
+    if (target <= len || i + 2 === m.route.length) return [a, b];
+    target -= len;
+  }
+  const first = m.route[0] as Id;
+  return [first, first];
+}
