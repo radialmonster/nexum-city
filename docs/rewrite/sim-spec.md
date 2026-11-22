@@ -447,7 +447,7 @@ Goal: at least 15 minutes of active, asynchronous play for a new player, without
 
 ### Rules
 
-- **Rush.** For `balance.rush.hours` (24) game hours after joining, building and settling take 1/`factor` (10x faster). Siege, travel and raids are unaffected. A new home district starts with the kit `rush.kit` (30 parts, 10 power), exactly one level-1 Workshop. The view shows `self.rushUntilMs`; the event `rush.ended` fires at the end. Bots follow the same rule.
+- **Rush.** For `balance.rush.hours` (24) game hours after joining, building and settling take 1/`factor` (10x faster). Siege, travel and raids are unaffected. A new home district starts with the kit `rush.kit` (30 parts, 10 power, 20 supplies), exactly one level-1 Workshop. The view shows `self.rushUntilMs`; the event `rush.ended` fires at the end. Bots follow the same rule.
 - **Starter contract.** One civic contract is reserved for the newcomer on the nearest hub: 5 supplies at 200 percent of the reference value (premium 100), window = van ETA plus 20 min (hubs are 30 to 65 min away by van, so the 20 min is a grace on top). Other players cannot take it (`reserved_contract`).
 - **Street jobs.** A personal list of up to 3 (`balance.jobs.cap`), one new offer every 30 min, drawn deterministically from the seeded RNG. Each is done by one crew and an optional carrier (a carrier makes it 67 percent of the time).
   - courier: 4 to 8 min, carry 4 to 10 units, pays 6 to 12 credits; raidable like a haul.
@@ -475,7 +475,45 @@ First 15 minutes of a scripted newcomer (target at least 8 actions and 3 complet
 | Turtle, before                    | 3.75      | 111             | 534   |              |
 | Turtle, with perks                | 3.88      | 233             | 577   |              |
 
-Raider lead is 0.94x with perks (1.12x before; 1.03x with perks and 1.08x before on 32 seeds), inside the 1.4x limit. Raid success is 10 percent with perks (12 percent before) on seeds 1 to 8 and 19 percent (21 percent) on 32 seeds. The 45 to 65 percent target could not be reproduced: the original main baseline was 57 percent on seeds 1 to 8 only by luck, about 19 to 21 percent on 32 seeds. Merchants have fewer districts because the rush kit and jobs shift their spending; the harness district floor was relaxed to 2.5 on the 8-seed set. Job volume per player: merchant 56 taken (268 credits), raider 32 (151), turtle 95 (454). Settling is never accepted inside the 15-minute session, because it needs 60 supplies at home.
+Raider lead is 0.94x with perks (1.12x before; 1.03x with perks and 1.08x before on 32 seeds), inside the 1.4x limit. Raid success is 10 percent with perks (12 percent before) on seeds 1 to 8 and 19 percent (21 percent) on 32 seeds. The 10 percent was not seed luck: it was a death spiral in the raider bot and the raid rules, fixed in "Raid balance after task 77" below (the first version of this note wrongly blamed luck). Merchants have fewer districts because the rush kit and jobs shift their spending; the harness district floor was relaxed to 2.5 on the 8-seed set. Job volume per player: merchant 56 taken (268 credits), raider 32 (151), turtle 95 (454). Settling is still not accepted inside the 15-minute session even with 20 more kit supplies (60 at the start): the first build and recruit spend supplies before the settle is tried.
+
+### Raid balance after task 77
+
+**Cause.** Raid success fell from 57 percent to 10 percent on seeds 1 to 8 (33 hits, 310 repelled, more than twice the raids) for two reasons, found with `node scripts/raid-diag.mjs 8`:
+
+- Every repelled raid costs the raiders 30 percent of their strength for good, and nothing gave it back. The raider bot always sent the first two idle crews, which were the weakened ones, and re-ambushed every hour. Raiders averaged 5.2 strength against a guard of 17.1 and ended each season with crews at the floor of 1. The street-job couriers (task 77) added many cheap targets, which raised the raid count, but every kind of target was being repelled (by target: job 21 hit and 94 repelled, haul 11 and 138, contract 1 and 16, escorted hauls 0 and 60). Job crews are single crews that count as half-strength drivers, so they were not the main problem.
+- Bimodal seeds before task 77 (min 4 percent, max 100 percent) were the same spiral, only less severe.
+
+**Fix** (both parts are needed; the bot rule alone makes raiders give up and results stay bimodal):
+
+- Crews mend: a crew below its starting strength regains 1 strength every `balance.raid.mendHours` (1.5) game hours while it rests at a district (event `crew.mend`, queued after a loss, deterministic).
+- The raider bot ambushes with its two strongest idle crews, and only when together they have at least 16 strength (`AMBUSH_MIN_STRENGTH`); otherwise it waits and mends.
+- The merchant bot now fetches supplies it bought and left in a hub stash (as the turtle already did). The newcomer kit also has 20 supplies (60 in all).
+- `raid.hit`, `raid.repelled` and `raid.evaded` carry a `target` label (job, settle, runner, contract, haul, plus `+escort`). `RULES_VERSION` stays 3.
+
+**Numbers** (invariants 0; `node scripts/bot-table.mjs 8|16`; each cell is districts / credits at 48 h / score / contracts):
+
+| Seeds 1-8 | Merchant                | Raider           | Turtle                 | Raider lead | Raids, success | Per-seed success spread |
+| --------- | ----------------------- | ---------------- | ---------------------- | ----------- | -------------- | ----------------------- |
+| Before 77 | 3.31 / 1418 / 458 / 3.1 | 4.06 / 417 / 569 | 3.44 / 228 / 528 / 2.3 | 1.08x       | 168, 57%       | 4 to 100, sd 41         |
+| Task 77   | 2.75 / 2185 / 544 / 8.4 | 3.75 / 507 / 543 | 3.88 / 233 / 577 / 3.8 | 0.94x       | 333, 10%       | 0 to 33, sd 10          |
+| This fix  | 2.63 / 1629 / 524 / 8.3 | 4.94 / 444 / 639 | 4.38 / 195 / 612 / 3.5 | 1.04x       | 191, 61%       | 39 to 88, sd 20         |
+
+| Seeds 1-16 | Merchant                | Raider           | Turtle                 | Raider lead | Raids, success | Per-seed success spread |
+| ---------- | ----------------------- | ---------------- | ---------------------- | ----------- | -------------- | ----------------------- |
+| Before 77  | 3.69 / 1468 / 512 / 4.5 | 4.31 / 369 / 584 | 4.19 / 221 / 585 / 2.3 | 1.00x       | 411, 36%       | 2 to 100, sd 37         |
+| Task 77    | 2.50 / 1998 / 494 / 7.6 | 3.84 / 477 / 555 | 3.69 / 295 / 561 / 3.9 | 0.99x       | 712, 12%       | 0 to 100, sd 24         |
+| This fix   | 2.44 / 1602 / 493 / 7.2 | 4.81 / 427 / 628 | 3.63 / 223 / 566 / 3.4 | 1.11x       | 391, 58%       | 21 to 88, sd 19         |
+
+**Merchant districts could not be restored to 3.2.** Without the newcomer perks the merchant holds 3.47 districts; with them 2.2 to 2.6. Removing the kit parts or the kit power alone brings it back (3.3), because together they pay for the early Workshop, so the merchant hauls more and its home keeps too few supplies for a settlement (upkeep eats them). That is a trade of the rush design, not of raids, so the honest harness floor is 2.4 on seeds 1 to 8 (the test also now requires raid success between 40 and 70 percent). Raiders now capture more (16 plots on seeds 1 to 8, 6 on task 77 and 8 before).
+
+First 15 minutes of the scripted newcomer with 60 supplies: 8 to 9 actions, 4 to 5 completions (before the rush: 3 and 1). A settle is still not accepted in the session.
+
+**Plain-language pros and cons**
+
+- Mending: a beaten crew is useful again after a few hours, so raiding stays a real choice and not a one-way slide. But repeated raiding is cheaper, so victims will be hit more often than with permanent losses.
+- Strong crews only: raids are fewer and more likely to win. But a weak raider has to wait before it can act, which is slower.
+- The kit supplies: a new player can reach a first settlement sooner. But it is a small gift that a late joiner does not get.
 
 ### Market movement (measure only, no rule changes)
 
