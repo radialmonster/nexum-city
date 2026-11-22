@@ -185,6 +185,12 @@ const WEAK_RIVAL_DISCOUNT = 0.5;
 /** The raider sets an ambush on every this-many-th hour of the season, so it is not constant. */
 const AMBUSH_EVERY_HOURS = 1;
 const AMBUSH_HOURS = 6;
+/**
+ * A raider only sets an ambush with its two strongest idle crews and when they total at least
+ * this much (a full pair is 20): a beaten crew rests until it has healed instead of marching
+ * out again to lose more (see sim-spec, "Raid balance after task 77").
+ */
+const AMBUSH_MIN_STRENGTH = 16;
 
 /**
  * A street edge on a rival's way to its nearest hub (the last street into the hub, where hauls
@@ -203,9 +209,12 @@ export function ambushOrders(s: GameState, me: Id): Order[] {
     return [];
   }
   for (const base of mine(s, me)) {
-    const crews = idleCrews(s, base.id, me);
+    const crews = idleCrews(s, base.id, me).sort(
+      (x, y) => y.strength - x.strength || (x.id < y.id ? -1 : 1),
+    );
     const van = vanAt(s, base.id, me);
     if (crews.length < 2 || !van) continue;
+    if ((crews[0] as Crew).strength + (crews[1] as Crew).strength < AMBUSH_MIN_STRENGTH) continue;
     const edges: { a: Id; b: Id; len: number; hot: boolean }[] = [];
     for (const d of Object.values(s.districts)) {
       if (d.kind === 'hub' || d.owner === me || d.owner === 'neutral') continue;
@@ -592,11 +601,14 @@ export const merchant: Bot = (s, me) => {
     prefer: 'pay',
     escort: true,
   });
+  // Supplies bought at a hub sit in the stash until a van goes to fetch them (as the turtle does).
+  const fetch = jobs.length > 0 ? [] : fetchOrders(s, me);
   orders.push(
     ...sellStash(s, me),
     ...jobs,
     ...runnerOrders(s, me, budget, MERCHANT_RUNNER_SPARE),
-    ...(jobs.length > 0 ? [] : haulToHub(s, me, true)),
+    ...fetch,
+    ...(jobs.length > 0 || fetch.length > 0 ? [] : haulToHub(s, me, true)),
     ...postSupplyContract(s, me, budget),
     ...resupply(s, me, budget),
   );
