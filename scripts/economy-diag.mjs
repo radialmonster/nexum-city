@@ -1,4 +1,4 @@
-// Economy check (tasks 79 and 80): regional prices, the trade window, money supply and the
+// Economy check (tasks 79 to 82: prices, shortages, fuel and the credit sinks): regional prices, the trade window, money supply and the
 // existing balance limits, over seeds 1 to 16 (or the seeds given). Run it before and after a
 // change: `--save before.json` stores the numbers, `--vs before.json` compares against them.
 // Usage: node scripts/economy-diag.mjs [firstSeed [lastSeed]] [--save file] [--vs file] [--set path=value,...]
@@ -69,7 +69,14 @@ const out = {
   types: {},
   raids: { hits: 0, decided: 0 },
   problems: 0,
+  shortageKeys: new Set(),
+  fuelValue: 0,
+  cargoValue: 0,
+  fuelTrips: 0,
+  sink: { feesAtoms: 0, upkeepAtoms: 0, levyAtoms: 0 },
+  days: 0,
 };
+const seenMovements = new Set();
 
 for (let seed = first; seed <= last; seed++) {
   const meanRef = {}; // hub -> parts ref sum, n
@@ -98,6 +105,19 @@ for (let seed = first; seed <= last; seed++) {
         out.daily[day].push(
           Object.values(s.players).reduce((n, p) => n + p.credits, 0) / ATOMS_PER_UNIT,
         );
+      }
+      for (const sh of s.shortages)
+        out.shortageKeys.add(`${seed}|${sh.hub}|${sh.good}|${sh.startMs}`);
+      for (const m of Object.values(s.movements)) {
+        if (!m.fuel || seenMovements.has(`${seed}|${m.id}`)) continue;
+        seenMovements.add(`${seed}|${m.id}`);
+        let cargo = 0;
+        for (const g of GOODS)
+          cargo += ((m.cargo?.[g] ?? 0) / ATOMS_PER_UNIT) * (balance.market.baseRefCents[g] / 100);
+        if (cargo <= 0) continue;
+        out.fuelTrips++;
+        out.cargoValue += cargo;
+        out.fuelValue += (m.fuel / ATOMS_PER_UNIT) * (balance.market.baseRefCents.power / 100);
       }
       for (const h of hubs) {
         const m = (meanRef[h] ??= { sum: 0, n: 0 });
@@ -145,6 +165,8 @@ for (let seed = first; seed <= last; seed++) {
   out.gradient.n++;
   if (avg(near) < mean(rest.map(avg))) out.gradient.pass++;
   out.problems += r.problems.length;
+  out.days += (r.final.season.endMs - r.final.season.startMs) / 86_400_000;
+  for (const k of Object.keys(out.sink)) out.sink[k] += r.final.sink[k] / ATOMS_PER_UNIT;
   out.raids.hits += r.raidHits;
   out.raids.decided += r.raidHits + r.raidsRepelled + r.raidsEvaded;
   for (const s of r.standings) {
@@ -167,6 +189,12 @@ const result = {
   payoutRatio: median(out.tradeProfit) / (median(out.contractProfit) || 1),
   creditsByDay: out.daily.map((d) => Math.round(mean(d))),
   moneyGrowth: mean(out.daily[6]) / (mean(out.daily[0]) || 1),
+  shortagesPerDay: +(out.shortageKeys.size / (out.days || 1)).toFixed(2),
+  fuelPercentOfCargo: +((100 * out.fuelValue) / (out.cargoValue || 1)).toFixed(2),
+  fuelTrips: out.fuelTrips,
+  sinkCreditsPerSeed: Object.fromEntries(
+    Object.entries(out.sink).map(([k, v]) => [k, Math.round(v / (last - first + 1))]),
+  ),
   raidSuccessPercent: (100 * out.raids.hits) / Math.max(1, out.raids.decided),
   problems: out.problems,
   types: Object.fromEntries(
