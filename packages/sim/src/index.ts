@@ -32,6 +32,13 @@ export type { Eta, Route } from './routing.js';
 export { step } from './step.js';
 export { dispatch, systems } from './systems.js';
 export type { Handlers, System } from './systems.js';
-export { addPlayer, createWorld, districtId, relocatePlayer } from './world.js';
+export {
+  addPlayer,
+  addPlayerWithEvents,
+  createWorld,
+  districtId,
+  relocatePlayer,
+} from './world.js';
+export { ensureFrontier, wantedOpenPlots } from './frontier.js';
 export type { AddPlayerOptions, WorldOptions } from './world.js';
 export * from './types.js';

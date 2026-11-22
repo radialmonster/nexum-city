@@ -203,3 +203,12 @@ Where the spec was silent, these simple choices were made. Code: `packages/sim`.
 - **View.** `PlayerView.markets` lists every hub book by price level (all quantities summed), the civic quote and depth, `refCents` and `lastCents`. `PlayerView.orders` lists only your own open orders. Books are public: hubs are always in sight.
 - **Events.** `trade.filled` (actors: buyer and seller, civic omitted) with `hub, good, price, qty, buyer, seller, taker, buyOrder, sellOrder`.
 - **Gap.** Snapshots written before this change have no `markets`; there are no live players, so the server does not migrate them.
+
+### Frontier and city growth (task 1A)
+
+- `District.frontier` is `open | surveying | built`. Plots are laid out on the compact edge of the city (most occupied neighbours, then nearest the centre), never south of the Sound; the south row is docks.
+- The city keeps `max(4, ceil(players / 3))` open or surveying plots (`balance.frontier`). A new plot is surveyed for 4 h (`frontier.survey` queue event), then opens: it joins the street graph, with streets to every finished neighbour, and `frontier.opened` fires. Surveying plots are hidden from views.
+- `createWorld(seed, { startMs })` starts the season, queue and ticks at a given game time; the server's `genesis()` workaround is gone. The first open plots are created at world creation (instantly, with event ids reset to 0).
+- `addPlayer` with no `districtId` claims an open plot next to at least 2 neutral districts, as far as possible from other players' districts. If none is open, one is opened at once. `addPlayerWithEvents` also returns the events (`player.joined`, reason `new`). The explicit-id path is kept for tests.
+- A player who loses their last district gets a protected frontier plot chosen the same way (`relocatePlayer`), with `player.joined` reason `relocated`.
+- `PlayerView.graph` carries the public street graph (nodes, edges with lengths, hub ids) so the client can preview routes and ETAs.

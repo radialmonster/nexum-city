@@ -121,6 +121,14 @@ export const balance = {
     },
   },
 
+  frontier: {
+    /** The city keeps at least this many open plots (or `players / playersPerPlot`, whichever is more). */
+    minOpen: 4,
+    playersPerPlot: 3,
+    /** A new plot is surveyed for this long before it opens. */
+    surveyHours: 4,
+  },
+
   market: {
     /** Prices are integers in 1/100 credit. */
     priceScale: 100,

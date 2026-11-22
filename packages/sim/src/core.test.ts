@@ -44,7 +44,12 @@ describe('hashState', () => {
 describe('world', () => {
   const s = createWorld(5);
   it('builds the default city', () => {
-    expect(Object.values(s.districts).filter((d) => d.kind !== 'hub')).toHaveLength(24);
+    // 24 built districts plus the first open frontier plots.
+    const built = Object.values(s.districts).filter(
+      (d) => d.kind !== 'hub' && d.frontier === 'built',
+    );
+    expect(built).toHaveLength(24);
+    expect(Object.values(s.districts).filter((d) => d.frontier === 'open')).toHaveLength(4);
     expect(Object.values(s.districts).filter((d) => d.kind === 'hub')).toHaveLength(2);
     expect(s.world.soundY).toBe(s.world.rows);
     expect(s.districts['d0_3']?.kind).toBe('docks');

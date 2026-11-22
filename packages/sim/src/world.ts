@@ -1,7 +1,8 @@
 import { MS_PER_HOUR, balance, toAtoms } from './balance.js';
-import { afterWarehouseChange, emptyGoods } from './production.js';
+import { afterWarehouseChange } from './production.js';
 import { createRng, nextRange, shuffle } from './rng.js';
 import { emit, type Ctx } from './ctx.js';
+import { chooseStartPlot, districtId, ensureFrontier, newDistrict } from './frontier.js';
 import { newHubBooks } from './market.js';
 import { observe } from './fog.js';
 import { placeCrew } from './travel.js';
@@ -14,6 +15,7 @@ import type {
   GameState,
   GraphNode,
   Id,
+  SimEvent,
 } from './types.js';
 
 export interface WorldOptions {
@@ -26,37 +28,11 @@ export interface WorldOptions {
   edgeMaxM?: number;
   /** Season length in hours. Default `balance.season.lengthHours`. */
   seasonHours?: number;
+  /** Game time the world starts at (ms). The season and the first ticks are measured from here. Default 0. */
+  startMs?: number;
 }
 
-export function districtId(x: number, y: number): Id {
-  return `d${x}_${y}`;
-}
-
-function newDistrict(
-  id: Id,
-  name: string,
-  kind: DistrictKind,
-  x: number,
-  y: number,
-  slots: number,
-): District {
-  return {
-    id,
-    name,
-    kind,
-    pos: { x, y },
-    owner: 'neutral',
-    garrison: [],
-    stance: 'hold',
-    buildings: [],
-    slots,
-    warehouse: emptyGoods(),
-    frontier: 'built',
-    construction: null,
-    overflowing: false,
-    wasted: 0,
-  };
-}
+export { districtId };
 
 /**
  * Builds a starting city: a grid of districts joined by streets, two hubs on
@@ -70,6 +46,7 @@ export function createWorld(seed: number, options: WorldOptions = {}): GameState
   const edgeMax = options.edgeMaxM ?? balance.world.edgeMaxM;
   const rng = createRng(seed);
   const seasonMs = (options.seasonHours ?? balance.season.lengthHours) * MS_PER_HOUR;
+  const startMs = options.startMs ?? 0;
 
   const mix: DistrictKind[] = [];
   for (const [kind, n] of Object.entries(balance.world.kindMix)) {
@@ -123,10 +100,10 @@ export function createWorld(seed: number, options: WorldOptions = {}): GameState
   street('hubE', districtId(cols - 1, eastY));
   if (eastY - 1 >= 0) street('hubE', districtId(cols - 1, eastY - 1));
 
-  return {
+  const state: GameState = {
     version: 1,
     seed,
-    nowMs: 0,
+    nowMs: startMs,
     rng,
     counters: { crew: 0, carrier: 0, movement: 0, event: 0, seq: 2, order: 0 },
     world: { cols, rows, soundY: rows },
@@ -139,9 +116,9 @@ export function createWorld(seed: number, options: WorldOptions = {}): GameState
     reveals: {},
     sieges: {},
     season: {
-      startMs: 0,
-      endMs: seasonMs,
-      finaleStartMs: Math.max(0, seasonMs - balance.season.finaleHours * MS_PER_HOUR),
+      startMs,
+      endMs: startMs + seasonMs,
+      finaleStartMs: startMs + Math.max(0, seasonMs - balance.season.finaleHours * MS_PER_HOUR),
       finale: false,
       leaderId: null,
       belowMedian: [],
@@ -150,16 +127,24 @@ export function createWorld(seed: number, options: WorldOptions = {}): GameState
     memory: {},
     // The first hourly score and market ticks; each tick schedules the next.
     queue: [
-      { at: MS_PER_HOUR, seq: 1, kind: 'score.tick' },
-      { at: MS_PER_HOUR, seq: 2, kind: 'market.tick' },
+      { at: startMs + MS_PER_HOUR, seq: 1, kind: 'score.tick' },
+      { at: startMs + MS_PER_HOUR, seq: 2, kind: 'market.tick' },
     ],
   };
+  // The first open plots along the edge. Their events are not part of the game's history.
+  ensureFrontier({ state, events: [] }, true);
+  state.counters.event = 0;
+  return state;
 }
 
 export interface AddPlayerOptions {
   id: Id;
-  /** The district the player starts in; it becomes theirs. */
-  districtId: Id;
+  /**
+   * The district the player starts in; it becomes theirs. Leave it out to claim a
+   * frontier plot: one next to at least two neutral districts, as far as possible
+   * from the districts other players own.
+   */
+  districtId?: Id;
   credits?: number;
   supplies?: number;
   crews?: number;
@@ -169,18 +154,23 @@ export interface AddPlayerOptions {
 }
 
 /**
- * Bootstraps a player with a district, crews, vans, credits and supplies.
- * Returns a new state. This is a minimal setup helper; new-player placement
- * on the frontier (task 1A) will build on it.
+ * Bootstraps a player with a district, crews, vans, credits and supplies, then
+ * restocks the frontier. Returns the new state and the events (`player.joined`,
+ * and `frontier.opened` if a plot had to be opened at once).
  */
-export function addPlayer(state: GameState, opts: AddPlayerOptions): GameState {
+export function addPlayerWithEvents(
+  state: GameState,
+  opts: AddPlayerOptions,
+): { state: GameState; events: SimEvent[]; districtId: Id } {
   const next = JSON.parse(JSON.stringify(state)) as GameState;
-  const d = next.districts[opts.districtId];
-  if (!d) throw new Error(`unknown district ${opts.districtId}`);
-  if (d.kind === 'hub') throw new Error('hubs are never owned');
   if (next.players[opts.id]) throw new Error(`player ${opts.id} already exists`);
   if (next.season.finale || next.nowMs >= next.season.finaleStartMs)
     throw new Error('the season finale has begun: no new players');
+  const ctx: Ctx = { state: next, events: [] };
+  const d = opts.districtId ? next.districts[opts.districtId] : chooseStartPlot(ctx, opts.id);
+  if (!d)
+    throw new Error(opts.districtId ? `unknown district ${opts.districtId}` : 'no plot is free');
+  if (d.kind === 'hub') throw new Error('hubs are never owned');
   next.players[opts.id] = {
     id: opts.id,
     credits: toAtoms(opts.credits ?? balance.player.startCredits),
@@ -188,6 +178,7 @@ export function addPlayer(state: GameState, opts: AddPlayerOptions): GameState {
     score: 0,
   };
   d.owner = opts.id;
+  d.frontier = 'built';
   d.warehouse.supplies += toAtoms(opts.supplies ?? balance.player.startSupplies);
   const hours = opts.protectedHours ?? balance.player.protectedHours;
   if (hours > 0) d.protectedUntilMs = next.nowMs + hours * MS_PER_HOUR;
@@ -214,39 +205,30 @@ export function addPlayer(state: GameState, opts: AddPlayerOptions): GameState {
     next.carriers[van.id] = van;
   }
   // Production and warehouse state depend on ownership; schedule the first overflow check.
-  const ctx: Ctx = { state: next, events: [] };
   afterWarehouseChange(ctx, d);
+  emit(ctx, 'player.joined', [opts.id], [d.id], { reason: 'new' });
+  ensureFrontier(ctx);
   observe(ctx);
-  return next;
+  return { state: next, events: ctx.events, districtId: d.id };
+}
+
+/** Like `addPlayerWithEvents`, returning only the new state. */
+export function addPlayer(state: GameState, opts: AddPlayerOptions): GameState {
+  return addPlayerWithEvents(state, opts).state;
 }
 
 /**
- * A fresh plot for a player who lost their last district (ADR 0028): the
- * neutral, unbesieged district farthest from every other player's districts.
- * Their crews and carriers at `from` move there at once and it is protected.
- * Returns `null` when no neutral district is left. Task 1A will improve this.
+ * A fresh plot for a player who lost their last district (ADR 0028): a frontier
+ * plot chosen like a newcomer's, never the district just lost. Their crews and
+ * carriers at `from` move there at once and it is protected. Returns `null` only
+ * if no plot can be laid out.
  */
 export function relocatePlayer(ctx: Ctx, playerId: Id, from: District): District | null {
   const { state } = ctx;
-  const others = Object.values(state.districts).filter(
-    (d) => d.owner !== 'neutral' && d.owner !== playerId,
-  );
-  let best: District | null = null;
-  let bestScore = -1;
-  for (const d of Object.values(state.districts)) {
-    if (d.kind === 'hub' || d.owner !== 'neutral' || state.sieges[d.id] || d.id === from.id)
-      continue;
-    let nearest = 99;
-    for (const o of others) {
-      nearest = Math.min(nearest, Math.abs(o.pos.x - d.pos.x) + Math.abs(o.pos.y - d.pos.y));
-    }
-    if (nearest > bestScore || (nearest === bestScore && best !== null && d.id < best.id)) {
-      best = d;
-      bestScore = nearest;
-    }
-  }
+  const best = chooseStartPlot(ctx, playerId, from.id);
   if (!best) return null;
   best.owner = playerId;
+  best.frontier = 'built';
   best.stance = 'hold';
   best.warehouse.supplies += toAtoms(balance.player.startSupplies);
   best.protectedUntilMs = state.nowMs + balance.player.protectedHours * MS_PER_HOUR;
@@ -262,5 +244,6 @@ export function relocatePlayer(ctx: Ctx, playerId: Id, from: District): District
   }
   afterWarehouseChange(ctx, best);
   emit(ctx, 'player.joined', [playerId], [best.id], { reason: 'relocated' });
+  ensureFrontier(ctx);
   return best;
 }

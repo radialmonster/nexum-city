@@ -226,6 +226,14 @@ export const playerViewSchema = z.object({
   reveals: z.record(idSchema, z.number()),
   markets: z.record(idSchema, z.record(goodSchema, marketBookViewSchema)),
   orders: z.array(marketOrderSchema),
+  graph: z.object({
+    nodes: z.record(
+      idSchema,
+      z.object({ id: idSchema, type: z.enum(['district', 'junction']), pos: posSchema }),
+    ),
+    edges: z.array(z.object({ a: idSchema, b: idSchema, lengthM: z.number() })),
+    hubs: z.array(idSchema),
+  }),
 });
 
 /** Mirrors `Standing` from `standings` in `@nexum/sim`. */

@@ -38,6 +38,10 @@ const { state, events } = step(prev, inputs, toMs);
 - `viewFor(state, playerId)` gives a JSON-safe, player-specific `PlayerView` (own districts in full, districts in sight, remembered owners elsewhere, convoys in sight). `sightOf` is the underlying set.
 - `state.season` holds the clock (`startMs`, `endMs`, `finaleStartMs`, `finale`). Score is exact district-milliseconds; `standings(state)` ranks players; `score.tick` fires hourly. Below-median players recruit faster and captures against the leader are faster.
 
+## Frontier
+
+Open plots along the city edge keep newcomers placed (`frontier.ts`: `ensureFrontier`, `chooseStartPlot`). `createWorld(seed, { startMs })`, `addPlayer` without a district id, and `addPlayerWithEvents` are the entry points. Tuning is in `balance.frontier`.
+
 ## Markets
 
 `market.place { hub, side, good, price, qty }` and `market.cancel { orderId }`. One book per hub and good in `state.markets`; orders fill instantly when they cross, at the resting price, with price-time priority. Escrow is held by the order (goods from the hub stash, or credits). Virtual civic traders quote the reference plus and minus 8% with limited hourly depth (`civicBid`, `civicAsk`); an hourly `market.tick` refills depth, pulls the reference back and sweeps. `viewFor` includes `markets` (public) and `orders` (yours). Tuning is in `balance.market`; decisions are in `docs/rewrite/sim-spec.md`.

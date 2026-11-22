@@ -9,6 +9,7 @@ import type {
   Construction,
   Crew,
   Edge,
+  GraphNode,
   FrontierState,
   GameState,
   Good,
@@ -198,6 +199,8 @@ export interface PlayerView {
   markets: Record<Id, Record<Good, MarketBookView>>;
   /** Your own open orders. */
   orders: MarketOrder[];
+  /** The street graph is public: every node and street, and which nodes are hubs. */
+  graph: { nodes: Record<Id, GraphNode>; edges: Edge[]; hubs: Id[] };
 }
 
 const copy = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
@@ -221,6 +224,8 @@ export function viewFor(state: GameState, playerId: Id): PlayerView {
 
   const districts: Record<Id, DistrictView> = {};
   for (const d of Object.values(state.districts)) {
+    // Plots still being surveyed are not on the map yet.
+    if (d.frontier === 'surveying') continue;
     const base = { id: d.id, name: d.name, kind: d.kind, pos: copy(d.pos) };
     if (d.owner === playerId) {
       districts[d.id] = {
@@ -343,5 +348,13 @@ export function viewFor(state: GameState, playerId: Id): PlayerView {
     reveals,
     markets,
     orders,
+    graph: {
+      nodes: JSON.parse(JSON.stringify(state.graph.nodes)),
+      edges: state.graph.edges.map((e) => ({ ...e })),
+      hubs: Object.values(state.districts)
+        .filter((d) => d.kind === 'hub')
+        .map((d) => d.id)
+        .sort(),
+    },
   };
 }

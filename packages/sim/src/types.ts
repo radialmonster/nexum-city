@@ -146,6 +146,7 @@ export type QueuedEvent = { at: number; seq: number } & (
   | { kind: 'siege.check'; districtId: Id }
   | { kind: 'score.tick' }
   | { kind: 'market.tick' }
+  | { kind: 'frontier.survey'; districtId: Id }
 );
 export type QueuedKind = QueuedEvent['kind'];
 
