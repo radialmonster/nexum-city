@@ -97,9 +97,58 @@ There is a single capture bar per district, from 0 to 1.
   - A battle report is created for both sides.
 - **Protected districts** cannot be sieged.
 
-## Raids (milestone 2)
+## Raids and escorts (M2)
 
-The rules are planned but not built in Phase 1. Leave a hook: a convoy that passes a street segment checks for any interceptors posted there.
+Built in task 71 (sim only: contracts, server validation and bots are done; there is no client UI yet, see tracker rows 72 to 76). `RULES_VERSION` is now 2.
+
+### The rules
+
+- **Order:** `{ type: 'raid', carrierId, crewIds, a, b, hours }`. `a` and `b` are the two ends of one street. The crews walk to whichever end is nearer (a `raid` movement), then lie in wait (an `ambush` movement) for `hours` (an integer, 1 to 8, so a window is capped at 8 h). Errors: `bad_edge` (not a street), `bad_window`, `too_many_raids` (at most 2 raids or ambushes at once per player).
+- **Where the crews are:** inside the ambush movement. They are not garrison, not siege presence and not fog presence while waiting.
+- **Interception:** an enemy haul whose route uses the street is struck once, at the moment it crosses the middle of the street. A given haul is struck at most once per ambush. Your own convoys are never hit. Neutral and civic traders have no convoys, so nothing happens to them (market trades are instant).
+- **Combat:** two seeded rolls, each 80 to 120 percent of its base. Raiders: total crew strength. Guard: carrier toughness, plus the first escort crew at half strength, plus any other escort crews at full strength. A haul with no crew has only the carrier toughness.
+- **Raiders win:** they take 40 percent of each good in the cargo (capped by the room in the raiders' carrier, 5 units per crew on foot), 15 percent of what remains is destroyed, the escort loses at least 1 point (10 percent) of strength, and the haul carries on with what is left. If the raiders' carrier is full (1 unit or less of room left) the ambush ends early. A successful raid on a haul bound for a hub nudges that hub's reference price for the stolen goods up 4 percent.
+- **Raiders lose:** they lose at least 1 point (30 percent) of strength and the ambush ends (`repelled`). The haul is untouched.
+- **When it ends** (window over, full, repelled or recalled) the ambush becomes a `return` movement. The loot is deposited when the crews arrive home. A recalled ambush walks home at once. Known loophole: a haul that has been recalled cannot be struck on its way back (only outbound hauls have strike events).
+- **Escort:** haul orders already take `crewIds`, up to the carrier's seats. Escorts are not a new order.
+- **Not covered:** settle supply carriers are not intercepted (only hauls). Newbie protection does not exempt a player from raids (open question for the owner).
+
+### Fog
+
+An ambush is hidden unless the street's end `a` or `b` is in sight; then the viewer gets `ambushes: [{ id, owner, edge, untilMs }]` and nothing about crews. Ambushes are never in `convoys`. The raider's own ambush is in `movements`. The target learns only when hit (`raid.hit`).
+
+### Events
+
+| Event           | Actors     | Data                                                                                                                 |
+| --------------- | ---------- | -------------------------------------------------------------------------------------------------------------------- |
+| `raid.set`      | raider     | `movementId`, `edge`, `untilMs`, `crewIds` (on arrival)                                                              |
+| `raid.hit`      | both sides | `movementId`, `haulId`, `stolen`, `destroyed`, `remaining` (goods in units), `raiderStrength`, `guard`, `escortLost` |
+| `raid.repelled` | both sides | `movementId`, `haulId`, `raiderStrength`, `guard`, `raiderLost`                                                      |
+| `raid.ended`    | raider     | `movementId`, `reason` (`expired`, `recalled`, `repelled`, `full`), `loot` (units), `struck`                         |
+
+`arrived` now also carries `cargo` and `sent` (units), so a haul's goods can be checked: `sent = cargo + stolen + destroyed`.
+
+### Bots
+
+Raiders, while campaigning, check once an hour: with a base that has 2 idle crews and a van, and no raid out, they ambush the last street of a rival district's route to its nearest hub, the one closest to home, for 6 h. Server bots cannot see enemy convoys, so they guess the street. Merchants send a second crew as escort on hauls of 30 units or more. Both use the normal order path.
+
+### Pros and cons, in plain words
+
+- Raiding: cheap, no siege needed, and a hit pays in goods. But two crews sit idle for hours, and a good escort beats them and costs them strength.
+- Escorting: roughly halves what raiders get (100 percent success without escorts against about 60 percent with them in the harness), but a second crew is not building, settling or garrisoning.
+- Both sides are chosen in advance and played out later, so it works with players who are never online together.
+
+### Harness results (`npm run sim:season`, `node scripts/sim-seeds.mjs 1 8`)
+
+| Bot type | Districts per player, before | after | Trade per player, before | after |
+| -------- | ---------------------------- | ----- | ------------------------ | ----- |
+| merchant | 3.56                         | 3.75  | 49.9                     | 55.7  |
+| raider   | 3.94                         | 4.38  | 0                        | 0     |
+| turtle   | 3.31                         | 3.50  | 74.7                     | 74.6  |
+
+Score per player after: merchant 482, raider 594, turtle 509. The raider lead over the best other type is 1.17x on seeds 1 to 8 (1.10x before) and 1.03x on seeds 1 to 5, under the 1.4x limit. Per season: 27 ambushes, 19.5 hits and 13.6 repelled (59 percent of strikes succeed), 126 units stolen and 31 destroyed. Invariant problems stay 0, including goods conservation per haul and for the loot (stolen equals reported loot plus loot still waiting). The determinism hash still matches as one jump and in 60 s ticks (seed 1: `1b6a501904df4f`).
+
+Balance notes: with the first bot cadence (an ambush every 3 hours) merchants lost about 12 percent of districts and 24 percent of trade; raising the raider cadence to hourly made the raiders pay for losses more often and left merchants at or above the earlier numbers. Merchants do not collapse. Numbers are in `balance.raid` and can be tuned freely.
 
 ## Markets
 

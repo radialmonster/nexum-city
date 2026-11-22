@@ -151,6 +151,10 @@ Each phase ends with something you can open, run or test. Tasks and their status
 
 **Done when:** a city with only bots plays a full simulated season with readable, varied outcomes.
 
+### Phase 7: Milestone 2 mechanics
+
+- Raids and escorts (task 71, sim, contracts and bots done; `RULES_VERSION` 2). Then the raids UI (72), contracts board (73), Runner carrier (74), Watchtower and Garage (75) and a Hunter bot (76). Rows are in the tracker.
+
 ### Phase 6: Test season and deploy
 
 - 7-day test season, leaderboard, season end and reset (done, task 61).
