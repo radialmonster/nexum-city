@@ -104,14 +104,14 @@ Live status for [`plan.md`](plan.md). Update this file in the same commit as the
 
 ## Phase 7: Milestone 2 mechanics
 
-| ID  | Task                                                                 | Status | Notes                       |
-| --- | -------------------------------------------------------------------- | ------ | --------------------------- |
-| 71  | Raids and escorts (sim, contracts, server validation, bots, harness) | done   | 2026-11-22; RULES_VERSION 2 |
-| 72  | Raids UI (set an ambush, see ambushes and hits, battle report)       | todo   |                             |
-| 73  | Contracts board                                                      | todo   |                             |
-| 74  | Runner carrier                                                       | todo   |                             |
-| 75  | Watchtower and Garage (sight, wear and repair)                       | todo   |                             |
-| 76  | Hunter bot                                                           | todo   |                             |
+| ID  | Task                                                                 | Status | Notes                                                                       |
+| --- | -------------------------------------------------------------------- | ------ | --------------------------------------------------------------------------- |
+| 71  | Raids and escorts (sim, contracts, server validation, bots, harness) | done   | 2026-11-22; RULES_VERSION 2 (71b follow-ups kept it at 2: nothing deployed) |
+| 72  | Raids UI (set an ambush, see ambushes and hits, battle report)       | todo   |                                                                             |
+| 73  | Contracts board                                                      | todo   |                                                                             |
+| 74  | Runner carrier                                                       | todo   |                                                                             |
+| 75  | Watchtower and Garage (sight, wear and repair)                       | todo   |                                                                             |
+| 76  | Hunter bot                                                           | todo   |                                                                             |
 
 ## Playtest findings
 
@@ -161,3 +161,4 @@ QA playthrough of the production build as a new player (2026-11-22). Fixed in th
 - 2026-11-22: Camera pans on selection so the plot and its full radial clear the HUD cards (`panToFit`, measured HUD rects, `--duration-slow`, reduced-motion aware, temporary overscroll for edge plots). On phones a plot tap now shows the radial on the Map tab; a DETAILS item opens the District tab (an order is plot, order, confirm: three taps, the crew is pre-picked). Design doc updated.
 - 2026-11-22: Selection and phone polish. The camera overscroll now iterates until the pan target is reachable (a world smaller than the viewport pinned the camera and left the radial about 11 px short, so it flipped to a half ring), plus a 3 px fit slack; the full ring is used whenever it fits. On phones the SECTOR readout and RECENTRE are hidden and the view and zoom controls form one row of 44 px targets, and the ORDERS tab drops the time axis and puts SHOW and RECALL under each order. Verified on the phone: plot, SCOUT, confirm, ORDERS entry; DETAILS opens the DISTRICT tab; the water band is slim and clear of the controls; with `prefers-reduced-motion` the radial settles at once instead of easing over about 400 ms. The design doc now says an order is three taps (plot, order, confirm), not two.
 - 2026-11-22: Task 71 done. Raids and escorts in the sim (see sim-spec, "Raids and escorts (M2)"): raid order, ambush that strikes enemy hauls once as they cross a street, escorts via haul crews, fog, four events, hub price nudge, raider and merchant bot changes, per-haul goods conservation in the harness. Contracts and server accept the order; `RULES_VERSION` is 2, so the live season closes on deploy. Seeds 1 to 8: raider lead 1.17x, merchants 3.75 districts, invariants 0. No client UI yet (tasks 72 to 76).
+- 2026-11-22: Task 71b, raid follow-ups decided by the owner. Newbie-protected players' convoys cannot be struck (a shield on the target only, as with sieges; protected players may still ambush). Settle supply carriers can be raided; a short carrier fails the settlement as `raided` and the leftovers go home. A recalled convoy can be struck on the way back. Raider bots stay fog-honest (documented as intentional) and skip protected rivals. `RULES_VERSION` stays 2 because nothing containing it has been deployed. Seeds 1 to 8: raider lead 1.15x, merchants 3.38 districts and 47.5 trade (3.75 and 55.7 before), raid success 88 percent, invariants 0.
