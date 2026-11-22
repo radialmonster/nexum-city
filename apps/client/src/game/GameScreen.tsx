@@ -214,6 +214,7 @@ export function GameScreen() {
       }}
       onBreakUp={breakUp}
       onHaulSurplus={haulSurplus}
+      notices={state.charges}
     />
   );
   const side = (

@@ -14,3 +14,9 @@
 .dot {
   filter: drop-shadow(0 0 var(--space-2xs) var(--k));
 }
+
+.mark {
+  stroke-width: var(--border-thin);
+  stroke-dasharray: 2 2;
+  opacity: 0.5;
+}

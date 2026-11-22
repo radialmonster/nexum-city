@@ -10,6 +10,7 @@ import { clearUnderway, findAmbush } from './clearAmbush';
 import { isOwn } from './derive';
 import type { OrderDraft } from './store';
 import { surplusHaulDraft } from './surplus';
+import type { ChargeNotice } from './economy';
 
 export interface FeedPanelProps {
   readonly view: PlayerView;
@@ -25,6 +26,8 @@ export interface FeedPanelProps {
   readonly onBreakUp?: ((ambushId: string) => void) | undefined;
   /** Opens a prefilled haul that sells a full plot's surplus at the nearest hub. */
   readonly onHaulSurplus?: ((draft: OrderDraft) => void) | undefined;
+  /** Daily city charges (tax and upkeep) to list above the events, oldest first. */
+  readonly notices?: readonly ChargeNotice[] | undefined;
   /** Entries to show, newest first. */
   readonly limit?: number;
 }
@@ -50,6 +53,7 @@ export function FeedPanel({
   onReport,
   onBreakUp,
   onHaulSurplus,
+  notices = [],
   limit = 40,
 }: FeedPanelProps) {
   const entries = feedEntries(view, feed, limit, names);
@@ -67,6 +71,32 @@ export function FeedPanel({
       tag={away === null ? 'FIRST VISIT' : `${away} / ${String(fresh)} NEW`}
       className={styles['feed']}
     >
+      {notices.length > 0 && (
+        <ul className={styles['list']} aria-label="City charges">
+          {[...notices].reverse().map((n) => (
+            <li key={`charge-${String(n.atMs)}`} data-testid="charge-notice">
+              <div
+                className={cx(
+                  styles['entry'],
+                  styles['notice'],
+                  n.atMs > lastSeenMs && styles['fresh'],
+                )}
+                style={vars({ '--k': toneColor('warn') })}
+              >
+                <span className={styles['glyph']} aria-hidden="true">
+                  $
+                </span>
+                <span className={styles['body']}>
+                  <span className={styles['kind']}>
+                    CITY TAX <small>{ago(nowMs, n.atMs)}</small>
+                  </span>
+                  <span className={styles['text']}>{n.text}</span>
+                </span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
       {entries.length === 0 ? (
         <p className={styles['empty']}>Quiet so far. Events will show up here.</p>
       ) : (

@@ -405,6 +405,29 @@ export function describeEvent(
         text: `${side} ${formatUnits(qty)} ${good} at ${price.toFixed(2)} each in ${name(placeId)}.`,
       };
     }
+    case 'market.shortage': {
+      const good = str(d, 'good') ?? 'goods';
+      const hours = num(d, 'hours');
+      const pct = num(d, 'refPercent') ?? 40;
+      const span = hours === undefined ? '' : ` for ${String(hours)}h`;
+      return {
+        ...base,
+        kind: 'SHORTAGE',
+        glyph: '!',
+        tone: 'warn',
+        text: `${name(placeId)} is short of ${good}: prices +${String(pct)}%${span}. Sell ${good} there.`,
+      };
+    }
+    case 'market.shortage.ended': {
+      const good = str(d, 'good') ?? 'goods';
+      return {
+        ...base,
+        kind: 'SHORTAGE',
+        glyph: '.',
+        tone: 'news',
+        text: `${name(placeId)} is no longer short of ${good}. Prices are back to normal.`,
+      };
+    }
     case 'frontier.opened': {
       const plot = placeId ? view.districts[placeId] : undefined;
       const kind = str(d, 'kind') ?? plot?.kind;

@@ -96,3 +96,7 @@
   padding: var(--space-xs) var(--space-md);
   border-left: var(--border-thick) solid var(--color-line);
 }
+
+.notice {
+  cursor: default;
+}

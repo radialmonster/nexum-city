@@ -2,6 +2,7 @@ import type { CrewNames } from './derive';
 import type { FeedItem, PlayerView } from '@nexum/contracts';
 import { useContext, useSyncExternalStore, createContext } from 'react';
 import type { Tone } from '../ui';
+import { chargeNotice, type ChargeNotice } from './economy';
 
 export const FEED_KEEP = 200;
 
@@ -54,6 +55,8 @@ export interface GameState {
   /** Asks the map to fly to a district; `n` makes a repeated request to the same place count. */
   readonly flyTo: { readonly id: string; readonly n: number } | null;
   readonly draft: OrderDraft | null;
+  /** Daily city charges seen since the page opened, oldest first. */
+  readonly charges: readonly ChargeNotice[];
 }
 
 export const initialState: GameState = {
@@ -70,6 +73,7 @@ export const initialState: GameState = {
   selected: null,
   flyTo: null,
   draft: null,
+  charges: [],
 };
 
 export type GameAction =
@@ -119,13 +123,17 @@ export function reduce(state: GameState, action: GameAction): GameState {
         lastSeenMs: action.lastSeenMs,
         names: action.names ?? state.names,
       };
-    case 'view':
+    case 'view': {
+      const notice = chargeNotice(state.view, action.view);
+      const seen = notice !== null && state.charges.some((c) => c.atMs === notice.atMs);
       return {
         ...state,
         view: action.view,
         viewAt: action.at,
         names: action.names ?? state.names,
+        ...(notice && !seen ? { charges: [...state.charges, notice].slice(-8) } : {}),
       };
+    }
     case 'feed': {
       const feed = mergeFeed(state.feed, action.items);
       if (feed === state.feed) return state;

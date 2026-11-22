@@ -6,6 +6,8 @@ export interface SparklineProps {
   readonly tone?: Tone;
   readonly label: string;
   readonly className?: string | undefined;
+  /** Index of a point to mark with a thin vertical line (for example, your last visit). */
+  readonly markAt?: number | null | undefined;
 }
 
 const WIDTH = 90;
@@ -13,7 +15,13 @@ const HEIGHT = 24;
 const PAD = 3;
 
 /** Inline price trend. The line and end dot use `currentColor`, set from the tone. */
-export function Sparkline({ points, tone = 'accent', label, className }: SparklineProps) {
+export function Sparkline({
+  points,
+  tone = 'accent',
+  label,
+  className,
+  markAt = null,
+}: SparklineProps) {
   const min = Math.min(...points);
   const max = Math.max(...points);
   const span = max - min || 1;
@@ -23,6 +31,7 @@ export function Sparkline({ points, tone = 'accent', label, className }: Sparkli
     HEIGHT - PAD - ((p - min) / span) * (HEIGHT - 2 * PAD),
   ]);
   const last = coords[coords.length - 1];
+  const mark = markAt === null ? undefined : coords[markAt];
   return (
     <svg
       className={cx(styles['spark'], className)}
@@ -31,6 +40,16 @@ export function Sparkline({ points, tone = 'accent', label, className }: Sparkli
       role="img"
       aria-label={label}
     >
+      {mark !== undefined && (
+        <line
+          className={styles['mark']}
+          x1={mark[0]}
+          x2={mark[0]}
+          y1={0}
+          y2={HEIGHT}
+          stroke="currentColor"
+        />
+      )}
       <polyline
         className={styles['line']}
         points={coords.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ')}

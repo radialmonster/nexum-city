@@ -3,6 +3,7 @@ import {
   errorResponseSchema,
   etaResponseSchema,
   feedResponseSchema,
+  marketHistoryResponseSchema,
   meResponseSchema,
   okResponseSchema,
   placeOrderResponseSchema,
@@ -11,6 +12,7 @@ import {
   type AuthResponse,
   type EtaResponse,
   type FeedResponse,
+  type MarketHistoryResponse,
   type MeResponse,
   type OrderBody,
   type SeasonsResponse,
@@ -105,4 +107,9 @@ export const api = {
     const qs = p.toString();
     return call(`/feed${qs ? `?${qs}` : ''}`, feedResponseSchema);
   },
+  history: (hub: string, good: string): Promise<MarketHistoryResponse> =>
+    call(
+      `/market/history?hub=${encodeURIComponent(hub)}&good=${encodeURIComponent(good)}`,
+      marketHistoryResponseSchema,
+    ),
 };
