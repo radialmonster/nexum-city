@@ -22,6 +22,12 @@ for (const perks of [false, true]) {
   console.log(
     `  first completion at minute avg=${first1.length ? (first1.reduce((a, b) => a + b, 0) / first1.length).toFixed(1) : 'never'} (${first1.length}/${rows.length} seeds)`,
   );
+  const mins = (f) => rows.map(f).filter((m) => m !== null);
+  const settled = mins((r) => r.settleMin);
+  const paid = mins((r) => r.starterPaidMin);
+  console.log(
+    `  settle accepted in ${settled.filter((m) => m < 15).length}/${rows.length} seeds within 15 min, ${settled.length}/${rows.length} within 30 (avg minute ${settled.length ? (settled.reduce((a, b) => a + b, 0) / settled.length).toFixed(1) : '-'}); starter contract paid in ${paid.length}/${rows.length} seeds within 30 min`,
+  );
   const kinds = {};
   for (const r of rows)
     for (const [k, n] of Object.entries(r.kinds)) kinds[k] = (kinds[k] ?? 0) + n;

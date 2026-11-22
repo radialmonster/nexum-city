@@ -14,8 +14,9 @@ import { addPlayer, createWorld } from './world.js';
  * the distinct meaningful actions the game accepted and the things that finished.
  *
  * The script, in the order it tries things each minute: buy supplies at the nearest hub, build a
- * workshop, take a street job whenever a crew is free, take the starter contract and haul it
- * to the hub, recruit a crew, and settle a plot. Whatever the game refuses is simply tried
+ * workshop, take the starter contract and haul it to the hub, settle a plot (as soon as 60
+ * supplies are home and the first street job is done), take street jobs whenever a crew is free,
+ * and recruit a crew once the settle is in. Whatever the game refuses is simply tried
  * again next minute. It is a fixture, not a player model: it shows how much there is to do and
  * how much of it finishes, not how well anyone plays.
  */
@@ -32,6 +33,10 @@ export interface SessionResult {
   kinds: Record<string, number>;
   /** Minute of the first completion, or null. */
   firstCompletionMin: number | null;
+  /** Minute the game first accepted a settle order, or null (the aim is within 30). */
+  settleMin: number | null;
+  /** Minute the starter contract was paid, or null. */
+  starterPaidMin: number | null;
 }
 
 const DONE: SimEventKind[] = [
@@ -75,6 +80,8 @@ export function firstSession(seed: number, perks: boolean): SessionResult {
     completions30: 0,
     kinds,
     firstCompletionMin: null,
+    settleMin: null,
+    starterPaidMin: null,
   };
   const count = (kind: string, minute: number): void => {
     kinds[kind] = (kinds[kind] ?? 0) + 1;
@@ -84,6 +91,7 @@ export function firstSession(seed: number, perks: boolean): SessionResult {
   count('claim', 0);
 
   const done = new Set<string>();
+  let jobsDone = 0;
   for (let minute = 0; minute < 30; minute++) {
     const at = t0 + minute * MS_PER_MINUTE;
     const batch: Input[] = [];
@@ -130,6 +138,11 @@ export function firstSession(seed: number, perks: boolean): SessionResult {
       return true;
     };
 
+    const spare = (): Id | undefined => {
+      const free = crews.filter((c) => idleIds.has(c.id) && !used.has(c.id));
+      const keep = starterWaiting() ? 1 : 0;
+      return free.length > keep ? free[0]?.id : undefined;
+    };
     if (hub) {
       const book = s.markets[hub]?.['supplies'];
       if (book) {
@@ -156,7 +169,7 @@ export function firstSession(seed: number, perks: boolean): SessionResult {
       );
       const crew = idle();
       if (mineTaken && crew && !done.has('haul')) {
-        attempt('haul', 'haul', {
+        const haulOk = attempt('haul', 'haul', {
           type: 'haul',
           carrierId: van ?? null,
           crewIds: [crew],
@@ -164,15 +177,15 @@ export function firstSession(seed: number, perks: boolean): SessionResult {
           cargo: { [mineTaken.good]: mineTaken.qty },
           contractId: mineTaken.id,
         });
+        if (haulOk && van) used.add(van);
       }
       // Street jobs: quick ones first, a courier run with the van. The crew for the starter haul
       // is kept back until that haul has left.
-      const spare = (): Id | undefined => {
-        const free = crews.filter((c) => idleIds.has(c.id) && !used.has(c.id));
-        const keep = starterWaiting() ? 1 : 0;
-        return free.length > keep ? free[0]?.id : undefined;
-      };
-      for (const job of [...player.jobs].sort((x, y) => x.minutes - y.minutes)) {
+      // After the first quick errand is done the next crew that frees up is kept for the settle.
+      const holdForSettle = jobsDone >= 1 && !done.has('settle');
+      for (const job of holdForSettle
+        ? []
+        : [...player.jobs].sort((x, y) => x.minutes - y.minutes)) {
         const free = spare();
         if (!free) break;
         const carrier = job.kind === 'courier' && van && !used.has(van) ? van : null;
@@ -187,32 +200,40 @@ export function firstSession(seed: number, perks: boolean): SessionResult {
           if (carrier) used.add(carrier);
         }
       }
+      // Settle last: it takes whatever crew the quick jobs and the starter haul left free.
+      const plot = Object.values(s.districts)
+        .filter((d) => d.kind !== 'hub' && d.owner === 'neutral' && d.frontier === 'open')
+        .sort(
+          (a, b) =>
+            (shortestRoute(s.graph, home.id, a.id)?.lengthM ?? 1e9) -
+            (shortestRoute(s.graph, home.id, b.id)?.lengthM ?? 1e9),
+        )[0];
+      const settler = spare();
+      if (plot && settler) {
+        if (
+          attempt('settle', 'settle', {
+            type: 'settle',
+            carrierId: van && !used.has(van) ? van : null,
+            crewIds: [settler],
+            target: plot.id,
+          })
+        ) {
+          result.settleMin ??= minute;
+          if (van) used.add(van);
+        }
+      }
     }
     const homeNow = s.districts[home.id];
-    if (homeNow && minute >= 1)
+    // Recruiting costs 20 supplies, so it waits until the settle (60 supplies) has been sent.
+    if (homeNow && minute >= 1 && done.has('settle'))
       attempt('recruit', 'recruit', { type: 'recruit', districtId: home.id });
-    const plot = Object.values(s.districts)
-      .filter((d) => d.kind !== 'hub' && d.owner === 'neutral' && d.frontier === 'open')
-      .sort(
-        (a, b) =>
-          (shortestRoute(s.graph, home.id, a.id)?.lengthM ?? 1e9) -
-          (shortestRoute(s.graph, home.id, b.id)?.lengthM ?? 1e9),
-      )[0];
-    const crew = idle();
-    if (plot && crew) {
-      attempt('settle', 'settle', {
-        type: 'settle',
-        carrierId: van ?? null,
-        crewIds: [crew],
-        target: plot.id,
-      });
-    }
-
     const r = step(s, batch, at + MS_PER_MINUTE);
     s = r.state;
     for (const e of r.events) {
       if (DONE.includes(e.kind) && (e.actors.includes(me) || e.kind === 'trade.filled')) {
         if (e.kind === 'trade.filled' && !e.actors.includes(me)) continue;
+        if (e.kind === 'job.done') jobsDone += 1;
+        if (e.kind === 'contract.done') result.starterPaidMin ??= minute;
         if (minute < 15) result.completions15 += 1;
         result.completions30 += 1;
         result.firstCompletionMin ??= minute;
