@@ -127,7 +127,10 @@ export function ContractsBoard({
                   TAKEN BY <b>{takerName(names, me, c)}</b>
                 </span>
                 <span>
-                  DEPOSIT <b>{formatUnits(creditsOf(depositFor(c.reward)))} cr</b>
+                  DEPOSIT{' '}
+                  <b>
+                    {c.reservedFor ? 'none' : `${formatUnits(creditsOf(depositFor(c.reward)))} cr`}
+                  </b>
                 </span>
               </p>
               <div className={styles['actions']}>

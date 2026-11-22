@@ -125,6 +125,7 @@ export function GameScreen() {
 
   /** The first hub you can see: the resource chips open its market. */
   const firstHub = Object.values(view.districts).find((d) => d.relation === 'hub')?.id;
+  const openPlots = Object.values(view.districts).filter((d) => 'open' in d && d.open).length;
   const openMarket = (hub: string, good?: GoodName) => {
     if (!steps.openedMarket) updateSteps({ openedMarket: true });
     setPanel({ kind: 'market', hub, ...(good ? { good } : {}) });
@@ -254,7 +255,10 @@ export function GameScreen() {
                   {
                     id: 'settle',
                     label: 'Settle a frontier plot',
-                    hint: 'Send a crew to an open plot to claim it. Keep 60 supplies in your home warehouse: settling spends them.',
+                    hint:
+                      openPlots > 0
+                        ? 'Send a crew to an open plot to claim it. Keep 60 supplies in your home warehouse: settling spends them.'
+                        : 'No plot is open yet: the city surveys new ones for about 4 h. Keep 60 supplies in your home warehouse for then: settling spends them.',
                     done: Object.values(view.districts).filter(isOwn).length > 1,
                   },
                   {

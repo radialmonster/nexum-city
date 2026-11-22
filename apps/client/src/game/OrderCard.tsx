@@ -187,7 +187,16 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
         : (nodes[0] ?? null),
   );
   const [picked, setPicked] = useState<readonly string[] | null>(null);
-  const [carrierId, setCarrierId] = useState<string | null>(suggestion?.carrierId ?? null);
+  const [carrierId, setCarrierId] = useState<string | null>(
+    suggestion?.carrierId ??
+      // a contract has a deadline and a crew on foot is slow: start from the quickest carrier here
+      (draft.kind === 'haul' && draft.contractId && from
+        ? (carriersAt(view, from)
+            .filter((c) => !balance.carriers[c.kind].locked)
+            .sort((x, y) => balance.carriers[y.kind].speed - balance.carriers[x.kind].speed)[0]
+            ?.id ?? null)
+        : null),
+  );
   const [cargo, setCargo] = useState<Record<string, number>>({ ...draft.cargo });
   const [building, setBuilding] = useState<Pick['building']>('workshop');
   const [busy, setBusy] = useState(false);

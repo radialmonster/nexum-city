@@ -46,7 +46,9 @@ export function contractSentence(view: PlayerView, c: ContractView): string {
   return (
     `Bring ${formatUnits(c.qty)} ${c.good} to ${hubName(view, c.hub)} within ${String(c.hours)} h. ` +
     `Pays ${formatUnits(creditsOf(c.reward))} cr. ` +
-    `Deposit ${formatUnits(creditsOf(c.deposit > 0 ? c.deposit : depositFor(c.reward)))} cr, lost if late.`
+    (c.reservedFor
+      ? 'No deposit for your starter contract.'
+      : `Deposit ${formatUnits(creditsOf(c.deposit > 0 ? c.deposit : depositFor(c.reward)))} cr, lost if late.`)
   );
 }
 

@@ -64,7 +64,7 @@ export function describeContract(
     case 'contract.taken': {
       const text =
         taker === me
-          ? `You took a job: bring ${job} before the deadline. Deposit ${fmt(num(d, 'deposit'))} cr, lost if late.`
+          ? `You took a job: bring ${job} before the deadline. ${num(d, 'deposit') > 0 ? `Deposit ${fmt(num(d, 'deposit'))} cr, lost if late.` : 'No deposit.'}`
           : poster === me
             ? `${who(taker)} took your job: ${job}. They have until the deadline.`
             : `${who(taker)} took a job at ${hubName}: ${job}.`;
