@@ -93,6 +93,33 @@ describe('contracts mirror the sim', () => {
     expect(board.map((s) => standingSchema.parse(s))).toEqual(board);
   });
 
+  it('carries worn carriers, tower levels and the new event kinds', () => {
+    let state: GameState = addPlayer(createWorld(1), { id: 'p1', districtId: 'd0_0' });
+    state = addPlayer(state, { id: 'p2', districtId: 'd5_3' });
+    const van = Object.values(state.carriers).find((c) => c.owner === 'p1');
+    if (!van) throw new Error('no van');
+    van.wear = 55;
+    const d = state.districts['d1_0'];
+    if (d) d.buildings.push({ type: 'watchtower', level: 2 });
+    const view = viewFor(state, 'p1');
+    const parsed = playerViewSchema.parse(view);
+    expect(parsed.carriers[van.id]?.wear).toBe(55);
+    const seen = Object.values(parsed.districts).find((x) => x.id === 'd1_0');
+    expect(seen && 'watchtower' in seen ? seen.watchtower : 0).toBe(2);
+    // An unworn carrier needs no `wear`, and an older view without `watchtower` still parses.
+    const plain = Object.values(parsed.carriers).find((c) => c.id !== van.id);
+    expect(plain === undefined || plain.wear === undefined).toBe(true);
+    for (const kind of ['carrier.worn', 'carrier.repaired', 'raid.spotted'] as const) {
+      expect(SIM_EVENT_KINDS).toContain(kind);
+    }
+    expect(
+      orderSchema.safeParse({ type: 'build', districtId: 'd0_0', building: 'garage' }).success,
+    ).toBe(true);
+    expect(
+      orderSchema.safeParse({ type: 'build', districtId: 'd0_0', building: 'watchtower' }).success,
+    ).toBe(true);
+  });
+
   it('parses a newcomer view: rush, street jobs, the reserved starter contract and a job under way', () => {
     let state: GameState = addPlayer(createWorld(1), { id: 'p1', districtId: 'd0_0' });
     const before = viewFor(state, 'p1');
