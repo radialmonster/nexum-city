@@ -4,6 +4,8 @@
   "references": [
     { "path": "./packages/theme" },
     { "path": "./packages/theme/tsconfig.test.json" },
+    { "path": "./packages/sim" },
+    { "path": "./packages/sim/tsconfig.test.json" },
     { "path": "./tsconfig.tools.json" }
   ]
 }
