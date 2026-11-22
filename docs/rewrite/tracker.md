@@ -104,19 +104,20 @@ Live status for [`plan.md`](plan.md). Update this file in the same commit as the
 
 ## Phase 7: Milestone 2 mechanics
 
-| ID  | Task                                                                                                                | Status | Notes                                                                       |
-| --- | ------------------------------------------------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------------- |
-| 71  | Raids and escorts (sim, contracts, server validation, bots, harness)                                                | done   | 2026-11-22; RULES_VERSION 2 (71b follow-ups kept it at 2: nothing deployed) |
-| 72  | Raids UI (set an ambush, see ambushes and hits, battle report)                                                      | done   |                                                                             |
-| 73a | Contracts board (sim, contracts, server snapshot upgrade, bots, harness)                                            | done   | 2026-11-22; RULES_VERSION 3, SNAPSHOT_VERSION 2                             |
-| 73b | Contracts UI (board at a hub, post, take, haul for a contract, feed cards)                                          | done   | 2026-11-22; no sim change                                                   |
-| 74  | Runner carrier (sim, contracts, bots, harness)                                                                      | done   | 2026-11-22; RULES_VERSION stays 3, no snapshot change                       |
-| 74b | Runner UI (buy a Runner, pick it as a carrier, evaded feed card)                                                    | done   | order `carrier.buy`, events `carrier.bought` and `raid.evaded` in sim-spec  |
-| 77  | Newcomer rush and street jobs (sim, contracts, server snapshot, bots, harness)                                      | done   | 2026-11-22; RULES_VERSION stays 3, SNAPSHOT_VERSION upgrade 2 to 3          |
-| 77b | Rush and street jobs UI (rush banner, street jobs panel, starter-contract highlight, first-steps checklist)         | done   | order `job.take`, events `job.done`, `job.failed`, `rush.ended` in sim-spec |
-| 75  | Watchtower and Garage (sight, wear and repair, sim)                                                                 | done   | 2026-11-22; RULES_VERSION stays 3, no snapshot change (optional wear)       |
-| 75b | Watchtower and Garage UI (tower level on the map, carrier wear bar, warnings, per-building max level, Runner price) | done   | events carrier.worn, carrier.repaired, raid.spotted; see sim-spec           |
-| 76  | Hunter bot                                                                                                          | todo   |                                                                             |
+| ID  | Task                                                                                                                | Status | Notes                                                                         |
+| --- | ------------------------------------------------------------------------------------------------------------------- | ------ | ----------------------------------------------------------------------------- |
+| 71  | Raids and escorts (sim, contracts, server validation, bots, harness)                                                | done   | 2026-11-22; RULES_VERSION 2 (71b follow-ups kept it at 2: nothing deployed)   |
+| 72  | Raids UI (set an ambush, see ambushes and hits, battle report)                                                      | done   |                                                                               |
+| 73a | Contracts board (sim, contracts, server snapshot upgrade, bots, harness)                                            | done   | 2026-11-22; RULES_VERSION 3, SNAPSHOT_VERSION 2                               |
+| 73b | Contracts UI (board at a hub, post, take, haul for a contract, feed cards)                                          | done   | 2026-11-22; no sim change                                                     |
+| 74  | Runner carrier (sim, contracts, bots, harness)                                                                      | done   | 2026-11-22; RULES_VERSION stays 3, no snapshot change                         |
+| 74b | Runner UI (buy a Runner, pick it as a carrier, evaded feed card)                                                    | done   | order `carrier.buy`, events `carrier.bought` and `raid.evaded` in sim-spec    |
+| 77  | Newcomer rush and street jobs (sim, contracts, server snapshot, bots, harness)                                      | done   | 2026-11-22; RULES_VERSION stays 3, SNAPSHOT_VERSION upgrade 2 to 3            |
+| 77b | Rush and street jobs UI (rush banner, street jobs panel, starter-contract highlight, first-steps checklist)         | done   | order `job.take`, events `job.done`, `job.failed`, `rush.ended` in sim-spec   |
+| 75  | Watchtower and Garage (sight, wear and repair, sim)                                                                 | done   | 2026-11-22; RULES_VERSION stays 3, no snapshot change (optional wear)         |
+| 75b | Watchtower and Garage UI (tower level on the map, carrier wear bar, warnings, per-building max level, Runner price) | done   | events carrier.worn, carrier.repaired, raid.spotted; see sim-spec             |
+| 76  | Hunter bot, and bots that shop for parts and build (sim, harness, server roster)                                    | done   | 2026-11-22; RULES_VERSION stays 3, no snapshot change; clear-ambush not built |
+| 76b | Hunter UI (faction colour already exists; show the hunter in the roster and the Bot building notes)                 | todo   | no new shapes; `hunter` is a new bot kind and the harness has `raidsAgainst`  |
 
 ## Playtest findings
 
@@ -134,6 +135,8 @@ QA playthrough of the production build as a new player (2026-11-22). Fixed in th
 | P8  | The neutral tag style is inconsistent with other tags                                                                                      | done   |                                               |
 
 ## Log
+
+- 2026-11-22: Task 76 done. Bots now shop for building goods at hubs, fetch them home and build by personality; a new Hunter bot patrols with escorted hauls and watchtowers and is struck less than the field. The optional clear-ambush order was left out (see "Hunter bot" in the sim spec). RULES_VERSION stays 3.
 
 - 2026-11-22: Playtest findings P1 to P8 fixed. Siege root cause: a crew was pre-ticked on the order card, so ticking "a crew" unticked it and LAY SIEGE went grey with only a small blocker line; the API and engine accepted the same order (202), so no request was sent. The card now outlines ticked crews, says "N crew picked" or "No crew picked: tick one above", and a test covers the card to API to engine path (server tests settle and siege through `/api/orders`). Settle now has a UI: `viewFor` exposes `open` and `settling` (owner and completion time only, no crew ids or start time) on seen plots, the map draws open plots (dashed accent) and settlements (dashed in the settler colour), the radial menu offers SETTLE, the card shows 60 supplies and 10 h from the balance, the timeline shows SETTLING, the feed words `settle.*` and the district panel says OPEN PLOT or BEING SETTLED. Also: crews read as "Crew N", "Odds unknown: scout first" under fog, the camera offsets for the HUD sector card, a login blurb, market placeholders, a hub-stash note and a HAUL HOME shortcut, the radial menu closes behind an order card, and an unclaimed plot gets the neutral tag.
 - 2026-11-22: Playtest pass (new player, 2560/1920/390). Register, login, reload, logout/in, market, build, scout, feed events after a dev clock advance and /hall all work; no console errors beyond the expected logged-out 401. Added the dismissible first-steps checklist (localStorage), clearer build shortfall text, crew pre-pick on order cards and a favicon; the rest is under Playtest findings.

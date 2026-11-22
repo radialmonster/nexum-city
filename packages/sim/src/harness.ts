@@ -48,6 +48,8 @@ export interface SeasonResult {
   raidsEvaded: number;
   /** Diagnostic: strikes by target label (job, contract, haul, settle, runner; +escort). */
   raidTargets: Record<string, { hit: number; repelled: number; evaded: number }>;
+  /** Strikes by the player whose haul was struck (the second actor), to compare bot types. */
+  raidsAgainst: Record<string, { hit: number; repelled: number; evaded: number }>;
   /** Diagnostic: summed raider strength and guard over decided fights. */
   raidFights: { raiderStrength: number; guard: number; n: number };
   /** Diagnostic: per raider player, ambushes set, hits, repels and strength lost. */
@@ -80,7 +82,7 @@ export interface SeasonResult {
 /** The early-income checkpoint: 48 game hours. */
 const EARLY_MS = 48 * 3_600_000;
 
-const DEFAULT_BOTS: BotKind[] = ['raider', 'raider', 'turtle', 'turtle', 'merchant', 'merchant'];
+const DEFAULT_BOTS: BotKind[] = ['raider', 'raider', 'turtle', 'merchant', 'merchant', 'hunter'];
 
 /** A fresh world with the bots joined at game time 0. */
 export function seasonStart(options: SeasonOptions = {}): {
@@ -121,6 +123,7 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
   let raidsRepelled = 0;
   let raidsEvaded = 0;
   const raidTargets: SeasonResult['raidTargets'] = {};
+  const raidsAgainst: SeasonResult['raidsAgainst'] = {};
   const raidFights = { raiderStrength: 0, guard: 0, n: 0 };
   const raidsBy: SeasonResult['raidsBy'] = {};
   const raidOf = (id: unknown): SeasonResult['raidsBy'][string] =>
@@ -128,6 +131,8 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
   const tally = (e: SimEvent, field: 'hit' | 'repelled' | 'evaded'): void => {
     const t = (raidTargets[String(e.data['target'])] ??= { hit: 0, repelled: 0, evaded: 0 });
     t[field] += 1;
+    const v = (raidsAgainst[String(e.actors[1])] ??= { hit: 0, repelled: 0, evaded: 0 });
+    v[field] += 1;
     if (field !== 'evaded') {
       raidFights.raiderStrength += Number(e.data['raiderStrength']);
       raidFights.guard += Number(e.data['guard']);
@@ -351,6 +356,7 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
     raidsRepelled,
     raidsEvaded,
     raidTargets,
+    raidsAgainst,
     raidFights,
     raidsBy,
     runnersBought,

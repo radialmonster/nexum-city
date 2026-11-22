@@ -26,7 +26,7 @@ import {
  * the raw state (they are test fixtures, not clients), so they never see anything a player could
  * not act on. They are deliberately simple: they exist to exercise the rules, not to play well.
  */
-export type BotKind = 'raider' | 'turtle' | 'merchant';
+export type BotKind = 'raider' | 'turtle' | 'merchant' | 'hunter';
 
 export type Bot = (state: GameState, me: Id) => Order[];
 
@@ -865,6 +865,46 @@ export const merchant: Bot = (s, me) => {
   return orders;
 };
 
+const HUNTER_BUILDINGS = (_d: District, index: number): BuildingType[] =>
+  index === 0 ? ['watchtower', 'workshop', 'garage'] : ['watchtower', 'workshop'];
+
+/**
+ * Watches the streets: a Watchtower in every district (raiders skip streets under a rival tower
+ * they can see), escorted jobs with two crews in the van, and it holds hauls back while its own
+ * sight shows an ambush on the route. It never attacks.
+ */
+export const hunter: Bot = (s, me) => {
+  const budget = budgetFor(s, me);
+  const want = nextWant(s, me, HUNTER_BUILDINGS);
+  const keep = keepGoods(want);
+  const orders = [
+    ...economy(s, me, budget, 4, HUNTER_BUILDINGS),
+    ...settleOrders(s, me, budget, SETTLE_RESERVE, 1),
+    ...stageGoods(s, me, want),
+  ];
+  const fetch = fetchOrders(s, me, keep);
+  const jobs =
+    fetch.length > 0
+      ? []
+      : contractOrders(s, me, budget, {
+          maxQty: VAN_CARGO,
+          tripPercent: 60,
+          prefer: 'pay',
+          escort: true,
+        });
+  orders.push(
+    ...sellStash(s, me, keep),
+    ...jobs,
+    ...runnerOrders(s, me, budget, MERCHANT_RUNNER_SPARE),
+    ...fetch,
+    ...(jobs.length > 0 || fetch.length > 0 ? [] : haulToHub(s, me, keep, true)),
+    ...resupply(s, me, budget, want),
+    ...shopOrders(s, me, budget, want, MERCHANT_SHOP_RESERVE),
+    ...mine(s, me).map((d): Order => ({ type: 'stance', districtId: d.id, stance: 'hold' })),
+  );
+  return avoidAmbushes(s, me, orders);
+};
+
 /**
  * One street job per check-in, taken last so every other plan keeps its crews. A bot takes the
  * first offer that the normal order check accepts, with the van when one is idle at the
@@ -905,4 +945,5 @@ export const BOTS: Record<BotKind, Bot> = {
   raider: withJobs(raider),
   turtle: withJobs(turtle),
   merchant: withJobs(merchant),
+  hunter: withJobs(hunter),
 };

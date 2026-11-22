@@ -67,7 +67,9 @@ describe('bot roster', () => {
     game.bots?.run();
     const bots = game.store.allBots();
     expect(bots).toHaveLength(6);
-    expect(new Set(bots.map((b) => b.kind))).toEqual(new Set(['raider', 'turtle', 'merchant']));
+    expect(new Set(bots.map((b) => b.kind))).toEqual(
+      new Set(['raider', 'turtle', 'merchant', 'hunter']),
+    );
     expect(new Set(bots.map((b) => b.name)).size).toBe(6);
     for (const b of bots) {
       expect(b.motto.length).toBeGreaterThan(5);

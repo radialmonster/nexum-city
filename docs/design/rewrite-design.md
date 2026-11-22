@@ -218,12 +218,14 @@ All combat resolves automatically from strengths plus some randomness, and produ
 
 Bots play by exactly the same rules and on the same clock. They also visit periodically and issue orders. Each bot has a personality:
 
-| Bot      | Style                                                              |
-| -------- | ------------------------------------------------------------------ |
-| Raider   | Fast strikes on weak targets; raids trade routes                   |
-| Turtle   | Builds walls, defends, expands slowly into neutral land            |
-| Merchant | Trades and hauls; takes high-production districts; posts contracts |
-| Hunter   | Goes after whoever is leading, and after whoever last attacked it  |
+| Bot      | Style                                                                           |
+| -------- | ------------------------------------------------------------------------------- |
+| Raider   | Fast strikes on weak targets; raids trade routes                                |
+| Turtle   | Builds walls, defends, expands slowly into neutral land                         |
+| Merchant | Trades and hauls; takes high-production districts; posts contracts              |
+| Hunter   | Watches the streets: towers everywhere, escorted hauls, never attacks (task 76) |
+
+Bots build what their personality wants (turtle: walls, towers and a depot; merchant: depot, garage, workshop; hunter: watchtowers; raider: a workshop), shopping for parts at the hub markets when their own districts do not make them. Raiders skip shopping because their one van is their raiding engine. Details and numbers are in the "Bot building" and "Hunter bot" sections of `docs/rewrite/sim-spec.md`.
 
 Bots announce their intentions in readable language ("Rival 4 is moving on the city leader"), they avoid piling onto the same target, and they defend their own districts. When real players join, they take empty bot slots or join alongside them.
 

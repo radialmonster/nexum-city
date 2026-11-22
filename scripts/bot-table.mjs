@@ -6,6 +6,7 @@ const n = Number(process.argv[2] ?? 8);
 const days = Number(process.argv[3] ?? 7);
 const agg = {};
 const rates = [];
+const vic = {};
 let hit = 0,
   decided = 0,
   raids = 0;
@@ -17,6 +18,12 @@ for (let seed = 1; seed <= n; seed++) {
   decided += d;
   if (d > 0) rates.push((100 * r.raidHits) / d);
   if (r.problems.length) console.log('PROBLEMS', seed, r.problems.slice(0, 3));
+  for (const [id, t] of Object.entries(r.raidsAgainst ?? {})) {
+    const bot = r.players.find((p) => p.id === id)?.bot ?? 'other';
+    const v = (vic[bot] ??= { hit: 0, n: 0 });
+    v.hit += t.hit;
+    v.n += t.hit + t.repelled + t.evaded;
+  }
   for (const s of r.standings) {
     const bot = r.players.find((p) => p.id === s.playerId).bot;
     const a = (agg[bot] ??= { n: 0, d: 0, c: 0, s: 0, k: 0 });
@@ -31,6 +38,12 @@ console.log(`seeds 1-${n}: type districts credits48 score contracts`);
 for (const [bot, a] of Object.entries(agg)) {
   console.log(
     `  ${bot.padEnd(9)} ${(a.d / a.n).toFixed(2)} ${(a.c / a.n).toFixed(0)} ${(a.s / a.n).toFixed(0)} ${(a.k / a.n).toFixed(2)}`,
+  );
+}
+console.log('raid success against each type:');
+for (const [bot, v] of Object.entries(vic)) {
+  console.log(
+    `  ${bot.padEnd(9)} ${((100 * v.hit) / Math.max(1, v.n)).toFixed(0)}% (${v.hit}/${v.n})`,
   );
 }
 const best = Math.max(

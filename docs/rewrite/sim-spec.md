@@ -585,3 +585,44 @@ Raider lead 1.14x (1.11x before), limit 1.4x. Raid success 58 percent (411 of 71
 ### For the UI (task 75b, done)
 
 Done in task 75b: the client reads the global `maxLevel` of 3 and shows the Runner price from `balance.runner.credits`; it now uses the per-building `maxLevel` and `runnerPrice(district)`, shows `watchtower` on seen districts and `wear` on carriers (a bar, with the slowdown from `slowPercentAt`), and handles the three new events in the feed.
+
+The client still reads the global `maxLevel` of 3 and shows the Runner price from `balance.runner.credits`; both must use the per-building `maxLevel` and `runnerPrice(district)`. Show `watchtower` on seen districts, `wear` on carriers (a bar, with the slowdown from `slowPercentAt`) and toast the three new events.
+
+## Bot building (task 76)
+
+### Why bots barely built
+
+Parts only come from docks districts, and bots never bought parts at the hub markets. Where they did, the goods went to the hub stash and a crew with a van had to haul them home. Four bugs sat on that path: the shopping check counted supplies as a good the build needed, which blocked every purchase; `fetchOrders` used `mine()[0]` as home, and that index shifts as districts are added, so the van waited in the wrong place; goods that reached a full warehouse were discarded (producer districts refill to the cap, 120 units plus 120 per depot level); and merchant street jobs took the crews the fetch needed.
+
+### Rules
+
+- A bot picks its next wanted building per district from a list by personality, buys the short good at the nearest hub (capped by the room in the target warehouse), fetches it home and builds with the normal `build` order. Raiders: a Watchtower, Garage and Workshop at home and a Workshop elsewhere, but they never run building errands. Every errand took their single van off raiding (419 raids without errands, 26 to 120 with any), so they build from what their own districts make and sell the rest.
+- Turtle: walls, watchtower, workshop and depot. Merchant: workshop, depot, and a garage once it runs two carriers.
+- Bots only read their own fog-honest view and send ordinary orders, so rejections stay under 10 percent.
+
+### Results (seeds 1 to 16, invariants 0)
+
+Buildings per player after the change (with the hunter in the mix): raider workshop 1.00, watchtower 0.03; turtle workshop 0.19; merchant workshop 0.91, garage 0.03; hunter workshop 0.88, watchtower 0.13. Before (see "Bots" under Watchtower and Garage): turtle towers 0.09, merchant garage 0.06, no walls or depots at all. Building stays rare because production fills warehouses with one good and a single van is shared between hauling, raiding and shopping. The parts price stayed between 18.0 and 19.8 (base 18). `scripts/building-diag.mjs [seeds] [days]` prints these numbers.
+
+## Hunter bot (task 76)
+
+A new bot personality, `hunter`. It never attacks. It builds a Watchtower in every district it can pay for (raiders skip streets under a rival tower they can see), takes street jobs, runs escorted contract hauls with two crews in the van, and holds a haul while its own sight shows an ambush on the route. Server roster: raider, turtle, merchant, raider, merchant, hunter; the theme already had a hunter faction colour.
+
+### Harness mix
+
+The default mix is now 2 raiders, 1 turtle, 2 merchants, 1 hunter (six players, as before). A seventh player (a second turtle plus the hunter) crowded the map and pushed merchants to 2.31 districts on seeds 1 to 8, under the 2.4 floor; two hunters (eight players) held the floors but gave no clear drop in raid success. One turtle slot became the hunter.
+
+### Results (seeds 1 to 16, invariants 0)
+
+| Seeds 1-16 | Districts | Credits at 48 h | Score | Contracts |
+| ---------- | --------- | --------------- | ----- | --------- |
+| Merchant   | 3.19      | 1071            | 566   | 5.97      |
+| Raider     | 4.72      | 412             | 628   | 0         |
+| Turtle     | 4.63      | 896             | 683   | 4.00      |
+| Hunter     | 2.63      | 1130            | 509   | 6.81      |
+
+Before (merchant 2.47, raider 5.03, turtle 3.75 districts; scores 486, 640, 561). Raider lead 0.92x of the best (limit 1.4x). Raid success 43 percent (233 of 539), per seed min 18, max 75, sd 14; success against hunters 37 percent (89 of 238), against merchants 47 percent, against the turtle 50 percent. The hunter is viable (score 509 against 566 for the merchant). Raid success stays in the 40 to 70 percent band.
+
+### Clear ambush (not built)
+
+A crew strike on a revealed ambush street (strength compared, winner keeps the street) was designed but left out: it needs a new order, movement kind, event and validation, and the hunter already lowers raid success with towers and escorts alone. Pros: gives defenders an active answer. Cons: a new order and shapes in the contracts, and a second fight to balance. Open question for the owner.

@@ -95,3 +95,27 @@ describe('balance pass', () => {
     expect(avg('raider')).toBeLessThan(1.4 * best);
   });
 });
+
+describe('hunter bot', () => {
+  it('never attacks and is struck less often than the field', () => {
+    let hits = 0;
+    let decided = 0;
+    let allHits = 0;
+    let allDecided = 0;
+    for (let seed = 1; seed <= 6; seed++) {
+      const r = runSeason({ seed });
+      const hunterId = r.players.find((p) => p.bot === 'hunter')?.id ?? '';
+      expect(r.raidsBy[hunterId]?.set ?? 0).toBe(0);
+      const t = r.raidsAgainst[hunterId];
+      if (t) {
+        hits += t.hit;
+        decided += t.hit + t.repelled + t.evaded;
+      }
+      allHits += r.raidHits;
+      allDecided += r.raidHits + r.raidsRepelled + r.raidsEvaded;
+      expect(r.problems).toEqual([]);
+    }
+    expect(decided).toBeGreaterThan(0);
+    expect(hits / decided).toBeLessThan(allHits / allDecided);
+  });
+});
