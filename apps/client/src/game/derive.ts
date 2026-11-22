@@ -128,6 +128,29 @@ export function crewsAt(view: PlayerView, nodeId: string) {
   );
 }
 
+const idNumber = (id: string): number => Number(/d+/.exec(id)?.[0] ?? Number.MAX_SAFE_INTEGER);
+
+/** Your crew's player-facing label: "Crew 2", numbered by id order among your own crews. */
+export function crewLabel(view: PlayerView, id: string): string {
+  const mine = Object.values(view.crews)
+    .filter((c) => c.owner === view.playerId)
+    .map((c) => c.id)
+    .sort((a, b) => idNumber(a) - idNumber(b) || a.localeCompare(b));
+  const i = mine.indexOf(id);
+  return i < 0 ? 'Crew' : `Crew ${String(i + 1)}`;
+}
+
+/** Your carrier's label: "Van 1", numbered by id order among your carriers of that kind. */
+export function carrierLabel(view: PlayerView, id: string): string {
+  const c = view.carriers[id];
+  if (!c) return 'Carrier';
+  const same = Object.values(view.carriers)
+    .filter((x) => x.owner === view.playerId && x.kind === c.kind)
+    .map((x) => x.id)
+    .sort((a, b) => idNumber(a) - idNumber(b) || a.localeCompare(b));
+  return `${c.kind.charAt(0).toUpperCase()}${c.kind.slice(1)} ${String(same.indexOf(id) + 1)}`;
+}
+
 export function carriersAt(view: PlayerView, nodeId: string) {
   return Object.values(view.carriers).filter(
     (c) => c.owner === view.playerId && 'at' in c.loc && c.loc.at === nodeId,

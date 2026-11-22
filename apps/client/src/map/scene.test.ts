@@ -118,3 +118,27 @@ describe('territories and ownership labels', () => {
     expect(b.minX).toBe(scene.bounds.minX);
   });
 });
+
+describe('open and settling plots', () => {
+  it('carries the open flag and the settler role into the scene', () => {
+    const base = demoView({ reveal: true });
+    const target = Object.values(base.player.districts).find(
+      (d) => d.relation === 'visible' || d.relation === 'hub',
+    );
+    if (target?.relation !== 'visible') throw new Error('fixture');
+    const districts = {
+      ...base.player.districts,
+      [target.id]: {
+        ...target,
+        owner: 'neutral',
+        open: true,
+        settling: { owner: base.player.playerId, completesAtMs: base.player.nowMs + 1 },
+      },
+    };
+    const scene = layoutWorld({ ...base, player: { ...base.player, districts } }, t);
+    const d = scene.districts.find((x) => x.id === target.id);
+    expect(d?.open).toBe(false);
+    expect(d?.settling).toEqual({ role: 'self' });
+    expect(scene.districts.filter((x) => x.id !== target.id).every((x) => !x.settling)).toBe(true);
+  });
+});

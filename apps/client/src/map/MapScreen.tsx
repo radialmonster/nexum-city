@@ -27,7 +27,7 @@ const MENU: readonly RadialItem[] = [
 ];
 
 /** The orders the radial menu can open a confirm card for. */
-export type MapOrderKind = 'move' | 'haul' | 'siege' | 'reinforce' | 'scout' | 'build';
+export type MapOrderKind = 'move' | 'haul' | 'siege' | 'reinforce' | 'scout' | 'build' | 'settle';
 
 const ORDER_ITEMS: Record<MapOrderKind, RadialItem> = {
   move: { id: 'move', glyph: '>', label: 'MOVE' },
@@ -36,6 +36,7 @@ const ORDER_ITEMS: Record<MapOrderKind, RadialItem> = {
   reinforce: { id: 'reinforce', glyph: '+', label: 'REINFORCE' },
   scout: { id: 'scout', glyph: 'o', label: 'SCOUT' },
   build: { id: 'build', glyph: 'B', label: 'BUILD' },
+  settle: { id: 'settle', glyph: 'F', label: 'SETTLE' },
 };
 const CLOSE_ITEM: RadialItem = { id: 'close', glyph: 'x', label: 'CLOSE' };
 
@@ -44,6 +45,8 @@ export function orderMenu(d: {
   readonly mine: boolean;
   readonly isHub: boolean;
   readonly remembered: boolean;
+  /** An unclaimed open frontier plot in sight: it can be settled. */
+  readonly open?: boolean;
 }): readonly RadialItem[] {
   const kinds: MapOrderKind[] = d.mine
     ? ['move', 'haul', 'reinforce', 'build']
@@ -51,7 +54,9 @@ export function orderMenu(d: {
       ? ['move', 'haul']
       : d.remembered
         ? ['scout']
-        : ['siege', 'scout'];
+        : d.open
+          ? ['settle', 'siege', 'scout']
+          : ['siege', 'scout'];
   return [...kinds.map((k) => ORDER_ITEMS[k]), CLOSE_ITEM];
 }
 
@@ -65,6 +70,8 @@ export interface MapEmbed {
   readonly onOrder: (kind: MapOrderKind, districtId: Id) => void;
   /** A route to preview while an order card is open. */
   readonly route?: readonly Id[] | null;
+  /** Hide the radial menu, e.g. while an order card is open. */
+  readonly menuHidden?: boolean;
 }
 
 const ZOOM_STEP = 1.6;
@@ -178,6 +185,21 @@ export function MapScreen({
     sceneRef.current = scene;
   }, [scene]);
 
+  /**
+   * How far to nudge the camera target so it sits in the free part of the map, clear of the
+   * HUD sector card in the top-left corner: half the card's size, in screen pixels.
+   */
+  const hudInset = useCallback((): { x: number; y: number } => {
+    const card = hostRef.current?.parentElement?.querySelector<HTMLElement>('[class*="readout"]');
+    const host = hostRef.current?.getBoundingClientRect();
+    if (!card || !host) return { x: 0, y: 0 };
+    const r = card.getBoundingClientRect();
+    return {
+      x: Math.max(0, r.right - host.left) / 2,
+      y: Math.max(0, r.bottom - host.top) / 2,
+    };
+  }, []);
+
   const mineBounds = useCallback((s: Scene) => {
     const mine = s.districts.filter((d) => d.mine);
     if (mine.length === 0) return s.bounds;
@@ -225,10 +247,12 @@ export function MapScreen({
         if (opts.zoom === 'city') {
           c.set(frameBounds(cityBounds(first, palette.map), c.viewport, palette.map, 0.03));
         } else {
+          const zoom = zoomForLevel(opts.zoom, c.viewport, palette.map);
+          const inset = hudInset();
           c.set({
-            x: (b.minX + b.maxX) / 2,
-            y: (b.minY + b.maxY) / 2,
-            zoom: zoomForLevel(opts.zoom, c.viewport, palette.map),
+            x: (b.minX + b.maxX) / 2 - inset.x / zoom,
+            y: (b.minY + b.maxY) / 2 - inset.y / zoom,
+            zoom,
           });
         }
         setVp({ ...c.viewport });
@@ -309,7 +333,12 @@ export function MapScreen({
     if (!scene) return;
     const b = mineBounds(scene);
     act((r, now) => {
-      r.controller.animateTo(frameBounds(b, r.controller.viewport, palette.map, 0.25), now);
+      const to = frameBounds(b, r.controller.viewport, palette.map, 0.25);
+      const inset = hudInset();
+      r.controller.animateTo(
+        { ...to, x: to.x - inset.x / to.zoom, y: to.y - inset.y / to.zoom },
+        now,
+      );
     });
   };
 
@@ -370,7 +399,7 @@ export function MapScreen({
   const col = Math.round(cam.x / palette.map.pitchX);
   const row = Math.round(cam.y / palette.map.pitchY);
   const across = vp.w / cam.zoom / palette.map.pitchX;
-  const menuAt = sel && ready ? worldToHud(sel, cam, vp) : null;
+  const menuAt = sel && ready && !embed?.menuHidden ? worldToHud(sel, cam, vp) : null;
   const compact = ready && vp.w < palette.map.compactBelowPx;
 
   const districtList = scene ? (

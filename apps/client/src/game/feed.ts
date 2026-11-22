@@ -238,6 +238,44 @@ export function describeEvent(
         tone: 'warn',
         text: 'One of your orders could not run when its time came.',
       };
+    case 'settle.started': {
+      const mine = str(d, 'owner') === me;
+      return {
+        ...base,
+        kind: 'SETTLE',
+        glyph: 'F',
+        tone: mine ? 'accentAlt' : 'warn',
+        text: mine
+          ? `Your crew is settling ${name(placeId)}.`
+          : `A rival is settling ${name(placeId)}.`,
+      };
+    }
+    case 'settle.done': {
+      const mine = str(d, 'owner') === me;
+      return {
+        ...base,
+        kind: 'SETTLE',
+        glyph: 'F',
+        tone: mine ? 'ok' : 'warn',
+        text: mine ? `${name(placeId)} is yours.` : `A rival settled ${name(placeId)}.`,
+      };
+    }
+    case 'settle.failed': {
+      const reason = str(d, 'reason');
+      const why =
+        reason === 'taken'
+          ? 'someone else got there first'
+          : reason === 'captured'
+            ? 'the plot was captured'
+            : 'the settlement was abandoned';
+      return {
+        ...base,
+        kind: 'SETTLE',
+        glyph: '!',
+        tone: 'danger',
+        text: `Settling ${name(placeId)} failed: ${why}.`,
+      };
+    }
     default:
       return null;
   }

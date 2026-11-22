@@ -1,5 +1,5 @@
 import type { FeedItem, PlayerView } from '@nexum/contracts';
-import { buildDurationMs } from '@nexum/sim';
+import { balance, buildDurationMs } from '@nexum/sim';
 import type { Faction } from '../ui/util';
 import { isOwn } from './derive';
 
@@ -124,6 +124,24 @@ export function timelineEntries(
         endMs: d.construction.completesAtMs,
         progress: frac(nowMs - start, total),
         text: `BUILD ${d.construction.building} L${String(d.construction.level)}  ${shortDuration(d.construction.completesAtMs - nowMs)}`,
+        state: 'running',
+        recallId: null,
+        districtId: d.id,
+      });
+    }
+    if (d.relation !== 'own' && d.relation !== 'remembered' && d.settling?.owner === me) {
+      const total = balance.settle.hours * 3_600_000;
+      const start = d.settling.completesAtMs - total;
+      out.push({
+        id: `settle:${d.id}`,
+        kind: 'settle',
+        label: d.name,
+        glyph: GLYPH.settle,
+        faction: 'self',
+        startMs: start,
+        endMs: d.settling.completesAtMs,
+        progress: frac(nowMs - start, total),
+        text: `SETTLING  ${shortDuration(d.settling.completesAtMs - nowMs)} left`,
         state: 'running',
         recallId: null,
         districtId: d.id,

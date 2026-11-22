@@ -80,6 +80,10 @@ export interface SceneDistrict {
   visible: boolean;
   remembered: boolean;
   frontier: FrontierState;
+  /** An unclaimed plot anyone can settle (drawn with a dashed outline). */
+  open: boolean;
+  /** Who is settling this plot, as a faction role, or null. */
+  settling: { role: FactionRole } | null;
   slots: SceneSlot[];
   /** Warehouse fill, 0 to 1. */
   stock: number;
@@ -403,6 +407,8 @@ export function layoutWorld(view: MapView, t: MapTokens): Scene {
     let stock = 0;
     let garrison = 0;
     let frontier: FrontierState = 'built';
+    let open = false;
+    let settling: SceneDistrict['settling'] = null;
     if (dv.relation === 'own') {
       slots = Array.from({ length: dv.slots }, (_, i) => ({ level: dv.buildings[i]?.level ?? 0 }));
       const depot = dv.buildings.find((b) => b.type === 'depot')?.level ?? 0;
@@ -414,6 +420,8 @@ export function layoutWorld(view: MapView, t: MapTokens): Scene {
       frontier = dv.frontier;
     } else if (dv.relation !== 'remembered') {
       garrison = Object.values(dv.presence).reduce((a, b) => a + b, 0);
+      open = dv.open && !dv.settling;
+      if (dv.settling) settling = { role: roles.get(dv.settling.owner) ?? 'rival' };
     }
     const siege = dv.relation === 'remembered' ? null : (dv.siege?.progress ?? null);
     const sd: SceneDistrict = {
@@ -433,6 +441,8 @@ export function layoutWorld(view: MapView, t: MapTokens): Scene {
       visible: !remembered,
       remembered,
       frontier,
+      open,
+      settling,
       slots,
       stock,
       garrison,

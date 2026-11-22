@@ -80,3 +80,13 @@
   justify-content: flex-end;
   gap: var(--space-md);
 }
+
+/* A ticked crew or building reads clearly: accent border and tint, not just a small native tick. */
+.opt input {
+  accent-color: var(--color-accent);
+}
+
+.opt:has(input:checked) {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}

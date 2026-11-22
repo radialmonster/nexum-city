@@ -137,6 +137,8 @@ function revealAll(view: PlayerView, state: GameState): PlayerView {
       pos: d.pos,
       owner: d.owner,
       protected: false,
+      open: d.owner === 'neutral' && d.frontier === 'open',
+      settling: null,
       presence: {},
       siege: null,
     };

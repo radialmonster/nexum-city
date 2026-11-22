@@ -16,7 +16,7 @@ import { useCompact, useSession, useWallClock } from './sessionContext';
 import { gameNow, useGame, useStore } from './store';
 import { Timeline } from './Timeline';
 import { TopBar } from './TopBar';
-import { finaleClock, isOwn } from './derive';
+import { finaleClock, isOwn, ownDistricts } from './derive';
 import { SeasonEnd } from './SeasonEnd';
 import { FirstSteps } from './FirstSteps';
 import { loadFirstSteps, saveFirstSteps, type FirstStepsState } from './stepsStore';
@@ -198,6 +198,7 @@ export function GameScreen() {
               session.openDraft({ kind, districtId });
             },
             route,
+            menuHidden: state.draft !== null,
           }}
         />
         {finaleClock(view, nowMs).phase === 'over' && endSeen !== view.season.endMs && (
@@ -224,6 +225,15 @@ export function GameScreen() {
                   void session.placeOrder({ type: 'market.cancel', orderId });
                 }}
                 onClose={closePanel}
+                onHaulHome={(hub) => {
+                  const home = ownDistricts(view).find((d) => d.kind !== 'hub');
+                  if (!home) return;
+                  closePanel();
+                  store.dispatch({
+                    type: 'draft',
+                    draft: { kind: 'haul', districtId: home.id, from: hub },
+                  });
+                }}
               />
             )}
             {report && (

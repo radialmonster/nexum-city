@@ -3,7 +3,9 @@ import { balance, buildCost, buildDurationMs, eta, toUnits, type CarrierKind } f
 import { useEffect, useMemo, useState } from 'react';
 import { Bar, Button, Panel } from '../ui';
 import {
+  carrierLabel,
   carriersAt,
+  crewLabel,
   crewsAt,
   formatEta,
   formatHours,
@@ -24,6 +26,7 @@ const TITLES: Record<OrderDraft['kind'], string> = {
   reinforce: 'Reinforce',
   scout: 'Send a scout',
   build: 'Build',
+  settle: 'Settle a plot',
 };
 
 const CONFIRM: Record<OrderDraft['kind'], string> = {
@@ -33,6 +36,7 @@ const CONFIRM: Record<OrderDraft['kind'], string> = {
   reinforce: 'REINFORCE',
   scout: 'SCOUT',
   build: 'BUILD',
+  settle: 'SETTLE',
 };
 
 /** What the player has picked in the card. */
@@ -57,9 +61,10 @@ export function buildOrder(draft: OrderDraft, pick: Pick): OrderBody | null {
         : null;
     }
     case 'siege':
+    case 'settle':
       return pick.crewIds.length > 0
         ? {
-            type: 'siege',
+            type: draft.kind,
             carrierId: pick.carrierId,
             crewIds: [...pick.crewIds],
             target: draft.districtId,
@@ -116,7 +121,9 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
       draft.kind === 'build' ? [] : readyNodes(view, nowMs).filter((n) => n !== draft.districtId),
     [view, nowMs, draft],
   );
-  const [from, setFrom] = useState<string | null>(nodes[0] ?? null);
+  const [from, setFrom] = useState<string | null>(
+    draft.from && nodes.includes(draft.from) ? draft.from : (nodes[0] ?? null),
+  );
   const [picked, setPicked] = useState<readonly string[] | null>(null);
   const [carrierId, setCarrierId] = useState<string | null>(null);
   const [cargo, setCargo] = useState<Record<string, number>>({});
@@ -153,7 +160,12 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
 
   const own = target && isOwn(target) ? target : null;
   const sourceDistrict = source ? view.districts[source] : undefined;
-  const stock = sourceDistrict && isOwn(sourceDistrict) ? sourceDistrict.warehouse : null;
+  const stock =
+    sourceDistrict && isOwn(sourceDistrict)
+      ? sourceDistrict.warehouse
+      : sourceDistrict?.relation === 'hub'
+        ? (view.self.stash[sourceDistrict.id] ?? null)
+        : null;
   const carry = balance.carriers[kind].cargo;
   const cargoTotal = GOOD_KEYS.reduce((n, g) => n + Math.floor(cargo[g] ?? 0), 0);
 
@@ -180,6 +192,10 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
     blocker = `That carrier seats ${String(seats)}. Pick fewer crews or a bigger carrier.`;
   } else if (!route) {
     blocker = 'There is no street route there.';
+  } else if (draft.kind === 'settle') {
+    const have = stock ? toUnits(stock.supplies) : 0;
+    if (have < balance.settle.supplies)
+      blocker = `Settling takes ${String(balance.settle.supplies)} supplies from the starting warehouse, which holds ${formatUnits(have)}.`;
   } else if (draft.kind === 'haul') {
     if (cargoTotal === 0) blocker = 'Choose something to carry.';
     else if (cargoTotal > carry) blocker = `This carrier holds ${String(carry)} units.`;
@@ -187,6 +203,7 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
       blocker = 'The source warehouse does not hold that much.';
   }
 
+  const fogged = draft.kind === 'siege' && target?.relation === 'remembered';
   const odds = (() => {
     if (draft.kind !== 'siege' || !target || target.relation === 'remembered') return null;
     const defenderCount =
@@ -284,11 +301,16 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
                       toggle(c.id);
                     }}
                   />
-                  <span>{c.id}</span>
+                  <span>{crewLabel(view, c.id)}</span>
                   <small>strength {c.strength}</small>
                 </label>
               ))}
             </fieldset>
+            <p className={styles['line']} data-testid="crew-count">
+              {chosenCrews.length === 0
+                ? 'No crew picked: tick one above.'
+                : `${String(chosenCrews.length)} crew picked: ${chosenCrews.map((c) => crewLabel(view, c.id)).join(', ')}.`}
+            </p>
             <label className={styles['field']}>
               <span className={styles['cap']}>CARRIER</span>
               <select
@@ -300,7 +322,7 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
                 <option value="">On foot (1 seat)</option>
                 {carriers.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.kind} {c.id} ({seatsFor(c.kind)} seats)
+                    {carrierLabel(view, c.id)} ({seatsFor(c.kind)} seats)
                   </option>
                 ))}
               </select>
@@ -337,16 +359,34 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
                 ? `ETA ${formatEta(route.durationMs)} over ${String(Math.round(route.lengthM))} m`
                 : 'No route'}
             </p>
+            {draft.kind === 'settle' && (
+              <p className={styles['line']} data-testid="settle-cost">
+                Costs {balance.settle.supplies} supplies from this warehouse. The plot is yours{' '}
+                {balance.settle.hours} h after the crew arrives, if it holds.
+              </p>
+            )}
+            {fogged && (
+              <div className={styles['field']}>
+                <span className={styles['cap']}>ODDS</span>
+                <span className={styles['line']}>Odds unknown: scout first.</span>
+              </div>
+            )}
             {odds && (
               <div className={styles['field']}>
                 <span className={styles['cap']}>
                   ODDS {odds.estimated ? '(ESTIMATE: THE ENEMY IS HIDDEN BY FOG)' : ''}
                 </span>
-                <Bar value={odds.edge} faction="raider" label="Attacker edge" />
-                <span className={styles['line']}>
-                  {Math.round(odds.edge * 100)}% edge. About {formatHours(odds.hoursToCapture)} to
-                  capture if it holds.
-                </span>
+                {Number.isFinite(odds.hoursToCapture) ? (
+                  <>
+                    <Bar value={odds.edge} faction="raider" label="Attacker edge" />
+                    <span className={styles['line']}>
+                      {Math.round(odds.edge * 100)}% edge. About {formatHours(odds.hoursToCapture)}{' '}
+                      to capture if it holds.
+                    </span>
+                  </>
+                ) : (
+                  <span className={styles['line']}>Pick a crew to see the odds.</span>
+                )}
               </div>
             )}
           </>

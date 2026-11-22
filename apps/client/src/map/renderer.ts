@@ -540,6 +540,15 @@ export class MapRenderer {
     const lw = (sel ? m.edgeWidthSelected : m.edgeWidth) * px;
     if (unclaimed) {
       g.poly(flat, true).stroke({ width: lw, ...pal.color.plot });
+      // open frontier: a dashed accent outline marks a plot anyone may settle; a plot being
+      // settled is dashed in the settler's colour.
+      if (d.settling || d.open) {
+        dashedPolygon(g, pts, d.cx, d.cy, m.frontierDash * px, m.frontierDashGap * px);
+        g.stroke({
+          width: lw * 1.6,
+          ...(d.settling ? pal.faction[d.settling.role] : pal.color.accentAlt),
+        });
+      }
     } else {
       if (sel || d.mine) g.poly(flat, true).stroke({ width: lw * 3, ...withA(role, 0.18) });
       g.poly(flat, true).stroke({ width: lw, ...role });
