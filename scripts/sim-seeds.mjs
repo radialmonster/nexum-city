@@ -24,7 +24,8 @@ for (let seed = first; seed <= last; seed++) {
   problems += r.problems.length;
   for (const s of r.standings) {
     const bot = r.players.find((p) => p.id === s.playerId)?.bot ?? '?';
-    const t = (types[bot] ??= { players: 0, districts: 0, trade: 0, score: 0 });
+    const t = (types[bot] ??= { players: 0, districts: 0, trade: 0, score: 0, credits48: 0 });
+    t.credits48 += r.creditsAt48h?.[s.playerId] ?? 0;
     t.players += 1;
     t.districts += s.districts;
     t.trade += s.tradeScore ?? 0;
@@ -34,7 +35,7 @@ for (let seed = first; seed <= last; seed++) {
 console.log(`seeds ${first}-${last}`);
 for (const [bot, t] of Object.entries(types)) {
   console.log(
-    `${bot.padEnd(9)} districts/player=${(t.districts / t.players).toFixed(2)} trade/player=${(t.trade / t.players).toFixed(1)} score/player=${(t.score / t.players).toFixed(1)}`,
+    `${bot.padEnd(9)} districts/player=${(t.districts / t.players).toFixed(2)} trade/player=${(t.trade / t.players).toFixed(1)} credits@48h=${(t.credits48 / t.players).toFixed(0)} score/player=${(t.score / t.players).toFixed(1)}`,
   );
 }
 const scores = Object.values(types)

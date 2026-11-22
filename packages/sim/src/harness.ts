@@ -42,11 +42,16 @@ export interface SeasonResult {
   stolenUnits: number;
   destroyedUnits: number;
   districts: number;
+  /** Each player's credits (whole units) 48 game hours in, for the early-income check. */
+  creditsAt48h: Record<Id, number>;
   players: { id: Id; bot: BotKind }[];
   standings: Standing[];
   /** Broken invariants found at any decision time (empty is good). */
   problems: string[];
 }
+
+/** The early-income checkpoint: 48 game hours. */
+const EARLY_MS = 48 * 3_600_000;
 
 const DEFAULT_BOTS: BotKind[] = ['raider', 'raider', 'turtle', 'turtle', 'merchant', 'merchant'];
 
@@ -92,6 +97,7 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
   // Per haul: units stolen and destroyed on the way, to prove nothing is created or lost silently.
   const taken = new Map<string, number>();
   const problems: string[] = [];
+  const creditsAt48h: Record<Id, number> = {};
   const sumUnits = (v: unknown): number =>
     v && typeof v === 'object'
       ? Object.values(v as Record<string, unknown>).reduce<number>(
@@ -157,6 +163,9 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
     const result = step(state, batch, Math.min(at + beatMs, endMs));
     state = result.state;
     count(result.events);
+    if (at < EARLY_MS && state.nowMs >= EARLY_MS) {
+      for (const p of players) creditsAt48h[p.id] = toUnits(state.players[p.id]?.credits ?? 0);
+    }
     for (const problem of checkInvariants(state)) problems.push(`t=${state.nowMs}: ${problem}`);
   }
   // Loot conservation: everything stolen is either reported home or still with a waiting ambush.
@@ -192,6 +201,7 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
     stolenUnits,
     destroyedUnits,
     districts: Object.keys(state.districts).length,
+    creditsAt48h,
     players,
     standings: standings(state),
     problems,
