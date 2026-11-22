@@ -197,6 +197,7 @@ export function addPlayerWithEvents(
   d.warehouse.supplies += toAtoms(opts.supplies ?? balance.player.startSupplies);
   d.warehouse.parts += toAtoms(balance.rush.kit.parts);
   d.warehouse.power += toAtoms(balance.rush.kit.power);
+  d.warehouse.supplies += toAtoms(balance.rush.kit.supplies);
   const hours = opts.protectedHours ?? balance.player.protectedHours;
   if (hours > 0) d.protectedUntilMs = next.nowMs + hours * MS_PER_HOUR;
   for (let i = 0; i < (opts.crews ?? balance.player.startCrews); i++) {

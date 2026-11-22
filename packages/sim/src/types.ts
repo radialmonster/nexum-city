@@ -240,6 +240,7 @@ export type QueuedEvent = { at: number; seq: number } & (
   | { kind: 'contract.due'; contractId: Id }
   | { kind: 'job.refill'; playerId: Id }
   | { kind: 'rush.end'; playerId: Id }
+  | { kind: 'crew.mend'; crewId: Id }
 );
 export type QueuedKind = QueuedEvent['kind'];
 

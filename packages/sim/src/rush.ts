@@ -53,6 +53,7 @@ export function stripNewcomerPerks(s: GameState, options: { jobs?: boolean } = {
     if (d.kind === 'hub' || d.owner === 'neutral') continue;
     d.warehouse.parts = Math.max(0, d.warehouse.parts - toAtoms(balance.rush.kit.parts));
     d.warehouse.power = Math.max(0, d.warehouse.power - toAtoms(balance.rush.kit.power));
+    d.warehouse.supplies = Math.max(0, d.warehouse.supplies - toAtoms(balance.rush.kit.supplies));
   }
   const dropped = new Set<Id>();
   for (const id of Object.keys(s.contracts)) {

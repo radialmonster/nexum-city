@@ -1,4 +1,4 @@
-import { balance, toAtoms, toUnits } from './balance.js';
+import { MS_PER_HOUR, balance, toAtoms, toUnits } from './balance.js';
 import { emit, schedule, unschedule, type Ctx } from './ctx.js';
 import { nudgeRef } from './market.js';
 import { nextFloat } from './rng.js';
@@ -164,6 +164,36 @@ function roll(ctx: Ctx): number {
   return 1 + (nextFloat(ctx.state.rng) * 2 - 1) * k;
 }
 
+/** What a struck convoy was, for the harness breakdown: a label plus whether it had an escort. */
+function targetLabel(haul: Movement): string {
+  const kind = haul.job
+    ? 'job'
+    : haul.kind === 'settle'
+      ? 'settle'
+      : haul.carrierKind === 'runner'
+        ? 'runner'
+        : haul.contractId
+          ? 'contract'
+          : 'haul';
+  return `${kind}${haul.crewIds.length > 1 ? '+escort' : ''}`;
+}
+
+/**
+ * Crews hurt in a raid heal: 1 strength per `balance.raid.mendHours` while they rest at a
+ * district, up to the starting strength. Without it every repelled ambush is a permanent loss and
+ * raiders spiral down to strength 1 per crew (see sim-spec, "Raid balance after task 77").
+ */
+function scheduleMend(ctx: Ctx, crews: Crew[]): void {
+  for (const c of crews) {
+    if (c.strength >= balance.recruit.startStrength) continue;
+    if (ctx.state.queue.some((e) => e.kind === 'crew.mend' && e.crewId === c.id)) continue;
+    schedule(ctx, ctx.state.nowMs + balance.raid.mendHours * MS_PER_HOUR, {
+      kind: 'crew.mend',
+      crewId: c.id,
+    });
+  }
+}
+
 function strike(ctx: Ctx, ambush: Movement, haul: Movement): void {
   const { state } = ctx;
   const r = ambush.raid;
@@ -179,6 +209,7 @@ function strike(ctx: Ctx, ambush: Movement, haul: Movement): void {
         movementId: ambush.id,
         haulId: haul.id,
         chancePercent: balance.runner.evadePercent,
+        target: targetLabel(haul),
       });
       return;
     }
@@ -205,12 +236,14 @@ function strike(ctx: Ctx, ambush: Movement, haul: Movement): void {
       raiders,
       Math.max(1, Math.floor((raiderStrength * cfg.raiderLossPercent) / 100)),
     );
+    scheduleMend(ctx, raiders);
     emit(ctx, 'raid.repelled', actors, [r.a, r.b], {
       movementId: ambush.id,
       haulId: haul.id,
       raiderStrength,
       guard,
       raiderLost: lost,
+      target: targetLabel(haul),
     });
     endAmbush(ctx, ambush, 'repelled');
     return;
@@ -240,6 +273,7 @@ function strike(ctx: Ctx, ambush: Movement, haul: Movement): void {
       Math.floor((escort.reduce((n, c) => n + c.strength, 0) * cfg.escortLossPercent) / 100),
     ),
   );
+  scheduleMend(ctx, escort);
   emit(ctx, 'raid.hit', actors, [r.a, r.b], {
     movementId: ambush.id,
     haulId: haul.id,
@@ -249,6 +283,7 @@ function strike(ctx: Ctx, ambush: Movement, haul: Movement): void {
     raiderStrength,
     guard,
     escortLost,
+    target: targetLabel(haul),
   });
   const dest = state.districts[haul.to];
   if (dest && dest.kind === 'hub') {
@@ -263,6 +298,13 @@ export const raidSystem: System = {
     'raid.end': (ctx, ev) => {
       const m = ctx.state.movements[ev.movementId];
       if (m && m.kind === 'ambush') endAmbush(ctx, m, 'expired');
+    },
+    'crew.mend': (ctx, ev) => {
+      const crew = ctx.state.crews[ev.crewId];
+      if (!crew || crew.strength >= balance.recruit.startStrength) return;
+      // Only a crew resting at a district heals; one out on a job or ambush is checked again later.
+      if ('at' in crew.loc) crew.strength += 1;
+      scheduleMend(ctx, [crew]);
     },
     'raid.strike': (ctx, ev) => {
       const ambush = ctx.state.movements[ev.movementId];

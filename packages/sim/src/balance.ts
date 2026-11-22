@@ -165,6 +165,8 @@ export const balance = {
     destroyPercent: 15,
     /** Percent of the raiders' strength lost when they are beaten. */
     raiderLossPercent: 30,
+    /** A crew hurt in a raid regains 1 strength every this many hours while it rests at a district, up to its starting strength. */
+    mendHours: 1.5,
     /** Percent of the escort's strength lost when the raiders win. */
     escortLossPercent: 10,
     /** Each side's strength is rolled between 100 minus and 100 plus this percent. */
@@ -259,7 +261,7 @@ export const balance = {
     /** The starter civic contract reserved for a newcomer. */
     starter: { good: 'supplies', qty: 5, premiumPercent: 100, graceMinutes: 20 },
     /** Goods a new home district starts with, exactly one level-1 Workshop (so the first build is not a 30 minute haul away). */
-    kit: { parts: 30, power: 10 },
+    kit: { parts: 30, power: 10, supplies: 20 },
   },
 
   /** Street jobs: a personal list of quick errands, one new offer every `refillMinutes`. */

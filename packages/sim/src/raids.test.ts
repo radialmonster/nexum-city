@@ -188,16 +188,32 @@ describe('strikes', () => {
     const state = ambushed(w);
     setStrength(state, 'p1', 10);
     setStrength(state, 'p2', 500);
-    const before = crewsOf(state, 'p1').reduce((n, id) => n + (state.crews[id]?.strength ?? 0), 0);
     const r = runHaul(state, w.haul);
     expect(kinds(r.events)).toContain('raid.repelled');
     expect(kinds(r.events)).not.toContain('raid.hit');
     expect(movementsOf(r.state, 'ambush')).toHaveLength(0);
-    const after = crewsOf(r.state, 'p1').reduce(
-      (n, id) => n + (r.state.crews[id]?.strength ?? 0),
-      0,
-    );
-    expect(after).toBeLessThan(before);
+    const repelled = r.events.find((e) => e.kind === 'raid.repelled')?.data as {
+      raiderLost: number;
+      target: string;
+    };
+    expect(repelled.raiderLost).toBeGreaterThan(0);
+    expect(repelled.target).toBe('haul');
+  });
+
+  it('mends a beaten raider crew by 1 strength per mend period, up to its starting strength', () => {
+    const w = haulWorld();
+    const state = ambushed(w);
+    setStrength(state, 'p1', 10);
+    setStrength(state, 'p2', 500);
+    const ids = crewsOf(state, 'p1');
+    const r = runHaul(state, w.haul);
+    const total = ids.reduce((n, id) => n + (r.state.crews[id]?.strength ?? 0), 0);
+    // A day later (24 h at 1 mend per mendHours) every crew is back at its starting strength.
+    for (const id of ids) {
+      expect(r.state.crews[id]?.strength).toBeLessThanOrEqual(balance.recruit.startStrength);
+    }
+    expect(total).toBe(ids.length * balance.recruit.startStrength);
+    expect(checkInvariants(r.state)).toEqual([]);
   });
 
   it('hits a given haul at most once per ambush', () => {
