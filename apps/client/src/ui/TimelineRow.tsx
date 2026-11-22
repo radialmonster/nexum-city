@@ -24,7 +24,7 @@ export interface TimelineRowProps {
   readonly children?: ReactNode;
   /** Dashed "what would happen next" segments after the bar. */
   readonly previews?: readonly TimelinePreview[];
-  readonly className?: string;
+  readonly className?: string | undefined;
 }
 
 /** One line of the order timeline: an order bar with a progress fill and preview dashes. */

@@ -14,7 +14,7 @@ export interface GaugeProps {
   /** Total cells; whatever is not filled shows as free space. */
   readonly capacity: number;
   readonly label: string;
-  readonly className?: string;
+  readonly className?: string | undefined;
 }
 
 /** Warehouse fill: one cell per unit of capacity, coloured by the good stored in it. */

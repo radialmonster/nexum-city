@@ -1,0 +1,50 @@
+.screen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4xl);
+  padding: var(--space-3xl) var(--space-xl);
+}
+
+.logo {
+  font-size: var(--font-size-5xl);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-widest);
+  color: var(--color-text-bright);
+}
+
+.logo span {
+  color: var(--color-accent);
+}
+
+.card {
+  width: min(100%, var(--size-column));
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--letter-spacing-widest);
+  color: var(--color-text-dim);
+}
+
+.field input {
+  min-height: var(--size-control);
+  padding: var(--space-xs) var(--space-md);
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-lg);
+  color: var(--color-text-bright);
+  background: var(--color-panel-solid);
+  border: var(--border-thin) solid var(--color-line);
+}

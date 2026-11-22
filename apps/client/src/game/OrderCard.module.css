@@ -1,0 +1,82 @@
+.card {
+  width: min(100%, var(--size-column));
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.field legend,
+.cap {
+  padding: 0;
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--letter-spacing-widest);
+  color: var(--color-text-dim);
+}
+
+.field select,
+.cargo input {
+  min-height: var(--size-control);
+  padding: var(--space-xs) var(--space-md);
+  font: inherit;
+  font-family: var(--font-mono);
+  color: var(--color-text-bright);
+  background: var(--color-panel-solid);
+  border: var(--border-thin) solid var(--color-line);
+}
+
+.opt {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-xs) var(--space-md);
+  border: var(--border-thin) solid var(--color-line);
+}
+
+.opt small {
+  color: var(--color-text-dim);
+}
+
+.cargo {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-md);
+}
+
+.cargo label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3xs);
+  font-size: var(--font-size-xs);
+}
+
+.line {
+  margin: 0;
+  font-size: var(--font-size-md);
+}
+
+.blocker {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-md);
+  color: var(--color-warn);
+  border: var(--border-thin) solid var(--color-warn);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-md);
+}

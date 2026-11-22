@@ -6,7 +6,7 @@ export interface PanelProps {
   readonly title?: ReactNode;
   /** Small mono text at the right of the header. */
   readonly tag?: ReactNode;
-  readonly className?: string;
+  readonly className?: string | undefined;
   readonly children?: ReactNode;
 }
 

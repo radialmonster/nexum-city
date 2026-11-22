@@ -12,7 +12,7 @@ export interface TabsProps {
   readonly value: string;
   readonly onChange: (id: string) => void;
   readonly label: string;
-  readonly className?: string;
+  readonly className?: string | undefined;
 }
 
 /** Underlined tab strip. Arrow keys move between tabs. */

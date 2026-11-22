@@ -5,7 +5,7 @@ export interface SparklineProps {
   readonly points: readonly number[];
   readonly tone?: Tone;
   readonly label: string;
-  readonly className?: string;
+  readonly className?: string | undefined;
 }
 
 const WIDTH = 90;

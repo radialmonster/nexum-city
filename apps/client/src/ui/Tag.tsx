@@ -4,7 +4,7 @@ import { cx, factionColor, vars, type Faction } from './util';
 
 export interface TagProps {
   readonly faction?: Faction;
-  readonly className?: string;
+  readonly className?: string | undefined;
   readonly children: ReactNode;
 }
 

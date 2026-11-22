@@ -7,7 +7,7 @@ export interface ToastProps {
   readonly title: ReactNode;
   readonly children?: ReactNode;
   readonly onDismiss?: () => void;
-  readonly className?: string;
+  readonly className?: string | undefined;
 }
 
 /** A short-lived message: something happened, with an optional dismiss control. */

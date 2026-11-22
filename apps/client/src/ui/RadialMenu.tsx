@@ -14,7 +14,7 @@ export interface RadialMenuProps {
   readonly onSelect: (id: string) => void;
   /** Shown in the hub in the middle. */
   readonly title?: string;
-  readonly className?: string;
+  readonly className?: string | undefined;
 }
 
 // geometry, in viewBox units (the SVG is drawn at about 1 unit per CSS px at --s: 1)

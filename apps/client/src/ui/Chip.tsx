@@ -8,7 +8,7 @@ export interface ChipProps {
   readonly label?: ReactNode;
   readonly value: ReactNode;
   readonly faction?: Faction;
-  readonly className?: string;
+  readonly className?: string | undefined;
 }
 
 /** Compact resource chip: an icon, an optional label and a bright value. */

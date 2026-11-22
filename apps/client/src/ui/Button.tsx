@@ -4,7 +4,7 @@ import { cx } from './util';
 
 export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'className'> {
   readonly variant?: 'primary' | 'ghost' | 'danger';
-  readonly className?: string;
+  readonly className?: string | undefined;
 }
 
 /** Chamfered action button. */

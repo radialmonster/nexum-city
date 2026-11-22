@@ -1,0 +1,79 @@
+.feed {
+  display: flex;
+  flex-direction: column;
+  grid-area: feed;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  grid-area: side;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.feed > *,
+.side > * {
+  flex: 1 1 auto;
+}
+
+.map {
+  grid-area: map;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+.map[hidden] {
+  display: none;
+}
+
+.timeline {
+  grid-area: timeline;
+}
+
+.tabs {
+  grid-area: tabs;
+}
+
+.modal {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+  overflow-y: auto;
+}
+
+.game {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template:
+    'top top top' auto
+    'feed map side' 1fr
+    'timeline timeline timeline' auto / var(--size-column) 1fr var(--size-column);
+  background: var(--color-bg);
+}
+
+.game[data-compact='true'] {
+  grid-template:
+    'top' auto
+    'map' 1fr
+    'tabs' auto / 1fr;
+}
+
+.game[data-compact='true'] > .feed,
+.game[data-compact='true'] > .side {
+  grid-area: map;
+  z-index: var(--z-hud);
+  background: var(--color-panel-solid);
+}
+
+.game[data-compact='true'] > .timeline {
+  display: none;
+}

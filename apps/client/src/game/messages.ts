@@ -1,0 +1,51 @@
+import type { ApiErrorCode } from './api';
+
+/** Plain-language text for every typed rejection the server can send. */
+const MESSAGES: Record<ApiErrorCode, string> = {
+  invalid_request: 'That did not look right. Check what you typed and try again.',
+  unsupported_media_type: 'The game could not read that request.',
+  unauthorized: 'You are signed out. Sign in again.',
+  invalid_credentials: 'Wrong username or password.',
+  username_taken: 'That username is taken. Pick another.',
+  rate_limited: 'Too many tries. Wait a moment, then try again.',
+  world_full: 'The city is full for now. Try again later.',
+  not_found: 'The game could not find that.',
+  no_route: 'There is no street route there.',
+  internal: 'Something broke on the server. Try again in a moment.',
+  network: 'Cannot reach the game server. Check your connection.',
+  bad_response: 'The server sent something unexpected.',
+  unknown_actor: 'You are not part of this season.',
+  unknown_crew: 'One of those crews no longer exists.',
+  unknown_carrier: 'That carrier no longer exists.',
+  unknown_district: 'That district is not on the map.',
+  unknown_movement: 'That trip is already over.',
+  not_owner: 'That is not yours to command.',
+  crew_not_ready: 'A crew is still resting. Wait until it is ready.',
+  crew_busy: 'A crew is already on the road.',
+  carrier_busy: 'That carrier is already on the road.',
+  carrier_locked: 'You have not unlocked that carrier yet.',
+  not_colocated: 'The crews must start in the same district.',
+  no_crew: 'Pick at least one crew.',
+  too_many_crews: 'That carrier has fewer seats than crews picked.',
+  duplicate_unit: 'The same unit was picked twice.',
+  invalid_target: 'You cannot send this order to that district.',
+  empty_cargo: 'Pick something to carry.',
+  bad_quantity: 'That amount does not work. Use whole units.',
+  over_capacity: 'That is more than the carrier can hold.',
+  insufficient_goods: 'Not enough goods in the warehouse.',
+  insufficient_credits: 'Not enough credits.',
+  slot_unavailable: 'No free building slot here.',
+  max_level: 'That building is already at its top level.',
+  already_building: 'This district is already building something.',
+  already_recalled: 'That trip was already turned around.',
+  protected: 'That district is under new-owner protection. Try again later.',
+  unknown_good: 'The game does not know that good.',
+  bad_price: 'That price does not work.',
+  unknown_order: 'That market order is already gone.',
+  too_many_orders: 'You have too many open market orders.',
+};
+
+/** Words for any rejection code; unknown ones fall back to a generic line. */
+export function messageFor(code: string): string {
+  return (MESSAGES as Record<string, string | undefined>)[code] ?? 'The order was refused.';
+}

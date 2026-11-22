@@ -1,14 +1,24 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe('App routing', () => {
-  it('renders the kit page at /kit and /', () => {
-    for (const path of ['/kit', '/']) {
-      const { unmount } = render(<App path={path} />);
-      expect(screen.getByText('UI KIT')).toBeTruthy();
-      unmount();
-    }
+  it('renders the kit page at /kit', () => {
+    render(<App path="/kit" />);
+    expect(screen.getByText('UI KIT')).toBeTruthy();
+  });
+
+  it('shows the sign-in screen at / when there is no session', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response('{}', { status: 401 }))),
+    );
+    render(<App path="/" />);
+    expect(await screen.findByLabelText('USERNAME')).toBeTruthy();
   });
 
   it('renders a not-found message elsewhere', () => {

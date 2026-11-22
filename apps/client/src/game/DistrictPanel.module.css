@@ -1,0 +1,142 @@
+.panel {
+  grid-area: side;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel > div:last-child {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+}
+
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.cap {
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--letter-spacing-widest);
+  color: var(--color-text-dim);
+}
+
+.line {
+  font-size: var(--font-size-md);
+  color: var(--color-text);
+}
+
+.hint {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-dim);
+}
+
+.chips,
+.goods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.status {
+  padding: var(--space-3xs) var(--space-xs);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--tone);
+  border: var(--border-thin) solid var(--tone);
+}
+
+.status[data-tone='danger'] {
+  --tone: var(--color-danger);
+}
+
+.status[data-tone='ok'] {
+  --tone: var(--color-ok);
+}
+
+.status[data-tone='warn'] {
+  --tone: var(--color-warn);
+}
+
+.status[data-tone='accent'] {
+  --tone: var(--color-accent);
+}
+
+.status[data-tone='accentAlt'] {
+  --tone: var(--color-accent-alt);
+}
+
+.status[data-tone='special'] {
+  --tone: var(--color-special);
+}
+
+.slots,
+.nearby {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.slot {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-xs) var(--space-md);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  border: var(--border-thin) solid var(--color-line);
+}
+
+.slot b {
+  color: var(--color-text-bright);
+}
+
+.building {
+  border-style: dashed;
+  border-color: var(--color-accent-alt);
+}
+
+.free {
+  color: var(--color-text-dim);
+  border-style: dashed;
+}
+
+.near {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--space-xs) var(--space-md);
+  font: inherit;
+  color: var(--color-text);
+  cursor: pointer;
+  background: transparent;
+  border: var(--border-thin) solid var(--color-line);
+}
+
+.near:hover {
+  color: var(--color-text-bright);
+  border-color: var(--color-accent);
+}
+
+.near small {
+  font-family: var(--font-mono);
+  color: var(--color-text-dim);
+}
+
+.empty {
+  margin: 0;
+  color: var(--color-text-dim);
+}

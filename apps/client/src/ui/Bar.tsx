@@ -8,7 +8,7 @@ export interface BarProps {
   /** Segmented cells instead of a continuous fill. */
   readonly segmented?: boolean;
   readonly label: string;
-  readonly className?: string;
+  readonly className?: string | undefined;
 }
 
 /** Progress or capture bar, coloured by faction role. */

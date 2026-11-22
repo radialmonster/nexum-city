@@ -8,6 +8,11 @@
   user-select: none;
 }
 
+/* inside the game screen the map fills its own grid cell instead of the viewport */
+.screen[data-embedded='true'] {
+  position: absolute;
+}
+
 .canvas {
   position: absolute;
   inset: 0;

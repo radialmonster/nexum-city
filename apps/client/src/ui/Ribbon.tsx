@@ -9,7 +9,7 @@ export interface RibbonProps {
   readonly children?: ReactNode;
   /** A solid badge at the right, such as a countdown or "VIEW". */
   readonly badge?: ReactNode;
-  readonly className?: string;
+  readonly className?: string | undefined;
 }
 
 /** Alert banner: slides in under the legend and never covers the middle of the map. */

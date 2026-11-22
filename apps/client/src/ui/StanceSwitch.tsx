@@ -6,7 +6,7 @@ export type Stance = 'hold' | 'pullBack';
 export interface StanceSwitchProps {
   readonly value: Stance;
   readonly onChange: (stance: Stance) => void;
-  readonly className?: string;
+  readonly className?: string | undefined;
 }
 
 const OPTIONS: readonly { id: Stance; label: string }[] = [

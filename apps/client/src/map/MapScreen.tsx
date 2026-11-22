@@ -26,6 +26,47 @@ const MENU: readonly RadialItem[] = [
   { id: 'close', glyph: 'x', label: 'CLOSE' },
 ];
 
+/** The orders the radial menu can open a confirm card for. */
+export type MapOrderKind = 'move' | 'haul' | 'siege' | 'reinforce' | 'scout' | 'build';
+
+const ORDER_ITEMS: Record<MapOrderKind, RadialItem> = {
+  move: { id: 'move', glyph: '>', label: 'MOVE' },
+  haul: { id: 'haul', glyph: 'H', label: 'HAUL' },
+  siege: { id: 'siege', glyph: 'S', label: 'SIEGE' },
+  reinforce: { id: 'reinforce', glyph: '+', label: 'REINFORCE' },
+  scout: { id: 'scout', glyph: 'o', label: 'SCOUT' },
+  build: { id: 'build', glyph: 'B', label: 'BUILD' },
+};
+const CLOSE_ITEM: RadialItem = { id: 'close', glyph: 'x', label: 'CLOSE' };
+
+/** The radial menu for a district in the game screen: what you can order there. */
+export function orderMenu(d: {
+  readonly mine: boolean;
+  readonly isHub: boolean;
+  readonly remembered: boolean;
+}): readonly RadialItem[] {
+  const kinds: MapOrderKind[] = d.mine
+    ? ['move', 'haul', 'reinforce', 'build']
+    : d.isHub
+      ? ['move', 'haul']
+      : d.remembered
+        ? ['scout']
+        : ['siege', 'scout'];
+  return [...kinds.map((k) => ORDER_ITEMS[k]), CLOSE_ITEM];
+}
+
+/** What the game screen hands the map: it owns the data, the selection and the orders. */
+export interface MapEmbed {
+  readonly view: PlayerView;
+  readonly selected: Id | null;
+  readonly onSelect: (id: Id | null) => void;
+  /** Fly the map to a district; a new `n` repeats the request. */
+  readonly flyTo: { readonly id: Id; readonly n: number } | null;
+  readonly onOrder: (kind: MapOrderKind, districtId: Id) => void;
+  /** A route to preview while an order card is open. */
+  readonly route?: readonly Id[] | null;
+}
+
 const ZOOM_STEP = 1.6;
 const ROUTE_CARRIER: CarrierKind = 'van';
 
@@ -71,12 +112,24 @@ export function formatEta(ms: number): string {
 }
 
 /** Full-viewport map: the PixiJS canvas plus the navigation HUD. */
-export function MapScreen({ search = window.location.search }: { search?: string }) {
+export function MapScreen({
+  search = window.location.search,
+  embed,
+}: {
+  search?: string;
+  embed?: MapEmbed;
+}) {
   const opts = useMemo(() => parseMapOptions(search), [search]);
   const { theme } = useTheme();
   const palette: PixiPalette = useMemo(() => toPixiPalette(themes[theme]), [theme]);
-  const [view, setView] = useState<MapView | null>(null);
-  const [source, setSource] = useState<'demo' | 'live'>('demo');
+  const [fetched, setView] = useState<MapView | null>(null);
+  const [fetchedSource, setSource] = useState<'demo' | 'live'>('demo');
+  const embedView = embed?.view;
+  const view: MapView | null = useMemo(
+    () => (embedView ? { player: embedView, graph: embedView.graph } : fetched),
+    [embedView, fetched],
+  );
+  const source = embedView ? 'live' : fetchedSource;
   const hostRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<MapRenderer | null>(null);
   const [ready, setReady] = useState(false);
@@ -85,7 +138,16 @@ export function MapScreen({ search = window.location.search }: { search?: string
   const [cam, setCam] = useState<Camera>({ x: 0, y: 0, zoom: 1 });
   const [level, setLevel] = useState<ZoomLevel>(opts.zoom);
   const [vp, setVp] = useState({ w: 1, h: 1 });
-  const [selected, setSelected] = useState<Id | null>(null);
+  const [localSelected, setLocalSelected] = useState<Id | null>(null);
+  const selected = embed ? embed.selected : localSelected;
+  const embedRef = useRef(embed);
+  useEffect(() => {
+    embedRef.current = embed;
+  }, [embed]);
+  const setSelected = useCallback((id: Id | null) => {
+    setLocalSelected(id);
+    embedRef.current?.onSelect(id);
+  }, []);
   const [panel, setPanel] = useState<'inspect' | 'route' | null>(null);
   const [scale, setScale] = useState(1);
   /** Phone layout: the districts list and the minimap sit behind buttons. */
@@ -93,6 +155,7 @@ export function MapScreen({ search = window.location.search }: { search?: string
 
   // data: the logged-in view when there is one, otherwise the demo world
   useEffect(() => {
+    if (embedView) return;
     let live = true;
     const demo = () => demoView({ large: opts.large, reveal: opts.reveal });
     void (async () => {
@@ -104,7 +167,7 @@ export function MapScreen({ search = window.location.search }: { search?: string
     return () => {
       live = false;
     };
-  }, [opts]);
+  }, [opts, embedView]);
 
   const scene: Scene | null = useMemo(
     () => (view ? layoutWorld(view, palette.map) : null),
@@ -217,9 +280,14 @@ export function MapScreen({ search = window.location.search }: { search?: string
     return result ? { from, result, path: routePath(scene, result.route) } : null;
   }, [panel, sel, scene, view]);
 
+  const embedRoute = embed?.route;
+  const embedPath = useMemo(
+    () => (embedRoute && scene ? routePath(scene, embedRoute) : null),
+    [embedRoute, scene],
+  );
   useEffect(() => {
-    rendererRef.current?.setRoutePreview(routeInfo?.path ?? null);
-  }, [routeInfo, ready]);
+    rendererRef.current?.setRoutePreview(embedPath ?? routeInfo?.path ?? null);
+  }, [routeInfo, embedPath, ready]);
 
   const act = (fn: (r: MapRenderer, now: number) => void) => {
     const r = rendererRef.current;
@@ -245,6 +313,16 @@ export function MapScreen({ search = window.location.search }: { search?: string
     });
   };
 
+  // fly to a district when the game screen asks (a feed click, a nearby list entry)
+  const fly = embed?.flyTo;
+  useEffect(() => {
+    if (!fly || !scene || !ready) return;
+    const d = scene.byId[fly.id];
+    if (d) centreOn(d.cx, d.cy);
+    // only a new request (`n`) flies; the scene may change under an old one
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fly?.n, ready]);
+
   const goLevel = (l: ZoomLevel) => {
     if (l === 'city' && scene) {
       const b = cityBounds(scene, palette.map);
@@ -259,6 +337,11 @@ export function MapScreen({ search = window.location.search }: { search?: string
   };
 
   const menuAction = (id: string) => {
+    if (embed && sel) {
+      if (id === 'close') setSelected(null);
+      else embed.onOrder(id as MapOrderKind, sel.id);
+      return;
+    }
     if (id === 'close') {
       setSelected(null);
       setPanel(null);
@@ -326,7 +409,12 @@ export function MapScreen({ search = window.location.search }: { search?: string
   ) : null;
 
   return (
-    <div className={styles['screen']} data-source={source} data-compact={compact}>
+    <div
+      className={styles['screen']}
+      data-source={source}
+      data-compact={compact}
+      data-embedded={embed !== undefined}
+    >
       <div ref={hostRef} className={styles['canvas']} data-testid="map-canvas" />
       {(failed || (hasScene && noWebGl)) && (
         <p className={styles['notice']}>The map needs WebGL.</p>
@@ -508,7 +596,11 @@ export function MapScreen({ search = window.location.search }: { search?: string
               className={styles['menu']}
               style={vars({ '--x': `${String(menuAt.x)}px`, '--y': `${String(menuAt.y)}px` })}
             >
-              <RadialMenu items={MENU} title={sel.name.toUpperCase()} onSelect={menuAction} />
+              <RadialMenu
+                items={embed ? orderMenu(sel) : MENU}
+                title={sel.name.toUpperCase()}
+                onSelect={menuAction}
+              />
             </div>
           )}
         </>

@@ -11,6 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@nexum/contracts": "0.0.0",
     "@nexum/sim": "0.0.0",
     "@nexum/theme": "*",
     "pixi.js": "8.23.0",
