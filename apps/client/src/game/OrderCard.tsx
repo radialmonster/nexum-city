@@ -117,7 +117,7 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
     [view, nowMs, draft],
   );
   const [from, setFrom] = useState<string | null>(nodes[0] ?? null);
-  const [crewIds, setCrewIds] = useState<readonly string[]>([]);
+  const [picked, setPicked] = useState<readonly string[] | null>(null);
   const [carrierId, setCarrierId] = useState<string | null>(null);
   const [cargo, setCargo] = useState<Record<string, number>>({});
   const [building, setBuilding] = useState<Pick['building']>('workshop');
@@ -128,6 +128,8 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
   const carriers = source
     ? carriersAt(view, source).filter((c) => !balance.carriers[c.kind].locked)
     : [];
+  // Until the player picks, the first ready crew is chosen so a new player can confirm at once.
+  const crewIds = picked ?? crews.slice(0, 1).map((c) => c.id);
   const chosenCrews = crews.filter((c) => crewIds.includes(c.id));
   const kind = carrierKindOf(view, carrierId);
   const seats = seatsFor(kind);
@@ -164,8 +166,12 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
     else if (own.construction) blocker = 'Something is already being built here.';
     else if (own.buildings.length >= own.slots && !own.buildings.some((b) => b.type === building))
       blocker = 'No free slot. Upgrade a building you have.';
-    else if (GOOD_KEYS.some((g) => own.warehouse[g] < cost[g]))
-      blocker = 'This warehouse does not hold enough goods.';
+    else if (GOOD_KEYS.some((g) => own.warehouse[g] < cost[g])) {
+      const short = GOOD_KEYS.filter((g) => own.warehouse[g] < cost[g]).map(
+        (g) => `${String(Math.ceil(cost[g] - own.warehouse[g]))} ${g}`,
+      );
+      blocker = `This warehouse is short ${short.join(' and ')}. Buy it at a hub market or haul it in.`;
+    }
   } else if (nodes.length === 0) {
     blocker = 'No crew is ready to go. Crews rest for a while after an order.';
   } else if (chosenCrews.length === 0) {
@@ -193,7 +199,7 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
   })();
 
   const toggle = (id: string) => {
-    setCrewIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
+    setPicked(crewIds.includes(id) ? crewIds.filter((x) => x !== id) : [...crewIds, id]);
   };
 
   const confirm = async () => {

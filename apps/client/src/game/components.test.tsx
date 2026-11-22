@@ -133,9 +133,11 @@ describe('OrderCard', () => {
     return { onConfirm, onClose };
   };
 
-  it('blocks confirming until a crew is picked, then posts the order and closes', async () => {
+  it('pre-picks the first crew, blocks confirming with none, then posts the order and closes', async () => {
     const { onConfirm, onClose } = render_('siege');
     const confirm = screen.getByRole('button', { name: /lay siege/i });
+    expect((confirm as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(screen.getAllByRole('checkbox')[0] as HTMLElement);
     expect((confirm as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText(/Pick at least one crew/)).toBeTruthy();
     fireEvent.click(screen.getAllByRole('checkbox')[0] as HTMLElement);
