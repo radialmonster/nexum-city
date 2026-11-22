@@ -6,7 +6,7 @@ import { step } from './step.js';
 import type { District, GameState } from './types.js';
 import { viewFor } from './fog.js';
 import { addPlayerWithEvents, createWorld } from './world.js';
-import { wantedOpenPlots } from './frontier.js';
+import { sectorName, wantedOpenPlots } from './frontier.js';
 
 function join(state: GameState, n: number): GameState {
   let s = state;
@@ -22,6 +22,14 @@ const open = (s: GameState) =>
   Object.values(s.districts).filter((d) => d.frontier === 'open' && d.owner === 'neutral');
 
 describe('frontier', () => {
+  it('names sectors without a double dash, even at negative coordinates', () => {
+    expect(sectorName(0, 0)).toBe('Sector 1-1');
+    expect(sectorName(2, -1)).toBe('Sector 3-N1');
+    expect(sectorName(-2, 3)).toBe('Sector W2-4');
+    const s = join(createWorld(11), 12);
+    for (const d of Object.values(s.districts)) expect(d.name).not.toContain('--');
+  });
+
   it('starts with open plots on the edge, with no events in history', () => {
     const s = createWorld(11);
     expect(open(s)).toHaveLength(balance.frontier.minOpen);

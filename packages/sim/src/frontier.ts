@@ -9,6 +9,20 @@ export function districtId(x: number, y: number): Id {
   return `d${x}_${y}`;
 }
 
+/**
+ * One axis of a sector name. Non-negative cells count up from 1; cells beyond the
+ * original grid (negative coordinates) read as `N1`, `N2`... on the row axis and
+ * `W1`, `W2`... on the column axis, so names never contain "--".
+ */
+function axisLabel(n: number, negativePrefix: 'N' | 'W'): string {
+  return n >= 0 ? String(n + 1) : `${negativePrefix}${String(-n)}`;
+}
+
+/** The player-facing name of the sector at a grid cell, e.g. `Sector 3-N1`. */
+export function sectorName(x: number, y: number): string {
+  return `Sector ${axisLabel(x, 'W')}-${axisLabel(y, 'N')}`;
+}
+
 export function newDistrict(
   id: Id,
   name: string,
@@ -158,7 +172,7 @@ export function ensureFrontier(ctx: Ctx, instant = false): void {
     if (!cell) return;
     const plot = newDistrict(
       districtId(cell.x, cell.y),
-      `Sector ${cell.x + 1}-${cell.y + 1}`,
+      sectorName(cell.x, cell.y),
       pickKind(state, cell.y),
       cell.x,
       cell.y,

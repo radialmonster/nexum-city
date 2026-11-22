@@ -19,6 +19,7 @@ Every number here is a **tunable default**, kept in one `balance.ts` config obje
 
 - **District:**
   - `id`, `name`, `kind`, `pos` (grid x and y), `owner` (player id or `neutral`);
+  - `name` is `Sector <col>-<row>` (`sectorName` in `frontier.ts`): non-negative cells count from 1, and cells at negative coordinates read `W1`, `W2`... (columns) and `N1`, `N2`... (rows), so the north frontier reads `Sector 3-N1` and never `3--1`. Names are presentational (they do not affect rules) but are part of the state hash. Names are stored as plain strings, so older snapshots keep the old text and still load;
   - `garrison` (crew ids), `stance` (`hold` or `pullback`);
   - `buildings[]`, with 3 slots to start;
   - `warehouse` (goods counts and a capacity);

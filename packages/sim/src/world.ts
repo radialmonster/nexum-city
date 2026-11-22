@@ -2,7 +2,13 @@ import { MS_PER_HOUR, balance, toAtoms } from './balance.js';
 import { afterWarehouseChange } from './production.js';
 import { createRng, nextRange, shuffle } from './rng.js';
 import { emit, type Ctx } from './ctx.js';
-import { chooseStartPlot, districtId, ensureFrontier, newDistrict } from './frontier.js';
+import {
+  chooseStartPlot,
+  districtId,
+  ensureFrontier,
+  newDistrict,
+  sectorName,
+} from './frontier.js';
 import { newHubBooks } from './market.js';
 import { observe } from './fog.js';
 import { placeCrew } from './travel.js';
@@ -67,16 +73,7 @@ export function createWorld(seed: number, options: WorldOptions = {}): GameState
       // Once the shuffled mix runs out (bigger grids), cycle through it.
       const kind: DistrictKind =
         y === rows - 1 ? 'docks' : (mix[mixIndex++ % mix.length] ?? 'residential');
-      addNode(
-        newDistrict(
-          districtId(x, y),
-          `Sector ${x + 1}-${y + 1}`,
-          kind,
-          x,
-          y,
-          balance.buildings.slots,
-        ),
-      );
+      addNode(newDistrict(districtId(x, y), sectorName(x, y), kind, x, y, balance.buildings.slots));
     }
   }
 
