@@ -125,6 +125,7 @@ Each phase ends with something you can open, run or test. Tasks and their status
   - capture rings;
   - moving carriers.
 - Pan, zoom and inertia, with three zoom levels: city, tactical and district.
+- Level of detail by on-screen plot size, per-kind inner patterns, rival faction territories in the demo, and a phone layout with drawers.
 - Minimap with a viewport rectangle, recentre and jump-to, and off-screen alert arrows.
 - Select a district. A radial menu opens. Route preview with an ETA.
 

@@ -2,12 +2,15 @@ import { themes, toPixiPalette } from '@nexum/theme';
 import { describe, expect, it } from 'vitest';
 import { demoView } from './demo';
 import {
+  cityBounds,
   layoutWorld,
   moverPose,
+  ownerLabel,
   pickDistrict,
   pointAlong,
   pointInPolygon,
   silhouette,
+  territories,
 } from './scene';
 
 const t = toPixiPalette(themes.neon).map;
@@ -87,5 +90,31 @@ describe('layoutWorld', () => {
   it('fogs remembered districts in the default demo', () => {
     const fogged = layoutWorld(demoView({ large: true }), t);
     expect(fogged.districts.some((d) => d.remembered)).toBe(true);
+  });
+});
+
+describe('territories and ownership labels', () => {
+  const view = demoView({ large: true, reveal: true });
+  const scene = layoutWorld(view, t);
+
+  it('labels self, neutral and named rivals', () => {
+    expect(ownerLabel('x', true, 'turtle')).toBe('YOU');
+    expect(ownerLabel('neutral', false, 'turtle')).toBe('NEUTRAL');
+    expect(ownerLabel('r', false, 'raider', { r: 'Vex Syndicate' })).toBe('VEX SYNDICATE');
+    expect(ownerLabel('r', false, 'raider')).toBe('RAIDER');
+  });
+
+  it('groups claimed plots per crew, several rivals with distinct roles', () => {
+    const list = territories(scene);
+    expect(list.length).toBeGreaterThanOrEqual(5);
+    expect(new Set(list.map((x) => x.role)).size).toBeGreaterThanOrEqual(4);
+    expect(list.reduce((n, x) => n + x.count, 0)).toBeGreaterThan(scene.mine.length);
+    expect(scene.districts.some((d) => d.owner === 'neutral' && !d.isHub)).toBe(true);
+  });
+
+  it('frames the city including the Sound', () => {
+    const b = cityBounds(scene, t);
+    expect(b.maxY).toBeGreaterThan(scene.waterTop);
+    expect(b.minX).toBe(scene.bounds.minX);
   });
 });

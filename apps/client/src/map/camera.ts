@@ -40,18 +40,34 @@ export function clampZoom(zoom: number, vp: Viewport, t: MapTokens): number {
   return Math.min(hi, Math.max(lo, zoom));
 }
 
-/** Which level a zoom belongs to. */
+/**
+ * How many plots fit across the viewport at a level. The tokens give the
+ * desktop number; a narrow viewport shows fewer plots so a block never gets
+ * smaller than the level's minimum on-screen width.
+ */
+export function acrossForLevel(level: ZoomLevel, vpW: number, t: MapTokens): number {
+  const [across, minPx] =
+    level === 'city'
+      ? [t.acrossCity, t.minPlotPxCity]
+      : level === 'district'
+        ? [t.acrossDistrict, t.minPlotPxDistrict]
+        : [t.acrossTactical, t.minPlotPxTactical];
+  return Math.max(t.acrossMin, Math.min(across, vpW / minPx));
+}
+
+/** Which level a zoom belongs to: the nearer level on a log scale. */
 export function levelForZoom(zoom: number, vp: Viewport, t: MapTokens): ZoomLevel {
   const across = acrossForZoom(zoom, vp.w, t);
-  if (across >= t.levelCityAcross) return 'city';
-  if (across <= t.levelDistrictAcross) return 'district';
+  const city = acrossForLevel('city', vp.w, t);
+  const tactical = acrossForLevel('tactical', vp.w, t);
+  const district = acrossForLevel('district', vp.w, t);
+  if (across >= Math.sqrt(city * tactical)) return 'city';
+  if (across <= Math.sqrt(tactical * district)) return 'district';
   return 'tactical';
 }
 
 export function zoomForLevel(level: ZoomLevel, vp: Viewport, t: MapTokens): number {
-  const across =
-    level === 'city' ? t.acrossCity : level === 'district' ? t.acrossDistrict : t.acrossTactical;
-  return zoomForAcross(across, vp.w, t);
+  return zoomForAcross(acrossForLevel(level, vp.w, t), vp.w, t);
 }
 
 /** Zoom by `factor` keeping the world point under screen point (sx, sy) fixed. */

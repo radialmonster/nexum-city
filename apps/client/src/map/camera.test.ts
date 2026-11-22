@@ -114,3 +114,19 @@ describe('CameraController', () => {
     expect(acrossForZoom(c.cam.zoom, 800, t)).toBeCloseTo(t.acrossTactical);
   });
 });
+
+describe('phone viewport', () => {
+  const phone = { w: 390, h: 844 };
+  it('keeps plots at a readable on-screen width', () => {
+    for (const level of ['tactical', 'district'] as const) {
+      const z = zoomForLevel(level, phone, t);
+      expect(t.pitchX * z).toBeGreaterThanOrEqual(t.minPlotPxTactical * 0.99);
+    }
+  });
+  it('shows far fewer plots across than a wide screen', () => {
+    const wide = acrossForZoom(zoomForLevel('tactical', { w: 1920, h: 1080 }, t), 1920, t);
+    const small = acrossForZoom(zoomForLevel('tactical', phone, t), phone.w, t);
+    expect(small).toBeLessThan(wide);
+    expect(levelForZoom(zoomForLevel('tactical', phone, t), phone, t)).toBe('tactical');
+  });
+});

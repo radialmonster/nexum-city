@@ -5,13 +5,14 @@ import { formatEta, parseMapOptions } from './MapScreen';
 
 describe('parseMapOptions', () => {
   it('reads the query flags', () => {
-    expect(parseMapOptions('?zoom=city&large&reveal')).toEqual({
+    expect(parseMapOptions('?zoom=city&large')).toEqual({
       zoom: 'city',
       large: true,
       reveal: true,
       demo: false,
     });
     expect(parseMapOptions('').zoom).toBe('tactical');
+    expect(parseMapOptions('?fog').reveal).toBe(false);
     expect(parseMapOptions('?zoom=district&large=0').large).toBe(false);
   });
 });

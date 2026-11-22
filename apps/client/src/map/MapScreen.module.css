@@ -46,7 +46,22 @@
   top: var(--space-xl);
   right: var(--space-xl);
   max-height: 50%;
-  overflow: auto;
+  max-width: calc(var(--size-gauge) * 2.4);
+  overflow: hidden auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line) transparent;
+}
+
+.screen .jump::-webkit-scrollbar {
+  width: var(--space-xs);
+}
+
+.screen .jump::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.screen .jump::-webkit-scrollbar-thumb {
+  background: var(--color-line);
 }
 
 .screen .info {
@@ -80,7 +95,11 @@
 
 .jump-list button {
   width: 100%;
+  min-width: 0;
+  overflow: hidden;
   text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .minimap {
@@ -158,4 +177,89 @@
 
 .menu > * {
   pointer-events: auto;
+}
+
+/* the stacks are transparent to layout on wide screens; the phone layout flows them */
+.top,
+.dock {
+  display: contents;
+}
+
+.toggles {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.screen .drawer {
+  max-height: 45vh;
+  overflow: hidden auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line) transparent;
+}
+
+/* phone: panels flow in two stacks (top and bottom) so they can never overlap */
+.screen[data-compact='true'] .top {
+  position: absolute;
+  z-index: var(--z-hud);
+  top: var(--space-md);
+  right: var(--space-md);
+  left: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  pointer-events: none;
+}
+
+.screen[data-compact='true'] .top > * {
+  position: static;
+  pointer-events: auto;
+}
+
+.screen[data-compact='true'] .readout {
+  min-width: 0;
+}
+
+.screen[data-compact='true'] .coords {
+  font-size: var(--font-size-2xl);
+}
+
+.screen[data-compact='true'] .toggles > * {
+  flex: 1;
+}
+
+.screen[data-compact='true'] .minimap {
+  align-self: flex-start;
+}
+
+.screen[data-compact='true'] .minimap svg {
+  width: calc(var(--size-gauge) * 1.5);
+}
+
+.screen[data-compact='true'] .dock {
+  position: absolute;
+  z-index: var(--z-hud);
+  right: var(--space-md);
+  bottom: var(--space-md);
+  left: var(--space-md);
+  display: flex;
+  flex-direction: column-reverse;
+  gap: var(--space-xs);
+  pointer-events: none;
+}
+
+.screen[data-compact='true'] .dock > * {
+  position: static;
+  pointer-events: auto;
+}
+
+.screen[data-compact='true'] .controls {
+  align-items: stretch;
+}
+
+.screen[data-compact='true'] .row > * {
+  flex: 1;
+}
+
+.screen[data-compact='true'] .info {
+  min-width: 0;
 }

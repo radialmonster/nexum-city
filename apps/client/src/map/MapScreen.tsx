@@ -11,7 +11,7 @@ import { readHudScale } from './hudScale';
 import styles from './MapScreen.module.css';
 import { Minimap } from './Minimap';
 import type { MapRenderer } from './renderer';
-import { layoutWorld, routePath, type MapView, type Scene } from './scene';
+import { cityBounds, layoutWorld, routePath, type MapView, type Scene } from './scene';
 
 const LEVELS: readonly { id: ZoomLevel; label: string }[] = [
   { id: 'city', label: 'CITY' },
@@ -32,18 +32,19 @@ const ROUTE_CARRIER: CarrierKind = 'van';
 export interface MapOptions {
   readonly zoom: ZoomLevel;
   readonly large: boolean;
+  /** Show everything, rivals included. On by default for the demo; `?fog` turns it off. */
   readonly reveal: boolean;
   /** Force the demo world even when logged in. */
   readonly demo: boolean;
 }
 
-/** Read `?zoom=city|tactical|district`, `?large`, `?reveal` and `?demo` from a query string. */
+/** Read `?zoom=city|tactical|district`, `?large`, `?fog` and `?demo` from a query string. */
 export function parseMapOptions(search: string): MapOptions {
   const q = new URLSearchParams(search);
   const z = q.get('zoom');
   const zoom: ZoomLevel = z === 'city' || z === 'district' ? z : 'tactical';
   const flag = (k: string) => q.has(k) && q.get(k) !== '0' && q.get(k) !== 'false';
-  return { zoom, large: flag('large'), reveal: flag('reveal'), demo: flag('demo') };
+  return { zoom, large: flag('large'), reveal: !flag('fog'), demo: flag('demo') };
 }
 
 async function fetchMe(): Promise<MapView | null> {
@@ -87,6 +88,8 @@ export function MapScreen({ search = window.location.search }: { search?: string
   const [selected, setSelected] = useState<Id | null>(null);
   const [panel, setPanel] = useState<'inspect' | 'route' | null>(null);
   const [scale, setScale] = useState(1);
+  /** Phone layout: the districts list and the minimap sit behind buttons. */
+  const [drawer, setDrawer] = useState<'districts' | 'map' | null>(null);
 
   // data: the logged-in view when there is one, otherwise the demo world
   useEffect(() => {
@@ -141,6 +144,8 @@ export function MapScreen({ search = window.location.search }: { search?: string
           onFrame: (c, l) => {
             setCam(c);
             setLevel(l);
+            const v = rendererRef.current?.controller.viewport ?? made?.controller.viewport;
+            if (v) setVp((o) => (o.w === v.w && o.h === v.h ? o : { w: v.w, h: v.h }));
           },
           onPick: (id) => {
             setSelected(id);
@@ -154,12 +159,15 @@ export function MapScreen({ search = window.location.search }: { search?: string
         rendererRef.current = made;
         const c = made.controller;
         const b = mineBounds(first);
-        const framed = frameBounds(b, c.viewport, palette.map);
-        c.set({
-          x: (b.minX + b.maxX) / 2,
-          y: (b.minY + b.maxY) / 2,
-          zoom: zoomForLevel(opts.zoom, c.viewport, palette.map) || framed.zoom,
-        });
+        if (opts.zoom === 'city') {
+          c.set(frameBounds(cityBounds(first, palette.map), c.viewport, palette.map, 0.03));
+        } else {
+          c.set({
+            x: (b.minX + b.maxX) / 2,
+            y: (b.minY + b.maxY) / 2,
+            zoom: zoomForLevel(opts.zoom, c.viewport, palette.map),
+          });
+        }
         setVp({ ...c.viewport });
         setReady(true);
       } catch {
@@ -237,6 +245,19 @@ export function MapScreen({ search = window.location.search }: { search?: string
     });
   };
 
+  const goLevel = (l: ZoomLevel) => {
+    if (l === 'city' && scene) {
+      const b = cityBounds(scene, palette.map);
+      act((r, now) => {
+        r.controller.animateTo(frameBounds(b, r.controller.viewport, palette.map, 0.03), now);
+      });
+    } else {
+      act((r, now) => {
+        r.controller.animateToLevel(l, now);
+      });
+    }
+  };
+
   const menuAction = (id: string) => {
     if (id === 'close') {
       setSelected(null);
@@ -267,107 +288,197 @@ export function MapScreen({ search = window.location.search }: { search?: string
   const row = Math.round(cam.y / palette.map.pitchY);
   const across = vp.w / cam.zoom / palette.map.pitchX;
   const menuAt = sel && ready ? worldToHud(sel, cam, vp) : null;
+  const compact = ready && vp.w < palette.map.compactBelowPx;
+
+  const districtList = scene ? (
+    <ul className={styles['jump-list']}>
+      {scene.mine.map((id) => {
+        const d = scene.byId[id];
+        if (!d) return null;
+        return (
+          <li key={id}>
+            <Button
+              onClick={() => {
+                setSelected(id);
+                centreOn(d.cx, d.cy);
+                setDrawer(null);
+              }}
+            >
+              {d.name.toUpperCase()}
+            </Button>
+          </li>
+        );
+      })}
+    </ul>
+  ) : null;
+  const minimap = scene ? (
+    <div className={styles['minimap']}>
+      <Minimap
+        scene={scene}
+        camera={cam}
+        viewport={vp}
+        pitch={palette.map.pitchX}
+        onJump={(x, y) => {
+          centreOn(x, y, level);
+        }}
+      />
+    </div>
+  ) : null;
 
   return (
-    <div className={styles['screen']} data-source={source}>
+    <div className={styles['screen']} data-source={source} data-compact={compact}>
       <div ref={hostRef} className={styles['canvas']} data-testid="map-canvas" />
       {(failed || (hasScene && noWebGl)) && (
         <p className={styles['notice']}>The map needs WebGL.</p>
       )}
       {scene && (
         <>
-          <Panel
-            className={cx(styles['readout'])}
-            title="SECTOR"
-            tag={source === 'demo' ? 'DEMO' : 'LIVE'}
-          >
-            <div className={styles['coords']}>
-              {String(col).padStart(2, '0')}-{String(row).padStart(2, '0')}
-            </div>
-            <div className={styles['sub']}>
-              {level.toUpperCase()} / {across.toFixed(1)} PLOTS / {String(scene.districts.length)}{' '}
-              DISTRICTS
-            </div>
-          </Panel>
+          <div className={styles['top']}>
+            <Panel
+              className={cx(styles['readout'])}
+              title="SECTOR"
+              tag={source === 'demo' ? 'DEMO' : 'LIVE'}
+            >
+              <div className={styles['coords']}>
+                {String(col).padStart(2, '0')}-{String(row).padStart(2, '0')}
+              </div>
+              <div className={styles['sub']}>
+                {level.toUpperCase()} / {across.toFixed(1)} PLOTS / {String(scene.districts.length)}{' '}
+                DISTRICTS
+              </div>
+            </Panel>
 
-          <Panel
-            className={cx(styles['jump'])}
-            title="MY DISTRICTS"
-            tag={String(scene.mine.length)}
-          >
-            <ul className={styles['jump-list']}>
-              {scene.mine.map((id) => {
-                const d = scene.byId[id];
-                if (!d) return null;
-                return (
-                  <li key={id}>
-                    <Button
-                      onClick={() => {
-                        setSelected(id);
-                        centreOn(d.cx, d.cy);
-                      }}
-                    >
-                      {d.name.toUpperCase()}
-                    </Button>
-                  </li>
-                );
-              })}
-            </ul>
-          </Panel>
+            {compact && (
+              <div className={styles['toggles']}>
+                <Button
+                  variant={drawer === 'districts' ? 'primary' : 'ghost'}
+                  aria-expanded={drawer === 'districts'}
+                  onClick={() => {
+                    setDrawer(drawer === 'districts' ? null : 'districts');
+                  }}
+                >
+                  MY DISTRICTS {String(scene.mine.length)}
+                </Button>
+                <Button
+                  variant={drawer === 'map' ? 'primary' : 'ghost'}
+                  aria-expanded={drawer === 'map'}
+                  onClick={() => {
+                    setDrawer(drawer === 'map' ? null : 'map');
+                  }}
+                >
+                  MAP
+                </Button>
+              </div>
+            )}
 
-          <div className={styles['minimap']}>
-            <Minimap
-              scene={scene}
-              camera={cam}
-              viewport={vp}
-              pitch={palette.map.pitchX}
-              onJump={(x, y) => {
-                centreOn(x, y, level);
-              }}
-            />
+            {!compact && (
+              <Panel
+                className={cx(styles['jump'])}
+                title="MY DISTRICTS"
+                tag={String(scene.mine.length)}
+              >
+                {districtList}
+              </Panel>
+            )}
+            {compact && drawer === 'districts' && (
+              <Panel
+                className={cx(styles['drawer'])}
+                title="MY DISTRICTS"
+                tag={String(scene.mine.length)}
+              >
+                {districtList}
+              </Panel>
+            )}
+            {(!compact || drawer === 'map') && minimap}
           </div>
 
-          <div className={styles['controls']}>
-            <div className={styles['row']}>
-              {LEVELS.map((l) => (
+          <div className={styles['dock']}>
+            <div className={styles['controls']}>
+              <div className={styles['row']}>
+                {LEVELS.map((l) => (
+                  <Button
+                    key={l.id}
+                    variant={l.id === level ? 'primary' : 'ghost'}
+                    onClick={() => {
+                      goLevel(l.id);
+                    }}
+                  >
+                    {l.label}
+                  </Button>
+                ))}
+              </div>
+              <div className={styles['row']}>
                 <Button
-                  key={l.id}
-                  variant={l.id === level ? 'primary' : 'ghost'}
+                  aria-label="Zoom out"
                   onClick={() => {
                     act((r, now) => {
-                      r.controller.animateToLevel(l.id, now);
+                      r.controller.animateZoomBy(1 / ZOOM_STEP, now);
                     });
                   }}
                 >
-                  {l.label}
+                  -
                 </Button>
-              ))}
+                <Button
+                  aria-label="Zoom in"
+                  onClick={() => {
+                    act((r, now) => {
+                      r.controller.animateZoomBy(ZOOM_STEP, now);
+                    });
+                  }}
+                >
+                  +
+                </Button>
+                <Button onClick={recentre}>RECENTRE</Button>
+              </div>
             </div>
-            <div className={styles['row']}>
-              <Button
-                aria-label="Zoom out"
-                onClick={() => {
-                  act((r, now) => {
-                    r.controller.animateZoomBy(1 / ZOOM_STEP, now);
-                  });
-                }}
-              >
-                -
-              </Button>
-              <Button
-                aria-label="Zoom in"
-                onClick={() => {
-                  act((r, now) => {
-                    r.controller.animateZoomBy(ZOOM_STEP, now);
-                  });
-                }}
-              >
-                +
-              </Button>
-              <Button onClick={recentre}>RECENTRE</Button>
-            </div>
-          </div>
 
+            {sel && panel === 'inspect' && (
+              <Panel
+                className={cx(styles['info'])}
+                title={sel.name.toUpperCase()}
+                tag={sel.kind.toUpperCase()}
+              >
+                <div className={styles['sub']}>
+                  {sel.remembered
+                    ? 'REMEMBERED / LAST KNOWN'
+                    : sel.mine
+                      ? 'YOURS'
+                      : sel.owner === 'neutral'
+                        ? 'UNCLAIMED'
+                        : 'RIVAL'}
+                </div>
+                {!sel.remembered && (
+                  <div>
+                    GARRISON {String(sel.garrison)} / STOCK {String(Math.round(sel.stock * 100))}%
+                  </div>
+                )}
+                {sel.siege !== null && (
+                  <Tag faction="raider">UNDER SIEGE {String(Math.round(sel.siege * 100))}%</Tag>
+                )}
+              </Panel>
+            )}
+            {sel && panel === 'route' && (
+              <Panel className={cx(styles['info'])} title="ROUTE" tag={ROUTE_CARRIER.toUpperCase()}>
+                {routeInfo ? (
+                  <>
+                    <div>
+                      {(scene.byId[routeInfo.from]?.name ?? '').toUpperCase()} TO{' '}
+                      {sel.name.toUpperCase()}
+                    </div>
+                    <div className={styles['sub']}>
+                      {String(routeInfo.result.route.length - 1)} HOPS /{' '}
+                      {(routeInfo.result.lengthM / 1000).toFixed(1)} KM
+                    </div>
+                    <div className={styles['coords']}>
+                      ETA {formatEta(routeInfo.result.durationMs)}
+                    </div>
+                  </>
+                ) : (
+                  <div className={styles['sub']}>NO ROUTE DATA FOR THIS DISTRICT</div>
+                )}
+              </Panel>
+            )}
+          </div>
           {arrows.map((a) => (
             <button
               key={a.id}
@@ -399,53 +510,6 @@ export function MapScreen({ search = window.location.search }: { search?: string
             >
               <RadialMenu items={MENU} title={sel.name.toUpperCase()} onSelect={menuAction} />
             </div>
-          )}
-
-          {sel && panel === 'inspect' && (
-            <Panel
-              className={cx(styles['info'])}
-              title={sel.name.toUpperCase()}
-              tag={sel.kind.toUpperCase()}
-            >
-              <div className={styles['sub']}>
-                {sel.remembered
-                  ? 'REMEMBERED / LAST KNOWN'
-                  : sel.mine
-                    ? 'YOURS'
-                    : sel.owner === 'neutral'
-                      ? 'UNCLAIMED'
-                      : 'RIVAL'}
-              </div>
-              {!sel.remembered && (
-                <div>
-                  GARRISON {String(sel.garrison)} / STOCK {String(Math.round(sel.stock * 100))}%
-                </div>
-              )}
-              {sel.siege !== null && (
-                <Tag faction="raider">UNDER SIEGE {String(Math.round(sel.siege * 100))}%</Tag>
-              )}
-            </Panel>
-          )}
-          {sel && panel === 'route' && (
-            <Panel className={cx(styles['info'])} title="ROUTE" tag={ROUTE_CARRIER.toUpperCase()}>
-              {routeInfo ? (
-                <>
-                  <div>
-                    {(scene.byId[routeInfo.from]?.name ?? '').toUpperCase()} TO{' '}
-                    {sel.name.toUpperCase()}
-                  </div>
-                  <div className={styles['sub']}>
-                    {String(routeInfo.result.route.length - 1)} HOPS /{' '}
-                    {(routeInfo.result.lengthM / 1000).toFixed(1)} KM
-                  </div>
-                  <div className={styles['coords']}>
-                    ETA {formatEta(routeInfo.result.durationMs)}
-                  </div>
-                </>
-              ) : (
-                <div className={styles['sub']}>NO ROUTE DATA FOR THIS DISTRICT</div>
-              )}
-            </Panel>
           )}
         </>
       )}

@@ -104,6 +104,8 @@ The city is bigger than one screen (see "The world"), so the map is a window you
   1. **City:** every district is a coloured territory blob. It shows who holds what, where the frontier is, and pings for your alerts and the newest arrival.
   2. **Tactical (the default):** streets, convoys, siege rings, prices and fog. Orders are given here.
   3. **District:** a close view of one district, showing building slots, walls under construction, the warehouse level, crews at the gates and parked carriers.
+- **Level of detail follows on-screen size, not zoom level.** Each plot is measured in screen pixels. Below a minimum the name is hidden; above it the name, the owner sub-label, the inner pattern (dock cranes, grid lines, archive rows, farm rows, residential windows) and the hub price bars appear in steps, with a richer layer at district zoom. Tactical frames about 25-35 plots on a 1920-wide screen and fewer on a phone. All thresholds are `map` theme tokens.
+- **On phones (narrower than `compactBelowPx`)** the jump list and minimap collapse into buttons that open one drawer at a time, and the controls sit at the bottom within thumb reach, so panels never overlap.
 - **Navigation cluster** in the bottom-left corner of the map:
   - a minimap of the whole city with coloured territories, your viewport rectangle and alert pings;
   - zoom + and − buttons and the three level buttons;

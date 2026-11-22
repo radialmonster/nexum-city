@@ -42,3 +42,16 @@ describe.each(Object.entries(themes))('toPixiPalette(%s)', (_, theme) => {
     }
   });
 });
+
+describe('map detail tokens', () => {
+  it('exist in every theme with sane ordering', () => {
+    for (const theme of Object.values(themes)) {
+      const m = toPixiPalette(theme).map;
+      expect(m.lodNameMinPx).toBeLessThan(m.lodSubMinPx);
+      expect(m.lodDetailMinPx).toBeLessThan(m.lodRichMinPx);
+      expect(m.compactBelowPx).toBeGreaterThan(0);
+      expect(m.detailAlpha).toBeGreaterThan(0);
+      expect(m.innerGlowSteps).toBeGreaterThan(0);
+    }
+  });
+});

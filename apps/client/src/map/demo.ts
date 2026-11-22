@@ -21,11 +21,36 @@ import { GOOD_ORDER, type MapView } from './scene';
 
 export const DEMO_SELF = 'you';
 
+/**
+ * The rival crews of the demo city. Ids sort in the order the map cycles
+ * colour roles (raider, turtle, merchant, hunter, rival, newcomer), so each crew
+ * gets a different faction colour.
+ */
+export const DEMO_RIVALS: readonly {
+  id: Id;
+  name: string;
+  fx: number;
+  fy: number;
+  plots: number;
+}[] = [
+  { id: 'rival-1', name: 'Vex Syndicate', fx: 0.86, fy: 0.12, plots: 9 },
+  { id: 'rival-2', name: 'Iron Choir', fx: 0.1, fy: 0.08, plots: 9 },
+  { id: 'rival-3', name: 'Saffron Exchange', fx: 0.88, fy: 0.85, plots: 9 },
+  { id: 'rival-4', name: 'Null Pact', fx: 0.1, fy: 0.82, plots: 8 },
+  { id: 'rival-5', name: 'Helix', fx: 0.5, fy: 0.02, plots: 7 },
+  { id: 'rival-6', name: 'Kestrel Crew', fx: 0.56, fy: 1, plots: 4 },
+];
+
+/** Display names for the demo crews. */
+export function demoCrewNames(): Record<Id, string> {
+  return Object.fromEntries(DEMO_RIVALS.map((r) => [r.id, r.name]));
+}
+
 export interface DemoOptions {
   seed?: number;
   /** World size; `large` gives 15 x 9 = 135 plots plus hubs. */
   large?: boolean;
-  /** Show every district as visible instead of fogging what the player cannot see. */
+  /** Show every district as visible instead of fogging what the player cannot see (the demo default). */
   reveal?: boolean;
 }
 
@@ -57,26 +82,17 @@ export function demoState(opts: DemoOptions = {}): GameState {
   let state = createWorld(opts.seed ?? 7, { cols, rows });
   const at = (fx: number, fy: number): Id =>
     districtId(Math.round((cols - 1) * fx), Math.round((rows - 2) * fy));
-  const crews: [Id, number, number][] = [
-    [DEMO_SELF, 0.3, 0.55],
-    ['rival-raider', 0.8, 0.2],
-    ['rival-turtle', 0.15, 0.05],
-    ['rival-trader', 0.75, 0.8],
+  const crews: [Id, number, number, number][] = [
+    [DEMO_SELF, 0.5, 0.55, 12],
+    ...DEMO_RIVALS.map<[Id, number, number, number]>((r) => [r.id, r.fx, r.fy, r.plots]),
   ];
   for (const [id, fx, fy] of crews) {
     state = addPlayer(state, { id, districtId: at(fx, fy), protectedHours: 0 });
   }
   const scale = opts.large === true ? 1 : 0.4;
-  for (const [id, fx, fy] of crews) {
+  for (const [id, fx, fy, plots] of crews) {
     const home = state.districts[at(fx, fy)];
-    if (home)
-      claimNear(
-        state,
-        id,
-        home.pos.x,
-        home.pos.y,
-        Math.round((id === DEMO_SELF ? 9 : 7) * (opts.large === true ? 1 : scale)),
-      );
+    if (home) claimNear(state, id, home.pos.x, home.pos.y, Math.round(plots * scale));
   }
   // a siege on one of the player's plots and a few moving carriers
   const mine = Object.values(state.districts).filter((d) => d.owner === DEMO_SELF);
@@ -135,7 +151,13 @@ export function demoView(opts: DemoOptions = {}): MapView {
   if (opts.reveal === true) player = revealAll(player, state);
   // loop the carrier forever: the demo has no server clock
   const mine = Object.values(player.movements);
-  return { player, graph: state.graph, prices: demoPrices(player), loopMovements: mine.length > 0 };
+  return {
+    player,
+    graph: state.graph,
+    prices: demoPrices(player),
+    crewNames: demoCrewNames(),
+    loopMovements: mine.length > 0,
+  };
 }
 
 /** Stable made-up relative prices (0 to 1) for each hub, so the price bars have something to show. */

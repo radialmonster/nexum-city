@@ -33,6 +33,8 @@ export interface MapView {
   prices?: Readonly<Record<Id, Partial<Record<Good, number>>>>;
   /** Things that need the player, shown as pings and off-screen arrows. */
   alerts?: readonly MapAlert[];
+  /** Display names of the crews, by player id. */
+  crewNames?: Readonly<Record<Id, string>>;
   /** Replay a movement forever (the demo has no server clock). */
   loopMovements?: boolean;
 }
@@ -71,6 +73,8 @@ export interface SceneDistrict {
   points: number[];
   owner: Owner;
   role: FactionRole;
+  /** Short owner name for the sub-label: YOU, a crew name, or NEUTRAL. */
+  ownerLabel: string;
   mine: boolean;
   /** In sight right now. False for remembered districts (drawn as dimmed fog). */
   visible: boolean;
@@ -275,6 +279,56 @@ export function assignRoles(player: PlayerView): Map<Owner, FactionRole> {
   return roles;
 }
 
+/** The name shown under a district: YOU, a crew name (or its colour role), or NEUTRAL. */
+export function ownerLabel(
+  owner: Owner,
+  mine: boolean,
+  role: FactionRole,
+  names?: Readonly<Record<Id, string>>,
+): string {
+  if (mine) return 'YOU';
+  if (owner === 'neutral') return 'NEUTRAL';
+  return (names?.[owner] ?? role).toUpperCase();
+}
+
+/** One crew's territory, for the CITY-level label: where its plots centre and how many. */
+export interface Territory {
+  owner: Id;
+  role: FactionRole;
+  label: string;
+  cx: number;
+  cy: number;
+  count: number;
+}
+
+/** Group claimed plots by owner. Sorted by owner id so the result is stable. */
+export function territories(scene: Scene): Territory[] {
+  const by = new Map<Id, { t: Territory; sx: number; sy: number }>();
+  for (const d of scene.districts) {
+    if (d.owner === 'neutral' || d.isHub) continue;
+    let e = by.get(d.owner);
+    if (!e) {
+      e = {
+        t: { owner: d.owner, role: d.role, label: d.ownerLabel, cx: 0, cy: 0, count: 0 },
+        sx: 0,
+        sy: 0,
+      };
+      by.set(d.owner, e);
+    }
+    e.sx += d.cx;
+    e.sy += d.cy;
+    e.t.count++;
+  }
+  return [...by.values()]
+    .map(({ t, sx, sy }) => ({ ...t, cx: sx / t.count, cy: sy / t.count }))
+    .sort((a, b) => a.owner.localeCompare(b.owner));
+}
+
+/** World bounds of the whole city including the Sound, for framing the CITY level. */
+export function cityBounds(scene: Scene, t: MapTokens): Bounds {
+  return { ...scene.bounds, maxY: scene.waterTop + t.pitchY * 1.2 };
+}
+
 /** Streets from the graph, or derived from plot positions when the view has no graph. */
 function layoutStreets(view: MapView, t: MapTokens, by: Record<Id, SceneDistrict>): SceneStreet[] {
   const streets: SceneStreet[] = [];
@@ -368,6 +422,7 @@ export function layoutWorld(view: MapView, t: MapTokens): Scene {
       h: dh,
       points: silhouette(kind, dw, dh, t.chamfer),
       owner,
+      ownerLabel: ownerLabel(owner, mine, roles.get(owner) ?? 'neutral', view.crewNames),
       role: isHub ? 'neutral' : (roles.get(owner) ?? 'neutral'),
       mine,
       visible: !remembered,

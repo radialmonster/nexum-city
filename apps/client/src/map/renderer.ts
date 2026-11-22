@@ -19,7 +19,8 @@ import {
   type ZoomLevel,
 } from './camera';
 import { readHudScale } from './hudScale';
-import { moverPose, pickDistrict, type Scene, type SceneDistrict } from './scene';
+import { glowRings, insetPoints, kindDetail, lodFor, type Lod } from './detail';
+import { moverPose, pickDistrict, territories, type Scene, type SceneDistrict } from './scene';
 
 export interface RendererCallbacks {
   /** The camera or its level changed (called at most once per frame). */
@@ -94,6 +95,7 @@ export class MapRenderer {
   private baseDirty = true;
   private builtZoom = 0;
   private builtLevel: ZoomLevel = 'tactical';
+  private builtLod = '';
   private lastCam: Camera | null = null;
   private lastLevel: ZoomLevel | null = null;
   private raf = 0;
@@ -350,6 +352,7 @@ export class MapRenderer {
     const vp = this.controller.viewport;
     const level = this.controller.level();
     if (
+      this.lodKey(cam.zoom) !== this.builtLod ||
       level !== this.builtLevel ||
       this.builtZoom === 0 ||
       Math.abs(Math.log(cam.zoom / this.builtZoom)) > 0.25
@@ -378,11 +381,23 @@ export class MapRenderer {
     }
   }
 
+  /** The level-of-detail flags for a zoom, as a string so changes are cheap to spot. */
+  private lodKey(zoom: number): string {
+    const l = this.lodAt(zoom);
+    return `${l.name ? 'n' : '-'}${l.sub ? 's' : '-'}${l.detail ? 'd' : '-'}${l.rich ? 'r' : '-'}`;
+  }
+
+  private lodAt(zoom: number): Lod {
+    return lodFor(this.pal.map.pitchX * zoom, this.pal.map);
+  }
+
   private drawBase(level: ZoomLevel, zoom: number): void {
     const { pal, scene, base: g } = this;
     const m = pal.map;
     const px = 1 / zoom;
+    const lod = this.lodAt(zoom);
     g.clear();
+    this.builtLod = this.lodKey(zoom);
     this.builtZoom = zoom;
     this.builtLevel = level;
     this.baseDirty = false;
@@ -420,10 +435,48 @@ export class MapRenderer {
     }
 
     // districts
-    for (const d of scene.districts) this.drawDistrict(g, d, level, px);
+    for (const d of scene.districts) this.drawDistrict(g, d, level, px, lod);
+    if (city) this.drawTerritoryEdges(g, px);
   }
 
-  private drawDistrict(g: Graphics, d: SceneDistrict, level: ZoomLevel, px: number): void {
+  /** CITY level: a bold outline in the faction colour where one crew's land meets anything else. */
+  private drawTerritoryEdges(g: Graphics, px: number): void {
+    const { scene, pal } = this;
+    const m = pal.map;
+    const key = (gx: number, gy: number): string => `${gx},${gy}`;
+    const grid = new Map<string, SceneDistrict>();
+    for (const d of scene.districts) {
+      if (d.isHub) continue;
+      grid.set(key(Math.round(d.cx / m.pitchX), Math.round(d.cy / m.pitchY)), d);
+    }
+    const hw = m.pitchX / 2;
+    const hh = m.pitchY / 2;
+    const sides: [number, number, number, number, number, number][] = [
+      [0, -1, -hw, -hh, hw, -hh],
+      [1, 0, hw, -hh, hw, hh],
+      [0, 1, -hw, hh, hw, hh],
+      [-1, 0, -hw, -hh, -hw, hh],
+    ];
+    for (const d of scene.districts) {
+      if (d.isHub || d.owner === 'neutral' || d.remembered) continue;
+      const gx = Math.round(d.cx / m.pitchX);
+      const gy = Math.round(d.cy / m.pitchY);
+      for (const [dx, dy, x1, y1, x2, y2] of sides) {
+        const n = grid.get(key(gx + dx, gy + dy));
+        if (n && n.owner === d.owner) continue;
+        g.moveTo(d.cx + x1, d.cy + y1).lineTo(d.cx + x2, d.cy + y2);
+        g.stroke({ width: m.edgeWidthSelected * 1.5 * px, ...pal.faction[d.role] });
+      }
+    }
+  }
+
+  private drawDistrict(
+    g: Graphics,
+    d: SceneDistrict,
+    level: ZoomLevel,
+    px: number,
+    lod: Lod,
+  ): void {
     const { pal } = this;
     const m = pal.map;
     const role = pal.faction[d.role];
@@ -442,15 +495,32 @@ export class MapRenderer {
     if (d.isHub) {
       g.poly(flat, true).fill(withA(pal.color.accent, m.fillAlphaNeutral));
       g.poly(flat, true).stroke({ width: m.edgeWidth * 1.5 * px, ...pal.color.accent });
-      g.circle(d.cx, d.cy, m.hubRadius * 0.45).stroke({
-        width: m.edgeWidth * px,
-        ...withA(pal.color.accent, 0.8),
-      });
-      g.circle(d.cx, d.cy, m.hubRadius * 0.14).fill(pal.color.accent);
+      if (city) {
+        g.circle(d.cx, d.cy, m.hubRadius * 0.14).fill(pal.color.accent);
+        return;
+      }
+      this.glow(g, d, pal.color.accent);
+      // the market face: a header rule under the label and a baseline for the price bars
+      const R = m.hubRadius;
+      const rule = (y: number, a: number): void => {
+        g.moveTo(d.cx - R * 0.55, d.cy + y)
+          .lineTo(d.cx + R * 0.55, d.cy + y)
+          .stroke({ width: m.detailLine * px, ...withA(pal.color.accent, a) });
+      };
+      if (lod.detail) {
+        rule(-R * 0.08, m.detailAlpha);
+        rule(R * 0.66, m.detailAlpha * 1.5);
+      }
       return;
     }
     const alpha = unclaimed ? m.fillAlphaNeutral : city ? m.fillAlphaCity : m.fillAlpha;
+    // an opaque base so the streets drawn underneath do not show through the tint
+    if (!city) g.poly(flat, true).fill(pal.color.bg);
     g.poly(flat, true).fill(withA(role, alpha));
+    if (!city) {
+      this.glow(g, d, role);
+      if (lod.detail) this.texture(g, d, role, lod.rich, px, unclaimed ? 0.6 : 1);
+    }
     if (city) {
       // a hairline per plot keeps the territory readable as a grid of plots
       g.poly(flat, true).stroke({
@@ -462,14 +532,51 @@ export class MapRenderer {
     }
     const lw = (sel ? m.edgeWidthSelected : m.edgeWidth) * px;
     if (unclaimed) {
-      g.stroke({ width: lw, ...pal.color.plot });
-      dashedPolygon(g, pts, d.cx, d.cy, m.frontierDash * px, m.frontierDashGap * px);
-      g.stroke({ width: lw, ...pal.color.plot });
+      g.poly(flat, true).stroke({ width: lw, ...pal.color.plot });
     } else {
       if (sel || d.mine) g.poly(flat, true).stroke({ width: lw * 3, ...withA(role, 0.18) });
       g.poly(flat, true).stroke({ width: lw, ...role });
     }
     if (sel) g.poly(flat, true).stroke({ width: m.edgeWidthSelected * px, ...pal.color.accentAlt });
+  }
+
+  /** The faint inner glow: outline rings stepping inwards and fading. */
+  private glow(g: Graphics, d: SceneDistrict, colour: PixiColor): void {
+    const m = this.pal.map;
+    for (const r of glowRings(m)) {
+      const ring = Array.from(
+        insetPoints(d.points, r.k),
+        (v, i) => v + (i % 2 === 0 ? d.cx : d.cy),
+      );
+      g.poly(ring, true).stroke({
+        width: (m.edgeWidth * 2) / this.controller.cam.zoom,
+        ...withA(colour, r.a),
+      });
+    }
+  }
+
+  /** The per-kind inner texture (cranes, power lines, data rows, fields, windows). */
+  private texture(
+    g: Graphics,
+    d: SceneDistrict,
+    colour: PixiColor,
+    rich: boolean,
+    px: number,
+    k: number,
+  ): void {
+    const m = this.pal.map;
+    for (const p of kindDetail(d.kind, d.w, d.h, rich)) {
+      if (p.k === 'line') {
+        g.moveTo(d.cx + p.x1, d.cy + p.y1)
+          .lineTo(d.cx + p.x2, d.cy + p.y2)
+          .stroke({ width: m.detailLine * px, ...withA(colour, m.detailAlpha * p.a * k) });
+      } else {
+        if (p.k === 'rect') g.rect(d.cx + p.x, d.cy + p.y, p.w, p.h);
+        else g.circle(d.cx + p.x, d.cy + p.y, p.r);
+        if (p.fill) g.fill(withA(colour, m.detailFillAlpha * p.a * k));
+        else g.stroke({ width: m.detailLine * px, ...withA(colour, m.detailAlpha * p.a * k) });
+      }
+    }
   }
 
   /** In the city view districts grow to the full pitch so territories read as blobs. */
@@ -491,15 +598,18 @@ export class MapRenderer {
       const goodColours = [pal.color.accent, pal.color.warn, pal.color.accentAlt, pal.color.ok];
       for (const d of scene.districts) {
         if (!d.prices) continue;
-        const x0 = d.cx + m.hubRadius + m.priceBarGap;
+        const n = d.prices.length;
+        const total = n * m.priceBarWidth + (n - 1) * m.priceBarGap;
+        const x0 = d.cx - total / 2;
+        const floor = d.cy + m.hubRadius * 0.62;
         d.prices.forEach((p, i) => {
           const c = goodColours[i] ?? pal.color.accent;
           const x = x0 + i * (m.priceBarWidth + m.priceBarGap);
-          g.rect(x, d.cy - m.priceBarHeight / 2, m.priceBarWidth, m.priceBarHeight).fill(
+          g.rect(x, floor - m.priceBarHeight, m.priceBarWidth, m.priceBarHeight).fill(
             pal.color.track,
           );
           const hgt = m.priceBarHeight * p;
-          g.rect(x, d.cy + m.priceBarHeight / 2 - hgt, m.priceBarWidth, hgt).fill(c);
+          g.rect(x, floor - hgt, m.priceBarWidth, hgt).fill(c);
         });
       }
     }
@@ -616,14 +726,61 @@ export class MapRenderer {
     return t;
   }
 
+  /** Show a label shrunk to fit `maxPx` wide, or hide it when that would make it unreadable. */
+  private place(t: Text, x: number, y: number, maxPx: number, alpha = 1): void {
+    t.scale.set(1);
+    const k = Math.min(1, maxPx / Math.max(1, t.width));
+    t.scale.set(k);
+    t.position.set(x, y);
+    t.alpha = alpha;
+    t.visible = k >= this.pal.map.labelMinScale;
+  }
+
   private drawLabels(level: ZoomLevel, cam: Camera): void {
     const vp = this.controller.viewport;
     const { pal, scene } = this;
+    const m = pal.map;
     const fs = pal.fontSize;
     for (const t of this.labels.values()) t.visible = false;
-    if (level === 'city') return;
+    const lod = this.lodAt(cam.zoom);
+    if (level === 'city') {
+      const size = fs.lg * this.hudScale * m.cityLabelScale;
+      for (const tr of territories(scene)) {
+        const s = worldToScreen(cam, vp, tr.cx, tr.cy);
+        const t = this.label(`t:${tr.owner}`, tr.label, size, pal.faction[tr.role], false);
+        const reach = Math.sqrt(tr.count) * m.pitchX * cam.zoom * 1.6;
+        this.place(t, s.x, s.y, reach);
+      }
+    } else if (lod.name) {
+      this.districtLabels(level, cam, lod);
+    }
+    // the Sound
+    const w = worldToScreen(
+      cam,
+      vp,
+      (scene.bounds.minX + scene.bounds.maxX) / 2,
+      scene.waterTop + m.pitchY * 0.5,
+    );
+    const sound = this.label(
+      'sound',
+      'THE SOUND',
+      fs['2xl'] * this.hudScale * (level === 'city' ? m.cityLabelScale : 1),
+      pal.color.waterLabel,
+      false,
+    );
+    sound.scale.set(1);
+    sound.position.set(w.x, w.y);
+    sound.alpha = 1;
+    sound.visible = true;
+  }
+
+  private districtLabels(level: ZoomLevel, cam: Camera, lod: Lod): void {
+    const vp = this.controller.viewport;
+    const { pal, scene } = this;
+    const m = pal.map;
+    const fs = pal.fontSize;
     const view = visibleRect(cam, vp);
-    const pad = pal.map.pitchX;
+    const pad = m.pitchX;
     const nameSize = (level === 'district' ? fs.xl : fs.md) * this.hudScale;
     const subSize = (level === 'district' ? fs.md : fs.xs) * this.hudScale;
     for (const d of scene.districts) {
@@ -637,44 +794,27 @@ export class MapRenderer {
       const s = worldToScreen(cam, vp, d.cx, d.cy);
       const dim = d.remembered;
       const colour = dim ? pal.color.textDim : d.isHub ? pal.color.accent : pal.color.text;
+      // hubs are octagons, so their text has less room than the box suggests
+      const room = d.w * cam.zoom * (d.isHub ? 0.72 : 1) * m.labelFit;
+      const nameY = d.isHub ? -d.h * 0.27 : -d.h * 0.1;
       const name = this.label(
         `n:${d.id}`,
-        d.remembered ? '?' : d.name.toUpperCase(),
+        dim ? '?' : d.name.toUpperCase(),
         nameSize,
         colour,
         true,
       );
-      name.position.set(s.x, s.y - subSize * 0.7);
-      name.alpha = dim ? 0.7 : 1;
-      name.visible = true;
-      if (!dim && !d.isHub) {
-        const kind = this.label(
-          `k:${d.id}`,
-          d.kind.toUpperCase(),
-          subSize,
-          pal.color.textDim,
-          true,
-        );
-        kind.position.set(s.x, s.y + nameSize * 0.6);
-        kind.visible = true;
-      }
+      this.place(name, s.x, s.y + nameY * cam.zoom, room, dim ? 0.7 : 1);
+      if (dim || !lod.sub) continue;
+      const text = d.isHub ? 'PUBLIC MARKET' : `${d.ownerLabel} · ${d.kind.toUpperCase()}`;
+      const subColour = d.isHub
+        ? pal.color.textDim
+        : d.owner === 'neutral'
+          ? pal.color.textDim
+          : pal.faction[d.role];
+      const sub = this.label(`k:${d.id}`, text, subSize, subColour, true);
+      this.place(sub, s.x, s.y + (d.isHub ? -d.h * 0.12 : d.h * 0.07) * cam.zoom, room);
     }
-    // the Sound
-    const w = worldToScreen(
-      cam,
-      vp,
-      (scene.bounds.minX + scene.bounds.maxX) / 2,
-      scene.waterTop + pal.map.pitchY * 0.5,
-    );
-    const sound = this.label(
-      'sound',
-      'THE SOUND',
-      fs['2xl'] * this.hudScale,
-      pal.color.waterLabel,
-      false,
-    );
-    sound.position.set(w.x, w.y);
-    sound.visible = true;
   }
 }
 
