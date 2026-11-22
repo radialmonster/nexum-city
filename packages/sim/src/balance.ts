@@ -121,6 +121,28 @@ export const balance = {
     },
   },
 
+  market: {
+    /** Prices are integers in 1/100 credit. */
+    priceScale: 100,
+    maxPrice: 100_000,
+    maxQty: 1000,
+    maxOrdersPerPlayer: 20,
+    /** The civic bid and ask sit this many percent below and above the reference. */
+    civicSpreadPercent: 8,
+    /** Units each civic side will trade per hub and good; refilled hourly up to the cap. */
+    civicDepthCap: 60,
+    civicRefillPerHour: 20,
+    /** After a fill the reference moves 1/this of the way to the fill price. */
+    refDriftDivisor: 8,
+    /** Each hour the reference moves this percent of the way back to its base. */
+    reversionPercent: 5,
+    /** The reference never leaves this band around its base, in percent. */
+    refMinPercent: 50,
+    refMaxPercent: 200,
+    /** Starting civic reference prices in centi-credits per unit. */
+    baseRefCents: { parts: 1800, power: 1400, data: 2400, supplies: 1000 },
+  },
+
   player: {
     startCredits: 500,
     startSupplies: 40,

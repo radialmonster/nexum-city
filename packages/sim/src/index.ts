@@ -2,7 +2,9 @@ export * from './balance.js';
 export { buildCost, buildDurationMs } from './construction.js';
 export { observe, sightOf, viewFor } from './fog.js';
 export type {
+  BookLevel,
   DistrictView,
+  MarketBookView,
   OwnDistrictView,
   PlayerView,
   RememberedDistrictView,
@@ -15,6 +17,7 @@ export { inFinale, settleScore, standings } from './score.js';
 export type { Standing } from './score.js';
 export { isProtected, progressAt, siegeFraction } from './siege.js';
 export { applyOrder, validateOrder } from './orders.js';
+export { civicAsk, civicBid } from './market.js';
 export {
   buildingLevel,
   deposit,

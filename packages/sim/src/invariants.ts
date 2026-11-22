@@ -71,5 +71,35 @@ export function checkInvariants(s: GameState): string[] {
         if (goods[g] < 0) problems.push(`${p.id} stash at ${hub} negative ${g}`);
     }
   }
+  const orderIds = new Set<string>();
+  for (const [hub, books] of Object.entries(s.markets)) {
+    for (const good of GOODS) {
+      const book = books[good];
+      if (book.bidDepth < 0 || book.askDepth < 0)
+        problems.push(`${hub} ${good} civic depth negative`);
+      for (const [side, list] of [
+        ['buy', book.bids],
+        ['sell', book.asks],
+      ] as const) {
+        let prev: (typeof list)[number] | undefined;
+        for (const o of list) {
+          if (orderIds.has(o.id)) problems.push(`order ${o.id} is listed twice`);
+          orderIds.add(o.id);
+          if (o.qty <= 0) problems.push(`order ${o.id} has no open quantity`);
+          if (o.side !== side || o.hub !== hub || o.good !== good)
+            problems.push(`order ${o.id} is in the wrong book`);
+          if (!s.players[o.owner]) problems.push(`order ${o.id} has no owner`);
+          if (prev) {
+            const ordered =
+              side === 'buy'
+                ? prev.price > o.price || (prev.price === o.price && prev.seq < o.seq)
+                : prev.price < o.price || (prev.price === o.price && prev.seq < o.seq);
+            if (!ordered) problems.push(`${hub} ${good} ${side} book is out of order at ${o.id}`);
+          }
+          prev = o;
+        }
+      }
+    }
+  }
   return problems;
 }

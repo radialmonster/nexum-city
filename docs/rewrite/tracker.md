@@ -44,7 +44,7 @@ Live status for [`plan.md`](plan.md). Update this file in the same commit as the
 | 14  | Travel: carriers (on foot, van, hauler), routing, ETAs                                | done   | 2026-11-22, `59b7800`  |
 | 15  | Production and warehouses                                                             | done   | 2026-11-22, `59b7800`  |
 | 16  | Siege: a single capture bar with modifiers; garrison, walls and stance                | done   | 2026-11-22 (`45c2bed`) |
-| 17  | Markets: a hub order book with civic baseline traders                                 | todo   |                        |
+| 17  | Markets: a hub order book with civic baseline traders                                 | done   | 2026-11-22 (HASH17)    |
 | 18  | Fog and sight                                                                         | done   | 2026-11-22 (`45c2bed`) |
 | 19  | Season clock and district-hour scoring                                                | done   | 2026-11-22 (`45c2bed`) |
 | 1A  | New-player placement on the frontier, with protection; city growth                    | todo   | ADR 0028               |
@@ -114,3 +114,4 @@ Live status for [`plan.md`](plan.md). Update this file in the same commit as the
 - 2026-11-22: Phase A task A5 done. Cloudflare teardown complete: the cron worker, the Pages project and both D1 databases are deleted, and nothing named `nexum` remains on the account.
 - 2026-11-22: Phase 1 tasks 16, 18, 19 done (`45c2bed`). Siege (one capture bar per district, walls, stance, attrition rounds, loot, building damage, retreat, `reinforce`, battle report), fog (`viewFor`, `sightOf`, last-known owners) and season scoring (exact district-hours, hourly `score.tick`, catch-up modifiers, `standings`). An even fight captures in about 10 h. 134 tests pass.
 - 2026-11-22: sim-core merged into main (siege, fog and scoring). `packages/contracts` now mirrors the sim exactly (siege and reinforce orders, the `protected` error code, the new movement kinds, the fogged `PlayerView` and `Standing`; the compat test checks orders, events, movements, views and standings at compile time). The server uses the sim's `viewFor` for `/api/me` (the `viewForPlayer` adapter is gone, and a test proves a rival's warehouse and credits never appear), and `GET /api/standings` returns `standings(state)`. A new world now starts its season and first score tick at the wall-clock start time.
+- 2026-11-22: Phase 1 task 17 done (HASH17). Hub order books with price-time priority, escrow, instant crossing and virtual civic traders at reference ±8% with hourly depth refill; `trade.filled` events; `viewFor` carries public books and your own orders. Tick and jump hash the same.

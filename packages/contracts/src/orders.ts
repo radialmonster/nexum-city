@@ -19,6 +19,8 @@ export const goodSchema = z.enum(GOODS);
 export const buildingTypeSchema = z.enum(BUILDING_TYPES);
 export const carrierKindSchema = z.enum(CARRIER_KINDS);
 export const stanceSchema = z.enum(STANCES);
+export const SIDES = ['buy', 'sell'] as const;
+export const sideSchema = z.enum(SIDES);
 
 const crewIds = z.array(idSchema).max(MAX_CREWS_PER_ORDER);
 
@@ -73,6 +75,17 @@ export const orderSchema = z.discriminatedUnion('type', [
   }),
   z.strictObject({ type: z.literal('recall'), movementId: idSchema }),
   z.strictObject({ type: z.literal('recruit'), districtId: idSchema }),
+  z.strictObject({
+    type: z.literal('market.place'),
+    hub: idSchema,
+    side: sideSchema,
+    good: goodSchema,
+    /** Centi-credits per unit (integer). */
+    price: z.number().int(),
+    /** Whole units. */
+    qty: z.number().int(),
+  }),
+  z.strictObject({ type: z.literal('market.cancel'), orderId: idSchema }),
 ]);
 
 export type OrderBody = z.infer<typeof orderSchema>;
@@ -105,6 +118,10 @@ export const ORDER_ERROR_CODES = [
   'already_building',
   'already_recalled',
   'protected',
+  'unknown_good',
+  'bad_price',
+  'unknown_order',
+  'too_many_orders',
 ] as const;
 export const orderErrorCodeSchema = z.enum(ORDER_ERROR_CODES);
 export type OrderErrorCode = z.infer<typeof orderErrorCodeSchema>;

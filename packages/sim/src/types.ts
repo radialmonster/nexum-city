@@ -145,6 +145,7 @@ export type QueuedEvent = { at: number; seq: number } & (
   | { kind: 'production.full'; districtId: Id }
   | { kind: 'siege.check'; districtId: Id }
   | { kind: 'score.tick' }
+  | { kind: 'market.tick' }
 );
 export type QueuedKind = QueuedEvent['kind'];
 
@@ -179,6 +180,37 @@ export interface Siege {
   stats: { attackerStart: number; attackerLost: number; defenderLost: number; rounds: number };
 }
 
+export type Side = 'buy' | 'sell';
+
+/** A resting player order. Price is in centi-credits per unit; quantity in whole units. */
+export interface MarketOrder {
+  id: Id;
+  owner: Id;
+  hub: Id;
+  good: Good;
+  side: Side;
+  price: number;
+  /** Units still open. The escrow for them is held by the order. */
+  qty: number;
+  /** Placement number; breaks price ties (earlier first). */
+  seq: number;
+}
+
+/** One order book: one hub, one good. The civic traders are virtual and described by `refCents`. */
+export interface Book {
+  /** Bids, best (highest price) first, then oldest first. */
+  bids: MarketOrder[];
+  /** Asks, best (lowest price) first, then oldest first. */
+  asks: MarketOrder[];
+  /** Civic reference price in centi-credits; the civic bid and ask sit either side of it. */
+  refCents: number;
+  /** Units the civic traders will still buy / sell. Refilled hourly. */
+  bidDepth: number;
+  askDepth: number;
+  /** Price of the latest fill, or `null`. */
+  lastCents: number | null;
+}
+
 export interface Season {
   startMs: number;
   endMs: number;
@@ -205,6 +237,8 @@ export interface Counters {
   movement: number;
   event: number;
   seq: number;
+  /** Last market order number issued. */
+  order: number;
 }
 
 export interface GameState {
@@ -226,6 +260,8 @@ export interface GameState {
   /** Capture bars by district id. */
   sieges: Record<Id, Siege>;
   season: Season;
+  /** Order books by hub id, then good. */
+  markets: Record<Id, Record<Good, Book>>;
   /** What each player last saw of each district's owner (fog memory). */
   memory: Record<Id, Record<Id, Owner>>;
   /** Pending scheduled events, sorted by (at, seq). */
@@ -245,7 +281,9 @@ export type Order =
   | { type: 'scout'; crewId: Id; carrierId: Id | null; target: Id }
   | { type: 'stance'; districtId: Id; stance: Stance }
   | { type: 'recall'; movementId: Id }
-  | { type: 'recruit'; districtId: Id };
+  | { type: 'recruit'; districtId: Id }
+  | { type: 'market.place'; hub: Id; side: Side; good: Good; price: number; qty: number }
+  | { type: 'market.cancel'; orderId: Id };
 
 export type OrderType = Order['type'];
 
@@ -287,6 +325,10 @@ export const ORDER_ERRORS = [
   'already_building',
   'already_recalled',
   'protected',
+  'unknown_good',
+  'bad_price',
+  'unknown_order',
+  'too_many_orders',
 ] as const;
 export type OrderError = (typeof ORDER_ERRORS)[number];
 

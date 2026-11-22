@@ -2,6 +2,7 @@ import { MS_PER_HOUR, balance, toAtoms } from './balance.js';
 import { afterWarehouseChange, emptyGoods } from './production.js';
 import { createRng, nextRange, shuffle } from './rng.js';
 import { emit, type Ctx } from './ctx.js';
+import { newHubBooks } from './market.js';
 import { observe } from './fog.js';
 import { placeCrew } from './travel.js';
 import type {
@@ -127,7 +128,7 @@ export function createWorld(seed: number, options: WorldOptions = {}): GameState
     seed,
     nowMs: 0,
     rng,
-    counters: { crew: 0, carrier: 0, movement: 0, event: 0, seq: 1 },
+    counters: { crew: 0, carrier: 0, movement: 0, event: 0, seq: 2, order: 0 },
     world: { cols, rows, soundY: rows },
     graph: { nodes, edges },
     districts,
@@ -145,9 +146,13 @@ export function createWorld(seed: number, options: WorldOptions = {}): GameState
       leaderId: null,
       belowMedian: [],
     },
+    markets: { hubW: newHubBooks(), hubE: newHubBooks() },
     memory: {},
-    // The first hourly score tick; each tick schedules the next.
-    queue: [{ at: MS_PER_HOUR, seq: 1, kind: 'score.tick' }],
+    // The first hourly score and market ticks; each tick schedules the next.
+    queue: [
+      { at: MS_PER_HOUR, seq: 1, kind: 'score.tick' },
+      { at: MS_PER_HOUR, seq: 2, kind: 'market.tick' },
+    ],
   };
 }
 

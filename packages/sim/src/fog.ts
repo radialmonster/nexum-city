@@ -1,5 +1,6 @@
 import { PROGRESS_SCALE } from './balance.js';
 import type { Ctx } from './ctx.js';
+import { civicAsk, civicBid } from './market.js';
 import { movementPosition, movementSegment } from './routing.js';
 import { progressAt } from './siege.js';
 import type {
@@ -10,8 +11,10 @@ import type {
   Edge,
   FrontierState,
   GameState,
+  Good,
   Goods,
   Id,
+  MarketOrder,
   Movement,
   Owner,
   Pos,
@@ -160,6 +163,22 @@ export interface SeenConvoyView {
   segment: [Id, Id];
 }
 
+/** One price level of a public book: total open units at a price. */
+export interface BookLevel {
+  price: number;
+  qty: number;
+}
+
+/** A hub's public book for one good. Prices are centi-credits per unit. */
+export interface MarketBookView {
+  bids: BookLevel[];
+  asks: BookLevel[];
+  /** Civic traders' standing prices and how many units they will still take or give. */
+  civic: { bid: number; ask: number; bidDepth: number; askDepth: number };
+  refCents: number;
+  lastCents: number | null;
+}
+
 export interface PlayerView {
   playerId: Id;
   nowMs: number;
@@ -175,6 +194,10 @@ export interface PlayerView {
   convoys: SeenConvoyView[];
   /** Scout reveals you hold: district id to the time it ends. */
   reveals: Record<Id, number>;
+  /** Public order books by hub id, then good. */
+  markets: Record<Id, Record<Good, MarketBookView>>;
+  /** Your own open orders. */
+  orders: MarketOrder[];
 }
 
 const copy = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
@@ -263,6 +286,39 @@ export function viewFor(state: GameState, playerId: Id): PlayerView {
     if (who === playerId && where !== undefined && until > state.nowMs) reveals[where] = until;
   }
 
+  const levels = (list: readonly MarketOrder[]): BookLevel[] => {
+    const out: BookLevel[] = [];
+    for (const o of list) {
+      const last = out[out.length - 1];
+      if (last && last.price === o.price) last.qty += o.qty;
+      else out.push({ price: o.price, qty: o.qty });
+    }
+    return out;
+  };
+  const markets: Record<Id, Record<Good, MarketBookView>> = {};
+  const orders: MarketOrder[] = [];
+  for (const [hub, books] of Object.entries(state.markets)) {
+    const hubView = {} as Record<Good, MarketBookView>;
+    for (const good of Object.keys(books) as Good[]) {
+      const book = books[good];
+      hubView[good] = {
+        bids: levels(book.bids),
+        asks: levels(book.asks),
+        civic: {
+          bid: civicBid(book),
+          ask: civicAsk(book),
+          bidDepth: book.bidDepth,
+          askDepth: book.askDepth,
+        },
+        refCents: book.refCents,
+        lastCents: book.lastCents,
+      };
+      for (const o of [...book.bids, ...book.asks]) if (o.owner === playerId) orders.push(copy(o));
+    }
+    markets[hub] = hubView;
+  }
+  orders.sort((a, b) => a.seq - b.seq);
+
   const board = Object.values(state.players)
     .map((p) => ({ playerId: p.id, score: p.score / 3_600_000 }))
     .sort((a, b) => b.score - a.score || (a.playerId < b.playerId ? -1 : 1))
@@ -285,5 +341,7 @@ export function viewFor(state: GameState, playerId: Id): PlayerView {
     movements,
     convoys,
     reveals,
+    markets,
+    orders,
   };
 }

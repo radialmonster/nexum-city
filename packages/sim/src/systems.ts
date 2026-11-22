@@ -1,6 +1,7 @@
 import type { Ctx } from './ctx.js';
 import { constructionSystem } from './construction.js';
 import { observe } from './fog.js';
+import { marketSystem } from './market.js';
 import { productionSystem } from './production.js';
 import { scoreSystem } from './score.js';
 import { siegeSystem } from './siege.js';
@@ -35,6 +36,7 @@ export const systems: readonly System[] = [
   constructionSystem,
   siegeSystem,
   scoreSystem,
+  marketSystem,
   fogSystem,
 ];
 
