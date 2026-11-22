@@ -2,6 +2,8 @@ import type { KeyboardEvent, ReactNode } from 'react';
 import styles from './RadialMenu.module.css';
 import { cx } from './util';
 
+export type RadialFacing = 'around' | 'down' | 'up';
+
 export interface RadialItem {
   readonly id: string;
   readonly glyph: ReactNode;
@@ -15,6 +17,8 @@ export interface RadialMenuProps {
   /** Shown in the hub in the middle. */
   readonly title?: string;
   readonly className?: string | undefined;
+  /** Where the items go: all round the hub, or fanned out below / above it (near an edge). */
+  readonly facing?: RadialFacing;
 }
 
 // geometry, in viewBox units (the SVG is drawn at about 1 unit per CSS px at --s: 1)
@@ -32,7 +36,14 @@ const LABEL_PAD = 16;
 const LABEL_H = 22;
 
 /** Circular action menu around a point, such as around a district on the map. */
-export function RadialMenu({ items, selected, onSelect, title, className }: RadialMenuProps) {
+export function RadialMenu({
+  items,
+  selected,
+  onSelect,
+  title,
+  className,
+  facing = 'around',
+}: RadialMenuProps) {
   const activate = (e: KeyboardEvent, id: string) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -54,7 +65,11 @@ export function RadialMenu({ items, selected, onSelect, title, className }: Radi
         </text>
       )}
       {items.map((item, i) => {
-        const angle = (i / items.length) * 2 * Math.PI - Math.PI / 2;
+        // a half ring puts the items at the middle of equal slices of 180 degrees
+        const angle =
+          facing === 'around'
+            ? (i / items.length) * 2 * Math.PI - Math.PI / 2
+            : ((i + 0.5) / items.length) * Math.PI * (facing === 'down' ? 1 : -1);
         const x = CENTRE + RING * Math.cos(angle);
         const y = CENTRE + RING * Math.sin(angle);
         const on = item.id === selected;

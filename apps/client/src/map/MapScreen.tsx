@@ -2,7 +2,7 @@ import { themes, toPixiPalette, type PixiPalette } from '@nexum/theme';
 import { eta, type CarrierKind, type Id, type PlayerView } from '@nexum/sim';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '../theme/ThemeProvider';
-import { Button, Panel, RadialMenu, Tag, type RadialItem } from '../ui';
+import { Button, Panel, RadialMenu, Tag, type RadialFacing, type RadialItem } from '../ui';
 import { cx, vars } from '../ui/util';
 import { frameBounds, zoomForLevel, type Camera, type ZoomLevel } from './camera';
 import { demoView, DEMO_SELF } from './demo';
@@ -651,6 +651,7 @@ export function MapScreen({
               <RadialMenu
                 items={embed ? orderMenu(sel) : MENU}
                 title={sel.name.toUpperCase()}
+                facing={menuAt.facing}
                 onSelect={menuAction}
               />
             </div>
@@ -668,27 +669,26 @@ export function formatSector(col: number, row: number): string {
 }
 
 /**
- * Keep the radial menu inside the map viewport and out from under the HUD sector card: clamp
- * its centre by its half-size, and slide it below the card when the two would overlap.
- * `inset` is half the card's far corner, so the corner itself is twice that.
+ * Place the radial menu. It sits centred on its plot, clamped by its half-size to the map
+ * viewport on the sides. When there is no room above the plot (the viewport top, or the HUD
+ * sector card, whose far corner is `inset * 2`) the menu stays on the plot and fans its items
+ * out below it as a half ring, so the plot is never covered; likewise upward at the bottom.
  */
 export function clampMenu(
   at: { x: number; y: number },
   vp: { w: number; h: number },
   half: number,
   inset: { x: number; y: number },
-): { x: number; y: number } {
-  if (half <= 0) return at;
+): { x: number; y: number; facing: RadialFacing } {
+  if (half <= 0) return { ...at, facing: 'around' };
   const clamp = (v: number, lo: number, hi: number) =>
     lo > hi ? (lo + hi) / 2 : Math.min(hi, Math.max(lo, v));
   const x = clamp(at.x, half, vp.w - half);
-  let y = clamp(at.y, half, vp.h - half);
-  const cardRight = inset.x * 2;
-  const cardBottom = inset.y * 2;
-  if (x - half < cardRight && y - half < cardBottom) {
-    y = clamp(cardBottom + half, half, vp.h - half);
-  }
-  return { x, y };
+  const underCard = x - half < inset.x * 2;
+  const top = underCard ? inset.y * 2 : 0;
+  if (at.y - half < top) return { x, y: clamp(at.y, 0, vp.h - half), facing: 'down' };
+  if (at.y + half > vp.h) return { x, y: Math.max(at.y, half), facing: 'up' };
+  return { x, y: at.y, facing: 'around' };
 }
 
 function worldToHud(d: { cx: number; cy: number }, cam: Camera, vp: { w: number; h: number }) {

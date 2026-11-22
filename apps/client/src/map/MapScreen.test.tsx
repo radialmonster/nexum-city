@@ -41,13 +41,32 @@ describe('formatSector', () => {
 
 describe('clampMenu', () => {
   const vp = { w: 1000, h: 800 };
-  it('keeps the menu inside the viewport', () => {
-    expect(clampMenu({ x: 10, y: 790 }, vp, 150, { x: 0, y: 0 })).toEqual({ x: 150, y: 650 });
+  it('keeps the menu inside the viewport sideways', () => {
+    expect(clampMenu({ x: 10, y: 400 }, vp, 150, { x: 0, y: 0 })).toEqual({
+      x: 150,
+      y: 400,
+      facing: 'around',
+    });
   });
-  it('slides below the HUD card when they overlap', () => {
-    expect(clampMenu({ x: 400, y: 100 }, vp, 150, { x: 200, y: 60 })).toEqual({ x: 400, y: 270 });
+  it('fans below the plot when there is no room above it', () => {
+    expect(clampMenu({ x: 500, y: 90 }, vp, 150, { x: 0, y: 0 })).toEqual({
+      x: 500,
+      y: 90,
+      facing: 'down',
+    });
+  });
+  it('fans below the plot rather than overlapping the HUD card', () => {
+    expect(clampMenu({ x: 200, y: 190 }, vp, 150, { x: 200, y: 60 }).facing).toBe('down');
+    expect(clampMenu({ x: 700, y: 190 }, vp, 150, { x: 200, y: 60 }).facing).toBe('around');
+  });
+  it('fans above the plot at the bottom edge', () => {
+    expect(clampMenu({ x: 500, y: 760 }, vp, 150, { x: 0, y: 0 }).facing).toBe('up');
   });
   it('leaves the position alone when unmeasured', () => {
-    expect(clampMenu({ x: 5, y: 5 }, vp, 0, { x: 0, y: 0 })).toEqual({ x: 5, y: 5 });
+    expect(clampMenu({ x: 5, y: 5 }, vp, 0, { x: 0, y: 0 })).toEqual({
+      x: 5,
+      y: 5,
+      facing: 'around',
+    });
   });
 });
