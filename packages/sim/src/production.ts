@@ -123,6 +123,9 @@ export function afterWarehouseChange(ctx: Ctx, d: District): void {
       amount: 0,
       cause: 'overflow',
       ongoing: true,
+      // What is thrown away every hour while it stays full, so the card can say it plainly.
+      perHour: toUnits(Math.round(rate * MS_PER_HOUR)),
+      capacity: toUnits(cap),
     });
   }
 }
