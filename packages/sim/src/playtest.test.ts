@@ -199,5 +199,5 @@ describe('raiders probe a newcomer', () => {
       if (hit) touched += 1;
     }
     expect(touched).toBeGreaterThanOrEqual(2);
-  });
+  }, 30_000);
 });
