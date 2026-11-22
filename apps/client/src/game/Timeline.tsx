@@ -55,6 +55,7 @@ export function Timeline({ view, feed, nowMs, onRecall, onFly, compact = false }
                 end={r.end}
                 progress={r.progress}
                 state={r.state}
+                kind={r.kind}
               >
                 {r.text}
               </TimelineRow>

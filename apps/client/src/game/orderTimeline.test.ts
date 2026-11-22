@@ -175,3 +175,38 @@ describe('settling in the timeline', () => {
     expect(timelineEntries(theirs, [], now).some((x) => x.kind === 'settle')).toBe(false);
   });
 });
+
+describe('raid timeline text', () => {
+  it('names the street for raid and ambush bars', () => {
+    const base = {
+      carrierId: null,
+      carrierKind: 'foot' as const,
+      crewIds: ['c1'],
+      cargo: goods,
+      route: ['a', 'b'],
+      lengthM: 500,
+      from: 'a',
+      to: 'b',
+      departMs: now - 60_000,
+      arriveMs: now + 600_000,
+      raid: {
+        a: 'a',
+        b: 'b',
+        near: 'a',
+        home: 'a',
+        windowMs: 3_600_000,
+        untilMs: now,
+        struck: [],
+      },
+    };
+    const view = makeView({
+      movements: {
+        r1: { ...base, id: 'r1', owner: 'me', kind: 'raid' },
+        r2: { ...base, id: 'r2', owner: 'me', kind: 'ambush' },
+      },
+    });
+    const text = timelineEntries(view, [], now).map((e) => e.text);
+    expect(text.some((t) => t.startsWith('RAID to Alpha Docks - Beta Stacks'))).toBe(true);
+    expect(text.some((t) => t.startsWith('AMBUSH on Alpha Docks - Beta Stacks'))).toBe(true);
+  });
+});

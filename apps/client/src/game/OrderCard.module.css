@@ -90,3 +90,11 @@
   border-color: var(--color-accent);
   background: color-mix(in srgb, var(--color-accent) 12%, transparent);
 }
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  font-family: var(--font-mono);
+  color: var(--color-text-bright);
+}

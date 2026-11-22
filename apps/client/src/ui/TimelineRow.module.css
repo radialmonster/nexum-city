@@ -109,3 +109,21 @@
     background-position: 200% 0;
   }
 }
+
+/* raids: the ambush waits as a dashed, glowing bar; the trip home is a muted dashed bar */
+.row[data-kind='ambush'] .order {
+  background: none;
+  border-style: dashed;
+  box-shadow: 0 0 var(--space-md) var(--k);
+}
+
+.row[data-kind='ambush'] .order::before,
+.row[data-kind='return'] .order::before {
+  display: none;
+}
+
+.row[data-kind='return'] .order {
+  background: none;
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--k) 50%, transparent);
+}

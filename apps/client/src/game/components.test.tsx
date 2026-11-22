@@ -117,6 +117,30 @@ describe('buildOrder', () => {
   });
 });
 
+describe('buildOrder raid', () => {
+  const pick = {
+    from: 'a',
+    crewIds: ['c1'],
+    carrierId: null,
+    cargo: {},
+    building: 'depot' as const,
+  };
+  it('needs a street and crews, and defaults to four hours', () => {
+    expect(buildOrder({ kind: 'raid', districtId: 'a' }, pick)).toBeNull();
+    expect(buildOrder({ kind: 'raid', districtId: 'a' }, { ...pick, street: ['a', 'b'] })).toEqual({
+      type: 'raid',
+      carrierId: null,
+      crewIds: ['c1'],
+      a: 'a',
+      b: 'b',
+      hours: 4,
+    });
+    expect(
+      buildOrder({ kind: 'raid', districtId: 'a' }, { ...pick, street: ['a', 'b'], hours: 7 }),
+    ).toMatchObject({ hours: 7 });
+  });
+});
+
 describe('OrderCard', () => {
   const view = makeView();
   const render_ = (kind: 'siege' | 'move', onConfirm = vi.fn(() => Promise.resolve(true))) => {

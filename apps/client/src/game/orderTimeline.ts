@@ -108,11 +108,21 @@ export function timelineEntries(
       kind: m.kind,
       label: `${m.carrierKind} / ${String(crew)} crew`,
       glyph: GLYPH[m.kind],
-      faction: m.kind === 'siege' ? 'raider' : m.kind === 'scout' ? 'hunter' : 'self',
+      faction:
+        m.kind === 'siege' || m.kind === 'raid' || m.kind === 'ambush'
+          ? 'raider'
+          : m.kind === 'scout'
+            ? 'hunter'
+            : 'self',
       startMs: m.departMs,
       endMs: m.arriveMs,
       progress: frac(nowMs - m.departMs, m.arriveMs - m.departMs),
-      text: `${returning ? 'RETURN' : (verb[m.kind] ?? 'MOVE')} to ${name(target)}  ETA ${shortDuration(m.arriveMs - nowMs)}`,
+      text:
+        m.kind === 'ambush' && m.raid
+          ? `AMBUSH on ${name(m.raid.a)} - ${name(m.raid.b)}  ends in ${shortDuration(m.arriveMs - nowMs)}`
+          : m.kind === 'raid' && m.raid
+            ? `RAID to ${name(m.raid.a)} - ${name(m.raid.b)}  ETA ${shortDuration(m.arriveMs - nowMs)}`
+            : `${returning ? 'RETURN' : (verb[m.kind] ?? 'MOVE')} to ${name(target)}  ETA ${shortDuration(m.arriveMs - nowMs)}`,
       state: m.kind === 'siege' && !returning ? 'hot' : 'running',
       recallId: returning ? null : m.id,
       districtId: target,

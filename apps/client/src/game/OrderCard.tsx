@@ -27,6 +27,7 @@ const TITLES: Record<OrderDraft['kind'], string> = {
   scout: 'Send a scout',
   build: 'Build',
   settle: 'Settle a plot',
+  raid: 'Set an ambush',
 };
 
 const CONFIRM: Record<OrderDraft['kind'], string> = {
@@ -37,6 +38,7 @@ const CONFIRM: Record<OrderDraft['kind'], string> = {
   scout: 'SCOUT',
   build: 'BUILD',
   settle: 'SETTLE',
+  raid: 'SET AMBUSH',
 };
 
 /** What the player has picked in the card. */
@@ -47,6 +49,9 @@ export interface Pick {
   readonly carrierId: string | null;
   readonly cargo: Readonly<Record<string, number>>;
   readonly building: 'workshop' | 'depot' | 'walls';
+  /** Raid: the street's two ends and how long the crews wait. */
+  readonly street?: readonly [string, string] | null;
+  readonly hours?: number;
 }
 
 /** Turns a draft and the picks into the order the server takes, or null while it is incomplete. */
@@ -78,6 +83,17 @@ export function buildOrder(draft: OrderDraft, pick: Pick): OrderBody | null {
             carrierId: pick.carrierId,
             crewIds: [...pick.crewIds],
             to: draft.districtId,
+          }
+        : null;
+    case 'raid':
+      return pick.crewIds.length > 0 && pick.street
+        ? {
+            type: 'raid',
+            carrierId: pick.carrierId,
+            crewIds: [...pick.crewIds],
+            a: pick.street[0],
+            b: pick.street[1],
+            hours: pick.hours ?? 4,
           }
         : null;
     case 'haul': {
@@ -118,7 +134,9 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
   const target = view.districts[draft.districtId];
   const nodes = useMemo(
     () =>
-      draft.kind === 'build' ? [] : readyNodes(view, nowMs).filter((n) => n !== draft.districtId),
+      draft.kind === 'build'
+        ? []
+        : readyNodes(view, nowMs).filter((n) => draft.kind === 'raid' || n !== draft.districtId),
     [view, nowMs, draft],
   );
   const [from, setFrom] = useState<string | null>(
@@ -129,6 +147,8 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
   const [cargo, setCargo] = useState<Record<string, number>>({});
   const [building, setBuilding] = useState<Pick['building']>('workshop');
   const [busy, setBusy] = useState(false);
+  const [streetIdx, setStreetIdx] = useState(0);
+  const [hours, setHours] = useState(4);
 
   const source = from && nodes.includes(from) ? from : (nodes[0] ?? null);
   const crews = source ? crewsAt(view, source).filter((c) => c.readyAtMs <= nowMs) : [];
@@ -143,10 +163,45 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
   const maxCrews = draft.kind === 'scout' ? 1 : seats;
   const tooMany = chosenCrews.length > maxCrews;
 
+  // Raid: the streets that leave the chosen plot.
+  const streets = useMemo(
+    () =>
+      draft.kind === 'raid'
+        ? view.graph.edges
+            .filter((e) => e.a === draft.districtId || e.b === draft.districtId)
+            .map((e) => ({
+              a: e.a,
+              b: e.b,
+              other: e.a === draft.districtId ? e.b : e.a,
+              lengthM: e.lengthM,
+            }))
+        : [],
+    [view.graph, draft],
+  );
+  const street = streets[Math.min(streetIdx, streets.length - 1)] ?? null;
+  const streetA = street?.a ?? null;
+  const streetB = street?.b ?? null;
+  const streetEnds: readonly [string, string] | null =
+    streetA !== null && streetB !== null ? [streetA, streetB] : null;
+
   const route = useMemo(() => {
     if (!source || draft.kind === 'build') return null;
+    if (draft.kind === 'raid') {
+      // The crews walk to the nearer end of the street (ties: the smaller id), as the sim does.
+      if (streetA === null || streetB === null) return null;
+      const ends = [streetA, streetB].sort();
+      let best: ReturnType<typeof eta> = null;
+      for (const end of ends) {
+        const leg = eta(view.graph, source, end, kind);
+        if (leg && (!best || leg.durationMs < best.durationMs)) best = leg;
+      }
+      if (!best) return null;
+      const near = best.route[best.route.length - 1];
+      const far = ends.find((e) => e !== near);
+      return { ...best, route: far ? [...best.route, far] : best.route };
+    }
     return eta(view.graph, source, draft.districtId, kind === 'foot' ? 'foot' : kind);
-  }, [view.graph, source, draft, kind]);
+  }, [view.graph, source, draft, kind, streetA, streetB]);
 
   useEffect(() => {
     onRoute(route ? route.route : null);
@@ -155,7 +210,15 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
     };
   }, [route, onRoute]);
 
-  const pick: Pick = { from: source, crewIds, carrierId, cargo, building };
+  const pick: Pick = {
+    from: source,
+    crewIds,
+    carrierId,
+    cargo,
+    building,
+    street: streetEnds,
+    hours,
+  };
   const order = buildOrder(draft, pick);
 
   const own = target && isOwn(target) ? target : null;
@@ -190,6 +253,8 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
     blocker = 'Pick at least one crew.';
   } else if (tooMany) {
     blocker = `That carrier seats ${String(seats)}. Pick fewer crews or a bigger carrier.`;
+  } else if (draft.kind === 'raid' && !street) {
+    blocker = 'This plot has no street to wait on.';
   } else if (!route) {
     blocker = 'There is no street route there.';
   } else if (draft.kind === 'settle') {
@@ -289,8 +354,26 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
             {source && nodes.length === 1 && (
               <p className={styles['line']}>From {view.districts[source]?.name ?? source}.</p>
             )}
+            {draft.kind === 'raid' && (
+              <label className={styles['field']}>
+                <span className={styles['cap']}>STREET</span>
+                <select
+                  value={Math.min(streetIdx, streets.length - 1)}
+                  onChange={(e) => {
+                    setStreetIdx(Number(e.target.value));
+                  }}
+                >
+                  {streets.map((st, i) => (
+                    <option key={`${st.a}-${st.b}`} value={i}>
+                      To {view.districts[st.other]?.name ?? st.other} (
+                      {String(Math.round(st.lengthM))} m)
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <fieldset className={styles['field']}>
-              <legend>CREWS</legend>
+              <legend>{draft.kind === 'haul' ? 'CREWS (EXTRA CREWS ESCORT)' : 'CREWS'}</legend>
               {crews.length === 0 && <small>No crews ready here.</small>}
               {crews.map((c) => (
                 <label key={c.id} className={styles['opt']}>
@@ -354,6 +437,43 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
                 </div>
               </fieldset>
             )}
+            {draft.kind === 'haul' && (
+              <p className={styles['line']} data-testid="escort-hint">
+                Escorts make your haul harder to raid.
+              </p>
+            )}
+            {draft.kind === 'raid' && (
+              <>
+                <div className={styles['field']}>
+                  <span className={styles['cap']}>WAIT</span>
+                  <div className={styles['stepper']}>
+                    <Button
+                      aria-label="Wait one hour less"
+                      disabled={hours <= 1}
+                      onClick={() => {
+                        setHours(Math.max(1, hours - 1));
+                      }}
+                    >
+                      -
+                    </Button>
+                    <span data-testid="raid-hours">{String(hours)} h</span>
+                    <Button
+                      aria-label="Wait one hour more"
+                      disabled={hours >= 8}
+                      onClick={() => {
+                        setHours(Math.min(8, hours + 1));
+                      }}
+                    >
+                      +
+                    </Button>
+                  </div>
+                </div>
+                <p className={styles['line']} data-testid="raid-help">
+                  Crews wait on this street and strike the first enemy haul that passes. Raiders
+                  steal up to 40% of its cargo.
+                </p>
+              </>
+            )}
             <p className={styles['line']} data-testid="eta">
               {route
                 ? `ETA ${formatEta(route.durationMs)} over ${String(Math.round(route.lengthM))} m`
@@ -399,7 +519,7 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
         <div className={styles['actions']}>
           <Button onClick={onClose}>CANCEL</Button>
           <Button
-            variant={draft.kind === 'siege' ? 'danger' : 'primary'}
+            variant={draft.kind === 'siege' || draft.kind === 'raid' ? 'danger' : 'primary'}
             disabled={busy || order === null || blocker !== null}
             onClick={() => {
               void confirm();

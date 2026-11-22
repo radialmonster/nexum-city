@@ -24,6 +24,8 @@ export interface TimelineRowProps {
   readonly children?: ReactNode;
   /** Dashed "what would happen next" segments after the bar. */
   readonly previews?: readonly TimelinePreview[];
+  /** The order kind, for a distinct look: ambush bars wait dashed, return bars are muted. */
+  readonly kind?: string;
   readonly className?: string | undefined;
 }
 
@@ -38,6 +40,7 @@ export function TimelineRow({
   state = 'running',
   children,
   previews = [],
+  kind,
   className,
 }: TimelineRowProps) {
   const s = clamp01(start);
@@ -47,6 +50,7 @@ export function TimelineRow({
       className={cx(styles['row'], className)}
       style={vars({ '--k': factionColor(faction) })}
       role="listitem"
+      data-kind={kind}
     >
       <span className={styles['who']}>
         {glyph !== undefined && (
