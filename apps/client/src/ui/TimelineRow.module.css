@@ -131,3 +131,23 @@
   border-style: dashed;
   border-color: color-mix(in srgb, var(--k) 50%, transparent);
 }
+
+/* label of a bar too short to hold it: sits just right of the bar, or left of it near the track end */
+.beside {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--end) + var(--space-xs));
+  transform: translateY(-50%);
+  z-index: var(--z-base);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-none);
+  white-space: nowrap;
+  color: var(--color-text-bright);
+  pointer-events: none;
+}
+
+.beside-left {
+  left: auto;
+  right: calc(100% - var(--from) + var(--space-xs));
+}

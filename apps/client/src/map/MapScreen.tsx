@@ -498,7 +498,10 @@ export function MapScreen({
     if (c.moving) return;
     pannedFor.current = key;
     const at = worldToHud(sel, c.cam, c.viewport);
-    const d = panToFit(at, menuBox.half, c.viewport, hudRects());
+    // Fit only the plot itself (not the whole radial menu ring), so picking a district that is
+    // already on screen never moves the camera; the menu is clamped into view separately.
+    const plotHalf = (Math.min(sel.w, sel.h) / 2) * c.cam.zoom;
+    const d = panToFit(at, plotHalf, c.viewport, hudRects());
     if (!d || (d.dx === 0 && d.dy === 0)) return;
     const target = { ...c.cam, x: c.cam.x - d.dx / c.cam.zoom, y: c.cam.y - d.dy / c.cam.zoom };
     c.animateTo(target, nowFn(), readMotionMs('--duration-slow'), true);

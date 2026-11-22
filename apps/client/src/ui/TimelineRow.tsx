@@ -29,6 +29,11 @@ export interface TimelineRowProps {
   readonly className?: string | undefined;
 }
 
+/** Bars shorter than this fraction of the track put their label beside the bar. */
+const NARROW_BAR = 0.14;
+/** Narrow bars starting past this fraction put the label on their left, so it stays on the track. */
+const NARROW_FLIP = 0.6;
+
 /** One line of the order timeline: an order bar with a progress fill and preview dashes. */
 export function TimelineRow({
   label,
@@ -45,6 +50,8 @@ export function TimelineRow({
 }: TimelineRowProps) {
   const s = clamp01(start);
   const e = Math.max(s, clamp01(end));
+  // a bar too short to hold its label gets the label beside it
+  const narrow = e - s < NARROW_BAR && children !== undefined && children !== null;
   return (
     <div
       className={cx(styles['row'], className)}
@@ -70,8 +77,17 @@ export function TimelineRow({
           style={vars({ '--from': pct(s), '--size': pct(e - s), '--p': pct(progress) })}
           title={typeof children === 'string' ? children : undefined}
         >
-          <span className={styles['text']}>{children}</span>
+          {!narrow && <span className={styles['text']}>{children}</span>}
         </div>
+        {narrow && (
+          <span
+            className={cx(styles['beside'], s > NARROW_FLIP && styles['beside-left'])}
+            style={vars({ '--from': pct(s), '--end': pct(e) })}
+            data-testid="timeline-beside"
+          >
+            {children}
+          </span>
+        )}
         {previews.map((p, i) => {
           const from = clamp01(p.start);
           const to = Math.max(from, clamp01(p.end));
