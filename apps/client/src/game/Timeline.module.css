@@ -1,6 +1,7 @@
 .timeline {
   display: flex;
   flex-direction: column;
+
   /* Room for about 7 orders at any size; more scroll. Rows are taller than --size-row, so a row-based cap clipped the third row at 2560. */
   max-height: 35vh;
 }

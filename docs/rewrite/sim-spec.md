@@ -582,6 +582,6 @@ The Garage is a bonus on top of a baseline that already heals (wear is slow, gen
 
 Raider lead 1.14x (1.11x before), limit 1.4x. Raid success 58 percent (411 of 713) against 58 percent (428 of 739) before; per seed min 26, max 91, sd 21 (before 21, 88, 19). 393 raids (391 before). Wear per player: about 0.9 `carrier.worn` and 0.1 to 0.2 `carrier.repaired`; carriers end at an average wear of 43 (turtle) and 38 (merchant), so the slowdown matters at the margin only. Towers built per turtle 0.09, garages per merchant 0.06; `raid.spotted` did not fire in the harness (an ambush rarely lands inside a tower owner's reach), so the warning is covered by unit tests only. First tuning (perTrip 3, repair 120 min) cost the merchant and turtle about 2 percent of score and was softened to the numbers above.
 
-### For the UI (task 75b)
+### For the UI (task 75b, done)
 
-The client still reads the global `maxLevel` of 3 and shows the Runner price from `balance.runner.credits`; both must use the per-building `maxLevel` and `runnerPrice(district)`. Show `watchtower` on seen districts, `wear` on carriers (a bar, with the slowdown from `slowPercentAt`) and toast the three new events.
+Done in task 75b: the client reads the global `maxLevel` of 3 and shows the Runner price from `balance.runner.credits`; it now uses the per-building `maxLevel` and `runnerPrice(district)`, shows `watchtower` on seen districts and `wear` on carriers (a bar, with the slowdown from `slowPercentAt`), and handles the three new events in the feed.

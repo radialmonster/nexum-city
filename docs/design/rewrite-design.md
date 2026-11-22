@@ -274,7 +274,7 @@ How the server runs them (tasks 51 to 53): bots are real players with a row in `
 - Raids and escorts.
 - Runner carrier (sim and UI done). The own-district panel has a BUY RUNNER action with a plain pitch and a disabled reason. Haul and contract cards show a carrier comparison (speed, ETA, cargo, trade-off) and start on an idle Runner when the load is 16 or less and the deadline is tight. The feed shows `raid.evaded` for both sides and your own purchases; the map shows a slim Runner marker and a short evade flash (map tokens `runnerScale`, `runnerSlim`, `evadeFlashMs`).
 - Contracts.
-- Watchtower and Garage.
+- Watchtower and Garage (sim and UI done). The build list offers both with plain-language pitches and the per-building max level. Own towered districts draw a range ring on the map and ambushes the tower spots appear in the hostile style with a "spotted by your tower" marker (tokens `towerRingAlpha`, `towerReachAlpha`, `spottedRingAlpha`). The feed has a `raid.spotted` card; `carrier.worn` and `carrier.repaired` fold quietly. Carrier wear shows as a bar with "+N% slower" in the district panel, the empire panel (WORN CARRIERS) and the haul card, and the haul ETA includes the slowdown. The Runner price follows the district's Garage. A haul order card warns "Known ambush on this route" when a spotted ambush lies on the path (no new sim rule).
 - The animated replay.
 - Push notifications.
 - The fourth bot.
