@@ -449,7 +449,7 @@ Two first-session problems found in the 77b playthrough, and their fixes. `RULES
 
 **Open plots over time** (`node scripts/open-plots.mjs`, one joiner every 2 h; want = max(4, ceil(players / 3))): open plus surveying never exceeds want. 1 player: 3 open, 1 surveying; 13 players: 3 open, 2 surveying (want 5); 22 players: 6 open, 2 surveying (want 8); 24 players: 8 open (want 8). The map is not flooded.
 
-**Starter contract: kept as a "come back in about an hour" hook.** The nearest hub is about 5 km away, about 50 min by van, so the contract cannot finish in a first session. Pros of the hook: the first session has a clear reason to return, the contract pays well (premium 100 percent), and no new carrier is needed in the first minutes. Cons: a player who never returns sees an unfinished order. The alternative (a Runner, 300 credits, speed 160, about 30 min) costs more than a newcomer has and still does not finish in 15 min, so it was not chosen. UI shape: the contract's `windowMs` is the van trip plus 20 min grace, so the client may say "about `windowMs` minus 20 minutes by van, come back then".
+**Starter contract: kept as a "come back in about an hour" hook.** The nearest hub is about 5 km away, about 50 min by van, so the contract cannot finish in a first session. Pros of the hook: the first session has a clear reason to return, the contract pays well (premium 100 percent), and no new carrier is needed in the first minutes. Cons: a player who never returns sees an unfinished order. The alternative (a Runner, 300 credits, speed 160, about 30 min) costs more than a newcomer has and still does not finish in 15 min, so it was not chosen. UI shape: the contract's `windowMs` is the van trip plus 3 h grace (task 83), so the client may say "about `windowMs` minus 3 hours by van, come back then".
 
 **Results** (scripted newcomer, `scripts/first-session.mjs`, seeds 1 to 8): before, no perks, 2 actions and 1 completion in 15 min and no settle; now 8 actions and 3 completions in 15 min (floor 8 and 3), the settle accepted in 8 of 8 seeds within 15 min (average minute 5.1), the starter contract paid in 0 of 8 within 30 min (the hook). Bot harness seeds 1 to 16: raider lead 1.28x, raid success 56 percent, invariants 0.
 
@@ -460,10 +460,10 @@ Goal: at least 15 minutes of active, asynchronous play for a new player, without
 ### Rules
 
 - **Rush.** For `balance.rush.hours` (24) game hours after joining, building and settling take 1/`factor` (10x faster). Siege, travel and raids are unaffected. A new home district starts with the kit `rush.kit` (30 parts, 10 power, 20 supplies), exactly one level-1 Workshop. The view shows `self.rushUntilMs`; the event `rush.ended` fires at the end. Bots follow the same rule.
-- **Starter contract.** One civic contract is reserved for the newcomer on the nearest hub: 5 supplies at 200 percent of the reference value (premium 100), window = van ETA plus 20 min (hubs are 30 to 65 min away by van, so the 20 min is a grace on top). Other players cannot take it (`reserved_contract`).
+- **Starter contract.** One civic contract is reserved for the newcomer on the nearest hub: 5 supplies at 200 percent of the reference value (premium 100), window = van ETA plus 3 h (hubs are 30 to 65 min away by van, so the 3 h is a generous grace on top; a failed or untaken one is re-offered once, see "Playtest fixes"). Other players cannot take it (`reserved_contract`).
 - **Street jobs.** A personal list of up to 3 (`balance.jobs.cap`), one new offer every 30 min, drawn deterministically from the seeded RNG. Each is done by one crew and an optional carrier (a carrier makes it 67 percent of the time).
   - courier: 4 to 8 min, carry 4 to 10 units, pays 6 to 12 credits; raidable like a haul.
-  - salvage: 3 to 6 min, pays 1 to 2 parts.
+  - salvage: 3 to 6 min, pays 2 to 4 parts (task 83).
   - patrol: 5 to 10 min, pays 4 to 8 credits and reveals ambushes on the streets walked for 60 min.
   - Jobs give little or no score. Payouts are civic sources in the invariants and the harness conservation.
 - **Order and events.** `{type:'job.take', jobId, crewId, carrierId?}`; errors `unknown_job`, `reserved_contract`. Events `job.done`, `job.failed`, `rush.ended`. The view's `self.jobs` lists the offers and `self.jobNextMs` the next refill.
@@ -699,3 +699,26 @@ The sim keeps no history. The server writes every `trade.filled` event to a SQLi
 Credits per player per day, after: 1423, 4019, 7080, 10711, 13173, 16612, 19713. Districts (16 seeds): merchant 3.09, raider 6.38, turtle 4.72, hunter 2.0 (before 3.06, 4.31, 5.41, 2.88). On seeds 1 to 8, which the harness test uses, every type is at least 2.4 (hunter 2.63, merchant 2.50). The harness floors were not lowered, but the hunter's 16-seed average dropped and the results swing by about 0.3 districts for tiny parameter changes.
 
 Honest misses: the hub gap is a map-geometry limit (two hubs), and the money supply was already far above 3x before this change; fixing it is a sink job for stage 5.
+
+## Playtest fixes (task 83)
+
+From a scripted playtest as a newcomer. `RULES_VERSION` stays 3; no snapshot change.
+
+1. **Siege against defence 0 did not capture.** There is no defence 0 on a neutral plot: it holds a neutral guard of 20 that never loses strength (`siege.neutralGuard`, against 10 militia on an owned plot). Capture rate is `base x A/(A+D)`, so one crew of 10 takes about 13 to 15 h and loses strength each round; at strength 3 or less it routs and the bar decays. Two crews of 10 take about 8 h. Fix: `siegeDefence(state, district)` is exported and is the single source for the defence a siege faces; `combat.round` carries `defence` and `routed`; a siege that ends because the attackers routed emits `siege.broken` with `reason: 'routed'`, `defence`, `attackerStart`, `attackerLost` and a plain `note` ("the guard never tires"). Client note: `apps/client/src/game/odds.ts` (`siegeOdds`) uses the militia value for a neutral plot, so it shows a false "50 percent edge, 8 h"; the truth for one crew is about 33 percent and 12 h. It should call `siegeDefence`.
+2. **Open frontier plots are visible to everyone.** `viewFor(...).districts[id]` for an open plot outside sight is `{relation:'visible', id, name, kind, pos, owner:'neutral', protected:false, presence:{}, siege:null, open:true, settling:null, watchtower:0}`. Presence, siege and settling stay hidden outside sight, so no information leaks. A plot being settled is not shown as open. A newcomer can order `{type:'settle', carrierId, crewIds, target}` straight away.
+3. **Starter contract.** Window is van ETA plus 3 h (`rush.starter.graceMinutes` 180). A failed or untaken starter contract is re-offered once (`starterOffer = 2`, new `offerEndsMs`). `contract.failed` and `contract.expired` carry `starter`, `reoffered` and (failed) `deposit`, so the feed can say the deposit is lost or refunded.
+4. **Newcomer probe.** After protection ends the bots prefer a "fresh" target (protection ended within `PROBE_WINDOW_HOURS` = 24) and need only two crews of any total strength to ambush it, so the first hit is small and survivable. Merchant newcomer, seeds 1 to 16: 13 of 16 touched, median first touch about 6 h (12 of 16 and 20 h before); an idle newcomer was 0 of 16 touched before. Check with `node scripts/newcomer-probe.mjs 1 16 3` (`IDLE=1` for an idle newcomer).
+5. **Clear crews.** `pickClearCrewsOrWhy` returns `{error:'no_crew', reason:'busy'|'under_siege'}`; it never takes crews from a district that is under siege or being raided. `pickClearCrews` is a wrapper that returns null on an error.
+6. **Salvage job** pays 2 to 4 parts (was 1 to 2), about 15 to 25 percent of a Watchtower's cost over a few jobs.
+7. **Full warehouses.** Capacity stays 120. A larger base capacity (160) was tried and rejected: turtle score 800, top to next 1.38, raider lead 0.71x. The relief is information: the ongoing `production.wasted` event now carries `perHour` (units lost an hour) and `capacity`, so the client can say "full, losing N an hour". No automation was added.
+
+#### Harness (seeds 1 to 16, invariants 0)
+
+|                              | merchant | turtle | raider | hunter |
+| ---------------------------- | -------- | ------ | ------ | ------ |
+| districts per player, before | 3.06     | 5.41   | 4.31   | 2.88   |
+| districts per player, after  | 3.06     | 5.16   | 4.19   | 2.75   |
+| score per player, before     | 563      | 700    | 596    | 529    |
+| score per player, after      | 574      | 700    | 569    | 524    |
+
+Top to next 1.22 (1.17 before), raider lead 0.81x (0.85x before; floor 0.85x of the best other type is the viability test, which passes), raid success 45 percent (47), raids 20.3, hits 12.3. `node scripts/first-session.mjs`: settle accepted in 8 of 8 seeds within 15 min, no change.
