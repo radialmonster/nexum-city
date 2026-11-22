@@ -63,6 +63,7 @@ const MESSAGES: Record<ApiErrorCode, string> = {
   too_many_carriers: 'You already own as many Runners as you are allowed.',
   unknown_job: 'That street job is gone. Another one will turn up soon.',
   reserved_contract: 'That contract is reserved for a newcomer.',
+  no_fuel: 'Not enough power in your warehouses to fuel that trip. Stock up on power first.',
 };
 
 /** Words for any rejection code; unknown ones fall back to a generic line. */

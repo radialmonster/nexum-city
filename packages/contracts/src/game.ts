@@ -162,6 +162,8 @@ export const SIM_EVENT_KINDS = [
   'protection.ended',
   'score.tick',
   'order.rejected',
+  'market.shortage',
+  'market.shortage.ended',
   'raid.set',
   'raid.hit',
   'raid.repelled',
@@ -317,7 +319,16 @@ export const marketBookViewSchema = z.object({
     transport: z.number().int(),
     demand: z.number().int(),
     raid: z.number().int(),
+    shortage: z.number().int(),
   }),
+});
+
+/** A hub that is short of one good for a while (economy stage 3). */
+export const shortageSchema = z.object({
+  hub: idSchema,
+  good: goodSchema,
+  startMs: z.number(),
+  endMs: z.number(),
 });
 
 /** A resting market order. */
@@ -369,6 +380,13 @@ export const playerViewSchema = z.object({
   ambushes: z.array(seenAmbushSchema),
   reveals: z.record(idSchema, z.number()),
   markets: z.record(idSchema, z.record(goodSchema, marketBookViewSchema)),
+  shortages: z.array(shortageSchema),
+  /** What the credit sinks have taken so far, in atoms. */
+  sink: z.object({
+    feesAtoms: z.number(),
+    upkeepAtoms: z.number(),
+    levyAtoms: z.number(),
+  }),
   orders: z.array(marketOrderSchema),
   graph: z.object({
     nodes: z.record(

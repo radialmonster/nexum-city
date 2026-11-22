@@ -14,8 +14,11 @@ import type { GameState } from '@nexum/sim';
  * - 4: cost basis and regional prices (economy plan stages 1 and 2, tasks 79 and 80): districts
  *   carry `warehouseValue`, players `stashValue`, movements `value`, sell orders `value`, books
  *   `baseCents` and `why`, and the state has `heat`. Old piles are valued at the global base price.
+ * - 5: shortages, fuel and the credit sink (economy plan stages 3 and 4, tasks 81 and 82): the state
+ *   has `shortages` (empty) and `sink` (all zero), each book's `why` has `shortage` (0), and the
+ *   queue holds a `shortage.check` and an `upkeep.day` tick.
  */
-export const SNAPSHOT_VERSION = 4;
+export const SNAPSHOT_VERSION = 5;
 
 /**
  * Version of the sim rules the stored state was produced under. Bump it whenever a sim change
@@ -42,6 +45,7 @@ type Json = Record<string, unknown>;
 
 /** Spacing of the civic contract tick (`balance.contracts.civicEveryHours`). */
 const CIVIC_EVERY_MS = balance.contracts.civicEveryHours * MS_PER_HOUR;
+const SHORTAGE_EVERY_MS = balance.shortage.everyHours * MS_PER_HOUR;
 
 const isObject = (v: unknown): v is Json =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -138,6 +142,42 @@ const UPGRADES: readonly ((state: Json) => Json)[] = [
       })),
       movements: map(state['movements'], (m) => ({ value: worth(m['cargo']), ...m })),
       markets,
+    };
+  },
+  // 4 -> 5: no shortage running, a clean sink ledger, and the two new ticks queued.
+  (state) => {
+    const markets: Json = {};
+    for (const [hub, books] of Object.entries(isObject(state['markets']) ? state['markets'] : {})) {
+      const out: Json = {};
+      for (const [good, book] of Object.entries(isObject(books) ? books : {})) {
+        out[good] = isObject(book)
+          ? { ...book, why: { shortage: 0, ...(isObject(book['why']) ? book['why'] : {}) } }
+          : book;
+      }
+      markets[hub] = out;
+    }
+    const counters = isObject(state['counters']) ? state['counters'] : {};
+    let seq = typeof counters['seq'] === 'number' ? counters['seq'] : 0;
+    const nowMs = typeof state['nowMs'] === 'number' ? state['nowMs'] : 0;
+    const next = [...(Array.isArray(state['queue']) ? state['queue'] : [])];
+    const at = (e: unknown): number => (isObject(e) && typeof e['at'] === 'number' ? e['at'] : 0);
+    for (const tick of [
+      { at: nowMs + SHORTAGE_EVERY_MS, kind: 'shortage.check' },
+      { at: nowMs + 24 * MS_PER_HOUR, kind: 'upkeep.day' },
+    ]) {
+      seq += 1;
+      const index = next.findIndex((e) => at(e) > tick.at);
+      next.splice(index < 0 ? next.length : index, 0, { ...tick, seq });
+    }
+    return {
+      ...state,
+      markets,
+      shortages: Array.isArray(state['shortages']) ? state['shortages'] : [],
+      sink: isObject(state['sink'])
+        ? state['sink']
+        : { feesAtoms: 0, upkeepAtoms: 0, levyAtoms: 0 },
+      counters: { ...counters, seq },
+      queue: next,
     };
   },
 ];

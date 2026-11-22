@@ -159,6 +159,23 @@ describe('snapshot upgrades', () => {
     expect(book.asks[0].value).toBe(toAtoms(1) * 900);
   });
 
+  it('gives a version 4 snapshot no shortages, a zero sink ledger and the two new ticks', () => {
+    const old = {
+      nowMs: 1000,
+      counters: { seq: 4 },
+      markets: { h1: { parts: { why: { global: 1800, transport: 0 } } } },
+      queue: [{ at: 5_000, seq: 2, kind: 'score.tick' }],
+    };
+    const up = upgradeSnapshot(old, 4) as unknown as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+    expect(up['shortages']).toEqual([]);
+    expect(up['sink']).toEqual({ feesAtoms: 0, upkeepAtoms: 0, levyAtoms: 0 });
+    expect(up['markets'].h1.parts.why).toEqual({ global: 1800, transport: 0, shortage: 0 });
+    const kinds = (up['queue'] as { kind: string }[]).map((q) => q.kind);
+    expect(kinds).toContain('shortage.check');
+    expect(kinds).toContain('upkeep.day');
+    expect(up['counters'].seq).toBe(6);
+  });
+
   it('is a no-op at the current version and rejects newer or malformed input', () => {
     const cur = { players: {} };
     expect(upgradeSnapshot(cur, SNAPSHOT_VERSION)).toBe(cur);

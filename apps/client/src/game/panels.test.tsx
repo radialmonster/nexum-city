@@ -17,7 +17,7 @@ const book = {
   refCents: 100,
   lastCents: 101,
   baseCents: 100,
-  why: { from: null, distM: 0, global: 100, transport: 0, demand: 0, raid: 0 },
+  why: { from: null, distM: 0, global: 100, transport: 0, demand: 0, raid: 0, shortage: 0 },
 };
 const marketView = () =>
   makeView({

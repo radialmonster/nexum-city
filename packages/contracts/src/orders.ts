@@ -188,6 +188,7 @@ export const ORDER_ERROR_CODES = [
   'too_many_carriers',
   'unknown_job',
   'reserved_contract',
+  'no_fuel',
 ] as const;
 export const orderErrorCodeSchema = z.enum(ORDER_ERROR_CODES);
 export type OrderErrorCode = z.infer<typeof orderErrorCodeSchema>;

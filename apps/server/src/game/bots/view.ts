@@ -165,6 +165,8 @@ export function stateFromView(view: PlayerView): GameState {
     rng: [0, 0, 0, 0],
     counters: { crew: 0, carrier: 0, movement: 0, event: 0, seq: 0, order: 0, contract: 0, job: 0 },
     heat: {},
+    shortages: view.shortages,
+    sink: view.sink,
     world: { cols: 0, rows: 0, soundY: 0 },
     graph: { nodes: view.graph.nodes, edges: view.graph.edges },
     districts,

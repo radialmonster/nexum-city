@@ -61,6 +61,8 @@ export function makeView(over: Partial<PlayerView> = {}): PlayerView {
     ambushes: [],
     reveals: {},
     markets: {},
+    shortages: [],
+    sink: { feesAtoms: 0, upkeepAtoms: 0, levyAtoms: 0 },
     orders: [],
     graph: {
       nodes: {

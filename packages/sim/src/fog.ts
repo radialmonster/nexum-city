@@ -27,6 +27,7 @@ import {
   type Player,
   type Pos,
   type Season,
+  type Shortage,
   type Stance,
 } from './types.js';
 
@@ -307,6 +308,10 @@ export interface PlayerView {
   reveals: Record<Id, number>;
   /** Public order books by hub id, then good. */
   markets: Record<Id, Record<Good, MarketBookView>>;
+  /** Hubs that are short of a good right now (public). */
+  shortages: Shortage[];
+  /** What the credit sinks have taken so far, in atoms (public totals). */
+  sink: GameState['sink'];
   /** Your own open orders. */
   orders: MarketOrder[];
   /** Every hub's contracts board: open offers and taken jobs, all public. */
@@ -520,6 +525,8 @@ export function viewFor(state: GameState, playerId: Id): PlayerView {
     ambushes,
     reveals,
     markets,
+    shortages: state.shortages.map((s) => ({ ...s })),
+    sink: { ...state.sink },
     orders,
     contracts,
     graph: {
