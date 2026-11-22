@@ -178,7 +178,7 @@ export class CameraController {
     // keep the same number of plots across when the window resizes
     const zoom = this.cam.zoom * (vp.w / this.vp.w);
     this.vp = vp;
-    this.cam = clampCamera({ ...this.cam, zoom }, vp, this.bounds, this.tokens);
+    this.cam = this.clamp({ ...this.cam, zoom });
   }
 
   private clamp(cam: Camera): Camera {
@@ -260,17 +260,7 @@ export class CameraController {
   animateTo(target: Camera, nowMs: number, duration = 380, overscroll = false): void {
     this.vx = 0;
     this.vy = 0;
-    if (overscroll) {
-      // grow the pan limits just enough that the target is reachable
-      // (a world smaller than the view is pinned to its centre, so the room needed can exceed the
-      // first shortfall: grow until the target is reachable)
-      for (let i = 0; i < 4; i++) {
-        const got = this.clamp(target);
-        const need = Math.max(Math.abs(target.x - got.x), Math.abs(target.y - got.y));
-        if (need < 1e-6) break;
-        this.overscroll += need;
-      }
-    }
+    if (overscroll) this.growToReach(target);
     if (duration <= 0) {
       this.tween = null;
       this.cam = this.clamp(target);
@@ -283,6 +273,20 @@ export class CameraController {
       duration,
       anchor: null,
     };
+  }
+
+  /**
+   * Grow the pan limits just enough that the target is reachable. A world smaller than the view
+   * is pinned to its centre, so the room needed can exceed the first shortfall: grow until the
+   * target is reachable.
+   */
+  private growToReach(target: Camera): void {
+    for (let i = 0; i < 4; i++) {
+      const got = this.clamp(target);
+      const need = Math.max(Math.abs(target.x - got.x), Math.abs(target.y - got.y));
+      if (need < 1e-6) break;
+      this.overscroll += need;
+    }
   }
 
   /** Drop the extra pan room; if the view is outside the normal limits it slides back inside. */
@@ -313,7 +317,8 @@ export class CameraController {
   }
 
   /** Jump instantly. */
-  set(cam: Camera): void {
+  set(cam: Camera, overscroll = false): void {
+    if (overscroll) this.growToReach(cam);
     this.tween = null;
     this.vx = 0;
     this.vy = 0;

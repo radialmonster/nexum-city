@@ -25,6 +25,7 @@ import { Timeline } from './Timeline';
 import { RushBanner } from './RushBanner';
 import { TopBar } from './TopBar';
 import type { JobOffer } from './streetJobs';
+import { homeHint } from '../map/home';
 import { finaleClock, isOwn, ownDistricts, readyNodes } from './derive';
 import { SeasonEnd } from './SeasonEnd';
 import { FirstSteps } from './FirstSteps';
@@ -130,6 +131,8 @@ export function GameScreen() {
   if (!view || !account) return null;
   const nowMs = gameNow(state, wall);
   const alerts = Object.values(view.districts).filter((d) => isOwn(d) && d.siege !== null).length;
+  /** Your first plot: the home that pulses until it is first selected. */
+  const home = ownDistricts(view)[0];
   const select = (id: string | null) => {
     store.dispatch({ type: 'select', id });
   };
@@ -296,8 +299,15 @@ export function GameScreen() {
                   {
                     id: 'home',
                     label: 'Select your district',
-                    hint: 'Click your glowing plot on the map to see its crews and goods.',
+                    hint: homeHint(home?.name ?? null),
                     done: shown.selectedHome,
+                    ...(home
+                      ? {
+                          onGo: () => {
+                            fly(home.id);
+                          },
+                        }
+                      : {}),
                   },
                   {
                     id: 'settle',
@@ -344,6 +354,7 @@ export function GameScreen() {
             selected: state.selected,
             onSelect: select,
             flyTo: state.flyTo,
+            beaconId: !shown.selectedHome && home ? home.id : null,
             onOrder: (kind, districtId) => {
               session.openDraft({ kind, districtId });
             },

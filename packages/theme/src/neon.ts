@@ -364,6 +364,16 @@ export const neonMap = {
   flashMs: 2600,
   /** How long the quick flash for a Runner slipping past an ambush stays, in ms. */
   evadeFlashMs: 1400,
+  /** One breath of the home-plot beacon (a ring swelling out of your first plot), in ms. */
+  homeBeaconMs: 2200,
+  /** How far the beacon ring swells past the plot edge, as a fraction of the plot size. */
+  homeBeaconSpread: 0.35,
+  /** Peak opacity of the beacon ring and its halo. */
+  homeBeaconAlpha: 0.95,
+  /** Opacity of the soft halo filled inside the beacon. */
+  homeBeaconHaloAlpha: 0.22,
+  /** Opacity of the steady outer ring left on your plots once the beacon has retired. */
+  ownRingAlpha: 0.35,
   /** Minimum drag distance in px before a press becomes a pan instead of a click. */
   dragSlop: 5,
 } satisfies Record<string, number>;

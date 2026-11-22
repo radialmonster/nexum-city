@@ -6,6 +6,8 @@ export interface FirstStep {
   readonly label: string;
   readonly hint: string;
   readonly done: boolean;
+  /** When set, the step text is a button that does the step's first move (e.g. fly to it). */
+  readonly onGo?: () => void;
 }
 
 export interface FirstStepsProps {
@@ -22,10 +24,17 @@ export function FirstSteps({ steps, onDismiss }: FirstStepsProps) {
         {steps.map((s) => (
           <li key={s.id} className={styles['step']} data-done={s.done}>
             <Tag faction={s.done ? 'self' : 'neutral'}>{s.done ? 'DONE' : 'TODO'}</Tag>
-            <span className={styles['text']}>
-              <strong>{s.label}</strong>
-              <small>{s.hint}</small>
-            </span>
+            {s.onGo && !s.done ? (
+              <button type="button" className={styles['go']} onClick={s.onGo}>
+                <strong>{s.label}</strong>
+                <small>{s.hint}</small>
+              </button>
+            ) : (
+              <span className={styles['text']}>
+                <strong>{s.label}</strong>
+                <small>{s.hint}</small>
+              </span>
+            )}
           </li>
         ))}
       </ol>

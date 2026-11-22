@@ -99,6 +99,8 @@ export class MapRenderer {
   private readonly cb: RendererCallbacks;
   private scene: Scene;
   private selected: Id | null = null;
+  /** The plot that pulses until the player first selects it (the newcomer's home). */
+  private beacon: Id | null = null;
   /** A district whose own labels are hidden because the radial menu is drawn over it. */
   private menuFor: Id | null = null;
   private preview: number[] | null = null;
@@ -204,6 +206,12 @@ export class MapRenderer {
   setSelection(id: Id | null): void {
     this.selected = id;
     this.baseDirty = true;
+    this.dirty = true;
+  }
+
+  /** Pulse a halo around a plot (null stops it). */
+  setBeacon(id: Id | null): void {
+    this.beacon = id;
     this.dirty = true;
   }
 
@@ -404,6 +412,7 @@ export class MapRenderer {
       this.scene.alerts.length > 0 ||
       this.scene.ambushes.length > 0 ||
       this.flashes.length > 0 ||
+      this.beacon !== null ||
       this.scene.districts.some((d) => d.siege !== null);
     if (moved || this.dirty || animated) this.draw(now);
   };
@@ -605,6 +614,16 @@ export class MapRenderer {
       }
     } else {
       if (sel || d.mine) g.poly(flat, true).stroke({ width: lw * 3, ...withA(role, 0.18) });
+      if (d.mine && !sel) {
+        // a fainter steady ring just outside every owned plot, so yours stand apart from the hubs
+        g.poly(
+          Array.from(insetPoints(d.points, 1.05), (v, i) => v + (i % 2 === 0 ? d.cx : d.cy)),
+          true,
+        ).stroke({
+          width: lw,
+          ...withA(role, m.ownRingAlpha),
+        });
+      }
       g.poly(flat, true).stroke({ width: lw, ...role });
     }
     if (sel) g.poly(flat, true).stroke({ width: m.edgeWidthSelected * px, ...pal.color.accentAlt });
@@ -758,6 +777,25 @@ export class MapRenderer {
       g.circle(a.x, a.y, base + k * m.pitchX * 0.35).stroke({
         width: m.edgeWidth * px,
         ...withA(pal.color.danger, 1 - k),
+      });
+    }
+
+    // home beacon: a halo and a ring swelling out of the plot, in the faction colour
+    const home = this.beacon ? scene.byId[this.beacon] : undefined;
+    if (home && !home.remembered) {
+      const k = (now % m.homeBeaconMs) / m.homeBeaconMs;
+      const col = pal.faction[home.role];
+      const out = (s: number) =>
+        Array.from(insetPoints(home.points, s), (v, i) => v + (i % 2 === 0 ? home.cx : home.cy));
+      const breath = 0.5 - 0.5 * Math.cos(k * Math.PI * 2);
+      g.poly(out(1), true).fill(withA(col, m.homeBeaconHaloAlpha * breath));
+      g.poly(out(1 + m.homeBeaconSpread * k), true).stroke({
+        width: m.edgeWidthSelected * 1.5 * px,
+        ...withA(col, m.homeBeaconAlpha * (1 - k)),
+      });
+      g.poly(out(1.04), true).stroke({
+        width: m.edgeWidthSelected * 1.5 * px,
+        ...withA(col, m.homeBeaconAlpha * (0.5 + 0.5 * breath)),
       });
     }
 

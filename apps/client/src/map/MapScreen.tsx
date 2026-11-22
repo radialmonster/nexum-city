@@ -13,6 +13,7 @@ import {
   type ZoomLevel,
 } from './camera';
 import { demoView, DEMO_SELF } from './demo';
+import { needsHomeCentre } from './home';
 import { edgeArrows, type ArrowTarget } from './offscreen';
 import { readHudScale, readMotionMs } from './hudScale';
 import styles from './MapScreen.module.css';
@@ -94,6 +95,8 @@ export interface MapEmbed {
   readonly onSelect: (id: Id | null) => void;
   /** Fly the map to a district; a new `n` repeats the request. */
   readonly flyTo: { readonly id: Id; readonly n: number } | null;
+  /** A plot that pulses on the map until the player first selects it. */
+  readonly beaconId?: Id | null;
   readonly onOrder: (kind: MapOrderKind, districtId: Id) => void;
   /** A route to preview while an order card is open. */
   readonly route?: readonly Id[] | null;
@@ -228,13 +231,14 @@ export function MapScreen({
   const hudInset = useCallback((): { x: number; y: number } => {
     const card = hostRef.current?.parentElement?.querySelector<HTMLElement>('[class*="readout"]');
     const host = hostRef.current?.getBoundingClientRect();
-    if (!card || !host) return { x: 0, y: 0 };
+    // the phone layout hides the card, but its flag can lag the first frame: go by the width
+    if (!card || !host || host.width < palette.map.compactBelowPx) return { x: 0, y: 0 };
     const r = card.getBoundingClientRect();
     return {
       x: Math.max(0, r.right - host.left) / 2,
       y: Math.max(0, r.bottom - host.top) / 2,
     };
-  }, []);
+  }, [palette]);
 
   const mineBounds = useCallback((s: Scene) => {
     const mine = s.districts.filter((d) => d.mine);
@@ -249,6 +253,9 @@ export function MapScreen({
 
   // the renderer: created once per theme, lazily, and never under jsdom
   const hasScene = scene !== null;
+  /** The camera has been framed on the player's own plots (once; never again after a move). */
+  const centredRef = useRef(false);
+  const startCamRef = useRef<Camera | null>(null);
   useEffect(() => {
     const host = hostRef.current;
     if (!host || !hasScene || navigator.userAgent.includes('jsdom')) {
@@ -281,17 +288,22 @@ export function MapScreen({
         rendererRef.current = made;
         const c = made.controller;
         const b = mineBounds(first);
+        centredRef.current = first.mine.length > 0;
         if (opts.zoom === 'city') {
           c.set(frameBounds(cityBounds(first, palette.map), c.viewport, palette.map, 0.03));
         } else {
           const zoom = zoomForLevel(opts.zoom, c.viewport, palette.map);
           const inset = hudInset();
-          c.set({
-            x: (b.minX + b.maxX) / 2 - inset.x / zoom,
-            y: (b.minY + b.maxY) / 2 - inset.y / zoom,
-            zoom,
-          });
+          c.set(
+            {
+              x: (b.minX + b.maxX) / 2 - inset.x / zoom,
+              y: (b.minY + b.maxY) / 2 - inset.y / zoom,
+              zoom,
+            },
+            true,
+          );
         }
+        startCamRef.current = { ...c.cam };
         setVp({ ...c.viewport });
         setReady(true);
       } catch {
@@ -315,6 +327,11 @@ export function MapScreen({
   useEffect(() => {
     rendererRef.current?.setSelection(selected);
   }, [selected, ready]);
+
+  const beaconId = embed?.beaconId ?? null;
+  useEffect(() => {
+    rendererRef.current?.setBeacon(beaconId);
+  }, [beaconId, scene, ready]);
 
   useEffect(() => {
     const r = rendererRef.current;
@@ -382,9 +399,29 @@ export function MapScreen({
       r.controller.animateTo(
         { ...to, x: to.x - inset.x / to.zoom, y: to.y - inset.y / to.zoom },
         now,
+        undefined,
+        // a home on the world's edge still needs to land mid-screen, clear of the HUD card
+        true,
       );
     });
   };
+
+  // A newcomer's first scene may not hold their district yet: when it appears, frame it once,
+  // unless the player has already moved the camera.
+  useEffect(() => {
+    const r = rendererRef.current;
+    const start = startCamRef.current;
+    if (!r || !scene || !start) return;
+    const c = r.controller.cam;
+    const moved = c.x !== start.x || c.y !== start.y || c.zoom !== start.zoom;
+    if (!needsHomeCentre({ centred: centredRef.current, hasMine: scene.mine.length > 0, moved })) {
+      return;
+    }
+    centredRef.current = true;
+    recentre();
+    // recentre reads the latest scene and renderer; only the scene arriving matters here
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene, ready]);
 
   // fly to a district when the game screen asks (a feed click, a nearby list entry)
   const fly = embed?.flyTo;

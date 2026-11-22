@@ -161,4 +161,15 @@ describe('animateTo with overscroll', () => {
     c.update(1000);
     expect(c.cam.y).toBeCloseTo(target.y, 3);
   });
+
+  it('set with overscroll centres a frontier target and a resize keeps it', () => {
+    const small = { minX: 0, minY: 0, maxX: 800, maxY: 400 };
+    const zoom = 1;
+    const c = new CameraController(t, small, vp, { x: 400, y: 200, zoom });
+    const target = { x: 400, y: 200 - 300, zoom };
+    c.set(target, true);
+    expect(c.cam.y).toBeCloseTo(target.y, 3);
+    c.setViewport({ w: vp.w, h: vp.h });
+    expect(c.cam.y).toBeCloseTo(target.y, 3);
+  });
 });

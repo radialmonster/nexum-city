@@ -29,3 +29,27 @@
   font-size: var(--font-size-sm);
   color: var(--color-text-dim);
 }
+
+.go {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3xs);
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--font-size-md);
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.go small {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-dim);
+}
+
+.go:hover strong,
+.go:focus-visible strong {
+  color: var(--color-accent);
+}
