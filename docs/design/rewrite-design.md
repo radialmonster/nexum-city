@@ -138,6 +138,7 @@ The city is bigger than one screen (see "The world"), so the map is a window you
 - **The city grows as players join.** It isn't a fixed board:
   - A season starts with about 20–30 districts. It can reach dozens or hundreds, and a player only ever sees part of it at once.
   - The city's outer edge is a **frontier** of plots that are surveyed, then opened. To the south the city ends at the Sound.
+  - **Settling:** a seen open plot is marked in the fogged view (`open`, and `settling` with the settler and finish time only). Players settle it from the radial menu: 60 supplies from the starting warehouse and a 10 hour timer; the map, timeline and feed show it.
   - **Placing new players:** each new player gets one protected first district on a newly opened frontier plot, with unclaimed plots and neutral districts nearby to expand into. Protection lasts about 48 hours.
   - There's no permanent privileged home district. After protection ends, a first district can be besieged like any other.
   - A new arrival is announced to the whole city and marked on the map.
