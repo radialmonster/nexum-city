@@ -75,7 +75,7 @@ Status: approved by the owner on 2026-11-22 ("make a plan file and proceed all")
 - Power gains demand everywhere vans run, which ties the grid districts into the whole economy.
 - **As built:** fuel is pooled across the owner's warehouses (start store first), and the rate is small (van 50 milli-power per km, about 1.5% of cargo) because the 5 to 10% target collapsed the bots. A credit sink (daily levy and upkeep) was added to bring money growth from 15x to 4x. See sim-spec, "Economy stages 3 and 4 and the credit sink".
 
-### Stage 5 (tasks 79b to 82b): UI
+### Stage 5 (tasks 79b to 82b): UI (built, 2026-11-22)
 
 - **Price board.** Each good's price at every hub, with:
   - a season-long trend line, with your last visit marked;
@@ -85,6 +85,8 @@ Status: approved by the owner on 2026-11-22 ("make a plan file and proceed all")
 - **Your piles:** show "your cost 16.4". The sell form shows profit or loss against cost.
 - **Haul card:** fuel cost and "sell at East Hub: about +86 cr".
 - **Shortages:** a feed card, plus a tag on the hub on the map.
+- **Built:** a PRICES tab in the market panel (price per hub, hourly trend sparkline with a last-visit mark from `/api/market/history`, a plain why, best haul after fuel), your cost and a profit or loss verdict in the sell form and district panel, fuel and sale lines on the haul card with a BUY POWER shortcut on `no_fuel`, shortage feed cards, an ended card and a map glow and tag with time left, and a visible city tax chip and notice (levy, upkeep, charge cards detected from `sink` deltas).
+- **Built:** a PRICES tab in the market panel (price per hub, hourly trend sparkline with a last-visit mark from `/api/market/history`, a plain why, best haul after fuel), your cost and a profit or loss verdict in the sell form and district panel, fuel and sale lines on the haul card with a BUY POWER shortcut on `no_fuel`, shortage feed cards, an ended card and a map glow and tag with time left, and a visible city tax chip and notice (levy, upkeep, charge cards detected from `sink` deltas).
 - **Full warehouse:** a "storage full, output stopped" warning that makes a cheap sale a real choice.
 
 ### Later (optional)
