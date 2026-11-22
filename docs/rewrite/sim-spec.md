@@ -441,6 +441,18 @@ Changes: a protected player cannot set ambushes (`protected_no_raid`, bots respe
 
 Strike success fell from 88 percent to 63 percent (target 55 to 70). Ambushes per season 21.3 before, 20.6 after; hits 22.4 before, 17.3 after; repelled 3.1 before, 10.1 after; stolen 159 before, 127 after. The raider lead over the best other type is 1.12x (limit 1.4x) and invariant problems are 0. Finding: in the harness the strikes land almost only on unescorted van hauls (raiders about 17 strength against a guard of about 12), not on settle carriers, so the full-strength settle crews matter little there and the van toughness is what moves the rate. The rate is steep near this value (toughness 10 gives 83 percent, 13 gives 33 percent), so tune `balance.carriers.van.toughness` in small steps.
 
+## First-session frontier and starter hook (M2)
+
+Two first-session problems found in the 77b playthrough, and their fixes. `RULES_VERSION` stays 3 (nothing deployed that must replay) and the snapshot is unchanged.
+
+**Frontier.** World creation opens every plot and each joiner claims one, so a new player usually found none open, and the replacement plot surveyed for 4 h. Fix: while any player is in their newcomer rush, `ensureFrontier` surveys a new plot in `frontier.rushSurveyMinutes` (5 min) instead of `surveyHours` (4 h). A joiner who takes a plot sees its replacement open within minutes, so a recent joiner can settle inside their rush. The rush kit now also carries 30 supplies (`rush.kit.supplies`), which with the 30 bought at the hub make the 60 a settle needs, and stays under the 120 warehouse cap. Rejected: a buffer of 3 extra open plots at world creation (it shifted the bots: turtle districts 2.2, raid spread sd 23 to 30, and broke four frontier tests). The frontier tests exist to pin that the frontier stays stocked, fog is unchanged and a joiner always gets a plot; none were weakened, and one was added (a joiner's plot re-opens in minutes during a rush and in `surveyHours` otherwise).
+
+**Open plots over time** (`node scripts/open-plots.mjs`, one joiner every 2 h; want = max(4, ceil(players / 3))): open plus surveying never exceeds want. 1 player: 3 open, 1 surveying; 13 players: 3 open, 2 surveying (want 5); 22 players: 6 open, 2 surveying (want 8); 24 players: 8 open (want 8). The map is not flooded.
+
+**Starter contract: kept as a "come back in about an hour" hook.** The nearest hub is about 5 km away, about 50 min by van, so the contract cannot finish in a first session. Pros of the hook: the first session has a clear reason to return, the contract pays well (premium 100 percent), and no new carrier is needed in the first minutes. Cons: a player who never returns sees an unfinished order. The alternative (a Runner, 300 credits, speed 160, about 30 min) costs more than a newcomer has and still does not finish in 15 min, so it was not chosen. UI shape: the contract's `windowMs` is the van trip plus 20 min grace, so the client may say "about `windowMs` minus 20 minutes by van, come back then".
+
+**Results** (scripted newcomer, `scripts/first-session.mjs`, seeds 1 to 8): before, no perks, 2 actions and 1 completion in 15 min and no settle; now 8 actions and 3 completions in 15 min (floor 8 and 3), the settle accepted in 8 of 8 seeds within 15 min (average minute 5.1), the starter contract paid in 0 of 8 within 30 min (the hook). Bot harness seeds 1 to 16: raider lead 1.28x, raid success 56 percent, invariants 0.
+
 ## Newcomer rush and street jobs (M2)
 
 Goal: at least 15 minutes of active, asynchronous play for a new player, without punishing logging off. `RULES_VERSION` stays 3 (nothing deployed); the snapshot gains an upgrade step 2 to 3 (players get `rushUntilMs: 0`, `jobs: []`, `jobNextMs: 0`; `counters.job` is 0). Players already in a live season get no rush and no jobs on upgrade.
@@ -507,7 +519,7 @@ Raider lead is 0.94x with perks (1.12x before; 1.03x with perks and 1.08x before
 
 **Merchant districts could not be restored to 3.2.** Without the newcomer perks the merchant holds 3.47 districts; with them 2.2 to 2.6. Removing the kit parts or the kit power alone brings it back (3.3), because together they pay for the early Workshop, so the merchant hauls more and its home keeps too few supplies for a settlement (upkeep eats them). That is a trade of the rush design, not of raids, so the honest harness floor is 2.4 on seeds 1 to 8 (the test also now requires raid success between 40 and 70 percent). Raiders now capture more (16 plots on seeds 1 to 8, 6 on task 77 and 8 before).
 
-First 15 minutes of the scripted newcomer with 60 supplies: 8 to 9 actions, 4 to 5 completions (before the rush: 3 and 1). A settle is still not accepted in the session.
+First 15 minutes of the scripted newcomer with 60 supplies: 8 to 9 actions, 4 to 5 completions (before the rush: 3 and 1). A settle is still not accepted in the session (fixed afterwards, see "First-session frontier and starter hook").
 
 **Plain-language pros and cons**
 
