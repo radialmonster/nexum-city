@@ -184,3 +184,42 @@ export function kindDetail(kind: DistrictKind, w: number, h: number, rich: boole
   });
   return out;
 }
+
+/** A small deterministic generator seeded from a plot id, so a plot always looks the same. */
+function seeded(id: string): () => number {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619);
+  return () => {
+    h = Math.imul(h ^ (h >>> 15), 2246822519);
+    h = Math.imul(h ^ (h >>> 13), 3266489917);
+    h ^= h >>> 16;
+    return (h >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Lot lines and building footprints for a plot at district zoom: a column of seeded footprints
+ * down each side margin and a couple of lot lines, so every plot has some texture even when it is
+ * neutral. Same plot, same pattern. About a dozen primitives, all outside the label band.
+ */
+export function lotDetail(id: string, w: number, h: number): Prim[] {
+  const rnd = seeded(id);
+  const out: Prim[] = [];
+  const rows = 4 + Math.floor(rnd() * 2);
+  const colW = 0.09 * w;
+  for (const side of [-1, 1]) {
+    const edge = side * 0.4 * w;
+    for (let r = 0; r < rows; r++) {
+      if (rnd() < 0.2) continue;
+      const bh = (0.1 + rnd() * 0.07) * h;
+      const bw = colW * (0.6 + rnd() * 0.5);
+      const y = -0.36 * h + r * ((0.72 * h) / rows);
+      out.push(rect(side > 0 ? edge - bw : edge, y, bw, bh, rnd() < 0.5, 0.7));
+    }
+  }
+  // lot lines framing the label band
+  for (const f of [-0.3, 0.3]) {
+    out.push(line(-0.3 * w, f * h, 0.3 * w, f * h, 0.35));
+  }
+  return out;
+}

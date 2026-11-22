@@ -330,12 +330,12 @@ export function territories(scene: Scene): Territory[] {
 
 /** World bounds of the whole city including the Sound, for framing the CITY level. */
 export function cityBounds(scene: Scene, t: MapTokens): Bounds {
-  return { ...scene.bounds, maxY: scene.waterTop + t.pitchY * 1.2 };
+  return { ...scene.bounds, maxY: scene.waterTop + t.pitchY * t.soundCity };
 }
 
 /** What the camera may pan over: the plots plus only a strip of the Sound below them. */
 export function panBounds(scene: Scene, t: MapTokens): Bounds {
-  return { ...scene.bounds, maxY: scene.waterTop + t.pitchY * 0.5 };
+  return { ...scene.bounds, maxY: scene.waterTop + t.pitchY * t.soundPan };
 }
 
 /** Streets from the graph, or derived from plot positions when the view has no graph. */

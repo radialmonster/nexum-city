@@ -19,7 +19,7 @@ import {
   type ZoomLevel,
 } from './camera';
 import { readHudScale } from './hudScale';
-import { glowRings, insetPoints, kindDetail, lodFor, type Lod } from './detail';
+import { glowRings, insetPoints, kindDetail, lodFor, lotDetail, type Lod } from './detail';
 import {
   moverPose,
   panBounds,
@@ -414,8 +414,8 @@ export class MapRenderer {
     const padX = m.pitchX * 8;
     const left = b.minX - padX;
     const wide = b.maxX - b.minX + padX * 2;
-    g.rect(left, scene.waterTop, wide, m.pitchY * 5).fill(pal.color.waterDeep);
-    g.rect(left, scene.waterTop, wide, m.pitchY * 1.2).fill(withA(pal.color.water, 1));
+    g.rect(left, scene.waterTop, wide, m.pitchY * (m.soundPan + 1)).fill(pal.color.waterDeep);
+    g.rect(left, scene.waterTop, wide, m.pitchY * m.soundCity).fill(withA(pal.color.water, 1));
     g.moveTo(left, scene.waterTop)
       .lineTo(left + wide, scene.waterTop)
       .stroke({ width: m.edgeWidth * px, ...pal.color.waterEdge });
@@ -581,7 +581,9 @@ export class MapRenderer {
     k: number,
   ): void {
     const m = this.pal.map;
-    for (const p of kindDetail(d.kind, d.w, d.h, rich)) {
+    const prims = kindDetail(d.kind, d.w, d.h, rich);
+    if (rich && d.kind !== 'hub') prims.push(...lotDetail(d.id, d.w, d.h));
+    for (const p of prims) {
       if (p.k === 'line') {
         g.moveTo(d.cx + p.x1, d.cy + p.y1)
           .lineTo(d.cx + p.x2, d.cy + p.y2)
@@ -778,7 +780,7 @@ export class MapRenderer {
       cam,
       vp,
       (scene.bounds.minX + scene.bounds.maxX) / 2,
-      scene.waterTop + m.pitchY * 0.5,
+      scene.waterTop + m.pitchY * m.soundLabel,
     );
     const sound = this.label(
       'sound',

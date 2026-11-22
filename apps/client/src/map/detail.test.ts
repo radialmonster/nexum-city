@@ -1,6 +1,6 @@
 import { themes, toPixiPalette } from '@nexum/theme';
 import { describe, expect, it } from 'vitest';
-import { glowRings, insetPoints, kindDetail, lodFor, type Prim } from './detail';
+import { glowRings, insetPoints, kindDetail, lodFor, lotDetail, type Prim } from './detail';
 
 const t = toPixiPalette(themes.neon).map;
 const KINDS = ['docks', 'grid', 'archive', 'farms', 'stacks', 'residential'] as const;
@@ -65,5 +65,19 @@ describe('inner glow', () => {
       }
     });
     expect(insetPoints([10, -10, 4, 6], 0.5)).toEqual([5, -5, 2, 3]);
+  });
+});
+
+describe('lotDetail', () => {
+  it('is deterministic per plot and differs between plots', () => {
+    expect(lotDetail('d-1', 200, 220)).toEqual(lotDetail('d-1', 200, 220));
+    expect(lotDetail('d-1', 200, 220)).not.toEqual(lotDetail('d-2', 200, 220));
+  });
+  it('stays cheap and inside the plot', () => {
+    const prims = lotDetail('d-9', 200, 220);
+    expect(prims.length).toBeLessThanOrEqual(20);
+    for (const p of prims) {
+      if (p.k === 'rect') expect(Math.abs(p.x) + Math.abs(p.y)).toBeLessThan(200 + 220);
+    }
   });
 });

@@ -165,7 +165,7 @@ export const neonSize = {
   icon: 26,
   gauge: 120,
   spark: 90,
-  radial: 300,
+  radial: 380,
   toggle: 160,
   column: 380,
   page: 2400,
@@ -295,6 +295,10 @@ export const neonMap = {
   streetDashGap: 8,
   frontierDash: 10,
   frontierDashGap: 7,
+  // the Sound: how much water shows below the plots (in plot heights) when panning, at city zoom, and where its label sits
+  soundPan: 0.22,
+  soundCity: 0.7,
+  soundLabel: 0.11,
   // fog of war
   fogDim: 0.4,
   fogCover: 0.72,
