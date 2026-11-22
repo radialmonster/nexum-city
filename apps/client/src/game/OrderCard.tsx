@@ -24,6 +24,8 @@ import {
 } from './derive';
 import { CarrierCompare } from './CarrierCompare';
 import { contractSentence, lateWarning } from './contracts';
+import { costOf, expectedSale, fuelCheck, nearestHub, signedCredits } from './economy';
+import { credits } from './market';
 import { formatUnits } from './feed';
 import { messageFor } from './messages';
 import { siegeOdds } from './odds';
@@ -152,6 +154,8 @@ export interface OrderCardProps {
   readonly onClose: () => void;
   /** The route to draw on the map while the card is open. */
   readonly onRoute: (route: readonly string[] | null) => void;
+  /** Opens the power market at the nearest hub, for a trip that has no fuel. */
+  readonly onBuyPower?: ((hub: string) => void) | undefined;
 }
 
 export function carrierKindOf(view: PlayerView, id: string | null): CarrierKind | 'foot' {
@@ -159,7 +163,15 @@ export function carrierKindOf(view: PlayerView, id: string | null): CarrierKind 
 }
 
 /** The confirm card for an order opened from the map's radial menu. */
-export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: OrderCardProps) {
+export function OrderCard({
+  view,
+  draft,
+  nowMs,
+  onConfirm,
+  onClose,
+  onRoute,
+  onBuyPower,
+}: OrderCardProps) {
   const target = view.districts[draft.districtId];
   const contract = draft.contractId ? view.contracts[draft.contractId] : undefined;
   const job = draft.jobId ? view.self.jobs.find((j) => j.id === draft.jobId) : undefined;
@@ -300,6 +312,16 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
   const carry = balance.carriers[kind].cargo;
   const cargoTotal = GOOD_KEYS.reduce((n, g) => n + Math.floor(cargo[g] ?? 0), 0);
 
+  const fuel =
+    route && source && draft.kind !== 'build' && draft.kind !== 'job'
+      ? fuelCheck(view, source, kind, route.lengthM, Math.floor(cargo['power'] ?? 0))
+      : null;
+  const noFuel = fuel !== null && !fuel.enough;
+  const hubDest = view.districts[draft.districtId]?.relation === 'hub' ? draft.districtId : null;
+  const sale =
+    draft.kind === 'haul' && fuel && hubDest
+      ? expectedSale(view, hubDest, cargo, fuel.units)
+      : null;
   let blocker: string | null = null;
   if (draft.kind === 'build') {
     const level = (own?.buildings.find((b) => b.type === building)?.level ?? 0) + 1;
@@ -346,6 +368,9 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
     else if (stock && GOOD_KEYS.some((g) => toUnits(stock[g]) < (cargo[g] ?? 0)))
       blocker = 'The source warehouse does not hold that much.';
   }
+  if (blocker === null && noFuel) {
+    blocker = `This trip burns ${formatUnits(fuel.units)} power and your warehouses do not hold it. Buy power first, or go on foot.`;
+  }
 
   const fogged = draft.kind === 'siege' && target?.relation === 'remembered';
   const odds = (() => {
@@ -364,6 +389,11 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
       neutral,
     });
   })();
+
+  const cargoCost = (g: (typeof GOOD_KEYS)[number]): number | null =>
+    source
+      ? costOf(view, sourceDistrict?.relation === 'own' ? 'districts' : 'stash', source, g)
+      : null;
 
   const toggle = (id: string) => {
     setPicked(crewIds.includes(id) ? crewIds.filter((x) => x !== id) : [...crewIds, id]);
@@ -527,6 +557,11 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
                         }}
                       />
                       {stock && <small>of {formatUnits(toUnits(stock[g]))}</small>}
+                      {cargoCost(g) !== null && (
+                        <small data-testid="cargo-cost">
+                          your cost {credits(cargoCost(g) ?? 0)}
+                        </small>
+                      )}
                     </label>
                   ))}
                 </div>
@@ -535,6 +570,17 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
             {contract && (
               <p className={styles['line']} data-testid="contract-line">
                 For contract: {contractSentence(view, contract)}
+              </p>
+            )}
+            {fuel && fuel.units > 0 && (
+              <p className={styles['line']} data-testid="fuel-line">
+                Fuel: <b>{formatUnits(fuel.units)} power</b> from your warehouses.
+              </p>
+            )}
+            {draft.kind === 'haul' && sale && hubDest && (
+              <p className={styles['line']} data-testid="sale-line">
+                Sell at {view.districts[hubDest]?.name ?? hubDest}: about{' '}
+                <b>{signedCredits(sale.netCents)} cr</b> after fuel.
               </p>
             )}
             {draft.kind === 'haul' && (
@@ -636,9 +682,22 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
           </>
         )}
         {blocker && (
-          <p className={styles['blocker']} role="alert">
+          <p className={styles['blocker']} role="alert" data-testid="blocker">
             {blocker}
           </p>
+        )}
+        {noFuel && onBuyPower && source && (
+          <div className={styles['actions']}>
+            <Button
+              variant="primary"
+              onClick={() => {
+                const hub = nearestHub(view, source);
+                if (hub) onBuyPower(hub);
+              }}
+            >
+              BUY POWER
+            </Button>
+          </div>
         )}
         <div className={styles['actions']}>
           <Button onClick={onClose}>CANCEL</Button>

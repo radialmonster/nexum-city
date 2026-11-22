@@ -83,3 +83,17 @@ describe('store and clock', () => {
     expect(gameNow({ view: null, viewAt: 0 }, 800)).toBe(0);
   });
 });
+
+describe('city charge notices', () => {
+  const day = (levy: number) =>
+    makeView({ sink: { feesAtoms: 0, upkeepAtoms: 0, levyAtoms: levy * 360_000_000 } });
+
+  it('adds one notice when the shared tax total rises, and not again for the same night', () => {
+    let s = reduce(initialState, { type: 'view', view: day(0), at: 0 });
+    expect(s.charges).toHaveLength(0);
+    s = reduce(s, { type: 'view', view: { ...day(50), nowMs: 1_000_100 }, at: 1 });
+    expect(s.charges).toHaveLength(1);
+    s = reduce(s, { type: 'view', view: { ...day(50), nowMs: 1_000_200 }, at: 2 });
+    expect(s.charges).toHaveLength(1);
+  });
+});

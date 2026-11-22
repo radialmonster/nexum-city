@@ -4,6 +4,7 @@ import type { MarketHistoryResponse } from '@nexum/contracts';
 import {
   bestHauls,
   chargeHappened,
+  chargeNotice,
   charges,
   costOf,
   expectedSale,
@@ -253,5 +254,33 @@ describe('trendPoints', () => {
 
   it('falls back to the last civic quote', () => {
     expect(trendPoints(hist([]), null).points).toEqual([99]);
+  });
+});
+
+describe('chargeNotice', () => {
+  const at = (ms: number, levy: number, credits = 1000) =>
+    makeView({
+      nowMs: ms,
+      season: { startMs: 0, endMs: 10_000_000_000, finaleStartMs: 9_000_000_000, finale: false },
+      self: { ...makeView().self, credits: credits * ATOMS_PER_UNIT },
+      sink: { feesAtoms: 0, upkeepAtoms: 0, levyAtoms: levy * ATOMS_PER_UNIT },
+    });
+
+  it('stays silent until the shared totals rise', () => {
+    expect(chargeNotice(null, at(1000, 0))).toBeNull();
+    expect(chargeNotice(at(1000, 0), at(2000, 0))).toBeNull();
+  });
+
+  it('reports what the tax took, estimated from the view before it', () => {
+    const n = chargeNotice(at(86_000_000, 0, 1000), at(87_000_000, 280, 720));
+    expect(n?.levyCredits).toBe(280);
+    expect(n?.atMs).toBe(86_400_000);
+    expect(n?.text).toContain('City tax took about 280 cr');
+  });
+
+  it('says so when you were under the line', () => {
+    const n = chargeNotice(at(86_000_000, 0, 100), at(87_000_000, 50, 100));
+    expect(n?.levyCredits).toBe(0);
+    expect(n?.text).toContain('took nothing from you');
   });
 });

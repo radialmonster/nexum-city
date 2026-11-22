@@ -134,3 +134,7 @@
 .stack[hidden] {
   display: none;
 }
+
+.line[data-gain='false'] {
+  color: var(--color-warn);
+}

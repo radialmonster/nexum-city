@@ -308,3 +308,26 @@ describe('playtest fix events', () => {
     expect(e?.text).toContain('losing 18 power an hour');
   });
 });
+
+describe('shortage cards', () => {
+  it('announces a shortage with the price rise and the hours', () => {
+    const e = describeEvent(
+      feedItem(1, 'market.shortage', {
+        districts: ['b'],
+        data: { hub: 'b', good: 'parts', hours: 6, refPercent: 40 },
+      }),
+      view,
+    );
+    expect(e).toMatchObject({ kind: 'SHORTAGE', tone: 'warn' });
+    expect(e?.text).toContain('short of parts');
+    expect(e?.text).toContain('+40% for 6h');
+  });
+
+  it('says when a shortage is over', () => {
+    const e = describeEvent(
+      feedItem(2, 'market.shortage.ended', { districts: ['b'], data: { hub: 'b', good: 'parts' } }),
+      view,
+    );
+    expect(e?.text).toContain('no longer short of parts');
+  });
+});

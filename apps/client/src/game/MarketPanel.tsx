@@ -1,12 +1,20 @@
 import { useState } from 'react';
 import { toUnits } from '@nexum/sim';
-import type { ContractView, GoodName, PlayerView, FeedItem } from '@nexum/contracts';
+import type {
+  ContractView,
+  GoodName,
+  MarketHistoryResponse,
+  PlayerView,
+  FeedItem,
+} from '@nexum/contracts';
 import { Button, Panel, Sparkline, Tabs } from '../ui';
 import { vars } from '../ui/util';
 import { ContractsBoard } from './ContractsBoard';
 import { crewsAt, GOOD_KEYS, type CrewNames } from './derive';
 import { GOOD_TONE } from './DistrictPanel';
+import { costOf, saleVerdict, whyLine } from './economy';
 import { formatUnits } from './feed';
+import { PriceBoard } from './PriceBoard';
 import styles from './MarketPanel.module.css';
 import {
   bookTable,
@@ -46,7 +54,12 @@ export interface MarketPanelProps {
   /** Opens the haul card for a contract you took. */
   readonly onDeliver?: ((contract: ContractView) => void) | undefined;
   /** Starts on this tab. */
-  readonly tab?: 'market' | 'contracts' | undefined;
+  readonly tab?: 'market' | 'prices' | 'contracts' | undefined;
+  /** Loads a good's hourly price history at a hub, for the price board trends. */
+  readonly loadHistory?:
+    ((hub: string, good: GoodName) => Promise<MarketHistoryResponse>) | undefined;
+  /** Opens another hub's market (from the price board). */
+  readonly onOpenHub?: ((hub: string, good: GoodName) => void) | undefined;
 }
 
 type ContractOrder =
@@ -96,8 +109,10 @@ export function MarketPanel({
   onContract,
   onDeliver,
   tab: initialTab,
+  loadHistory,
+  onOpenHub,
 }: MarketPanelProps) {
-  const [tab, setTab] = useState<'market' | 'contracts'>(initialTab ?? 'market');
+  const [tab, setTab] = useState<'market' | 'prices' | 'contracts'>(initialTab ?? 'market');
   const [good, setGood] = useState<GoodName>(initial ?? 'parts');
   const [side, setSide] = useState<Side>('buy');
   const [price, setPrice] = useState('');
@@ -111,6 +126,10 @@ export function MarketPanel({
   const hubName = view.districts[hub]?.name ?? hub;
   const empty = price.trim() === '' && qty.trim() === '';
   const stashed = GOOD_KEYS.reduce((n, g) => n + stashUnits(view, hub, g), 0);
+  const myCost = costOf(view, 'stash', hub, good);
+  const sellPrice = check.ok && side === 'sell' ? check.priceCents : null;
+  const verdict =
+    sellPrice === null || !check.ok ? null : saleVerdict(myCost, sellPrice, check.qty);
   const crewHere = crewsAt(view, hub).some((c) => c.readyAtMs <= view.nowMs);
 
   const submit = async () => {
@@ -139,19 +158,18 @@ export function MarketPanel({
 
   return (
     <Panel title="Market" tag={hubName.toUpperCase()} className={styles['panel']}>
-      {onContract && (
-        <Tabs
-          label="Hub"
-          value={tab}
-          onChange={(id) => {
-            setTab(id === 'contracts' ? 'contracts' : 'market');
-          }}
-          tabs={[
-            { id: 'market', label: 'MARKET' },
-            { id: 'contracts', label: 'CONTRACTS' },
-          ]}
-        />
-      )}
+      <Tabs
+        label="Hub"
+        value={tab}
+        onChange={(id) => {
+          setTab(id === 'contracts' ? 'contracts' : id === 'prices' ? 'prices' : 'market');
+        }}
+        tabs={[
+          { id: 'market', label: 'MARKET' },
+          { id: 'prices', label: 'PRICES' },
+          ...(onContract ? [{ id: 'contracts', label: 'CONTRACTS' }] : []),
+        ]}
+      />
       {onContract && tab === 'contracts' && (
         <div className={styles['stack']}>
           <ContractsBoard
@@ -168,7 +186,7 @@ export function MarketPanel({
           </div>
         </div>
       )}
-      <div className={styles['stack']} hidden={onContract !== undefined && tab === 'contracts'}>
+      <div className={styles['stack']} hidden={tab === 'contracts'}>
         <Tabs
           label="Good"
           value={good}
@@ -177,136 +195,176 @@ export function MarketPanel({
           }}
           tabs={GOOD_KEYS.map((g) => ({ id: g, label: g.toUpperCase() }))}
         />
-        {table === null ? (
-          <p className={styles['none']}>This hub has no market for {good} yet.</p>
-        ) : (
+        {tab === 'prices' && (
           <>
-            <div className={styles['summary']}>
-              <span>
-                CITY PRICE <b>{credits(table.refCents)}</b>
-              </span>
-              <span>
-                LAST FILL <b>{table.lastCents === null ? 'none yet' : credits(table.lastCents)}</b>
-              </span>
-              {fills.length >= 2 ? (
-                <Sparkline points={fills} tone={GOOD_TONE[good]} label={`Recent ${good} fills`} />
-              ) : (
-                <small>No recent fills</small>
-              )}
-            </div>
-            <div className={styles['book']}>
-              <div>
-                <span className={styles['cap']}>SELLERS (ASKS) - price / qty / depth</span>
-                <Rows rows={table.asks} side="sell" max={table.maxDepth} />
-              </div>
-              <div>
-                <span className={styles['cap']}>BUYERS (BIDS) - price / qty / depth</span>
-                <Rows rows={table.bids} side="buy" max={table.maxDepth} />
-              </div>
+            <PriceBoard
+              view={view}
+              good={good}
+              hub={hub}
+              loadHistory={loadHistory}
+              onOpenHub={
+                onOpenHub &&
+                ((h) => {
+                  onOpenHub(h, good);
+                })
+              }
+            />
+            <div className={styles['actions']}>
+              <Button onClick={onClose}>CLOSE</Button>
             </div>
           </>
         )}
-        <p className={styles['line']}>
-          Your stash here: <b>{formatUnits(stashUnits(view, hub, good))}</b> {good}. Your credits:{' '}
-          <b>{formatUnits(toUnits(view.self.credits))}</b>.
-        </p>
-        <p className={styles['hint']}>
-          Goods you buy land in your stash at this hub. Haul them home to use them.
-        </p>
-        {onHaulHome && stashed > 0 && (
-          <div className={styles['actions']}>
-            <Button
-              disabled={!crewHere}
-              onClick={() => {
-                onHaulHome(hub);
-              }}
-            >
-              HAUL HOME
-            </Button>
-            {!crewHere && <small>Park a ready crew at this hub first.</small>}
-          </div>
-        )}
-        <form
-          className={styles['form']}
-          onSubmit={(e) => {
-            e.preventDefault();
-            void submit();
-          }}
-        >
-          <Tabs
-            label="Side"
-            value={side}
-            onChange={(id) => {
-              setSide(id === 'sell' ? 'sell' : 'buy');
-            }}
-            tabs={[
-              { id: 'buy', label: 'BUY' },
-              { id: 'sell', label: 'SELL' },
-            ]}
-          />
-          <label>
-            <span className={styles['cap']}>PRICE (CREDITS EACH)</span>
-            <input
-              inputMode="decimal"
-              placeholder="e.g. 1.50"
-              value={price}
-              onChange={(e) => {
-                setPrice(e.target.value);
-              }}
-            />
-          </label>
-          <label>
-            <span className={styles['cap']}>QUANTITY</span>
-            <input
-              inputMode="numeric"
-              placeholder="e.g. 10"
-              value={qty}
-              onChange={(e) => {
-                setQty(e.target.value);
-              }}
-            />
-          </label>
-          {!check.ok && (shown || !empty) && (
-            <p className={styles['blocker']} role="alert">
-              {messageFor(check.code)}
-            </p>
-          )}
-          {check.ok && (
-            <p className={styles['line']}>
-              {placement(table, side, check.priceCents)} Sets aside {check.escrow}.
-            </p>
-          )}
-          <p className={styles['hint']}>{ESCROW_LINE}</p>
-          <div className={styles['actions']}>
-            <Button onClick={onClose}>CLOSE</Button>
-            <Button type="submit" variant="primary" disabled={busy || !check.ok}>
-              PLACE {side.toUpperCase()} ORDER
-            </Button>
-          </div>
-        </form>
-        <div>
-          <span className={styles['cap']}>YOUR OPEN ORDERS HERE</span>
-          {mine.length === 0 ? (
-            <p className={styles['none']}>None.</p>
+        <div className={styles['stack']} hidden={tab === 'prices'}>
+          {table === null ? (
+            <p className={styles['none']}>This hub has no market for {good} yet.</p>
           ) : (
-            <ul className={styles['orders']}>
-              {mine.map((o) => (
-                <li key={o.id}>
-                  <span>
-                    {o.side.toUpperCase()} {formatUnits(o.qty)} {o.good} at {credits(o.price)}
-                  </span>
-                  <Button
-                    variant="danger"
-                    onClick={() => {
-                      onCancel(o.id);
-                    }}
-                  >
-                    CANCEL
-                  </Button>
-                </li>
-              ))}
-            </ul>
+            <>
+              <div className={styles['summary']}>
+                <span>
+                  CITY PRICE <b>{credits(table.refCents)}</b>
+                </span>
+                <span>
+                  LAST FILL{' '}
+                  <b>{table.lastCents === null ? 'none yet' : credits(table.lastCents)}</b>
+                </span>
+                {fills.length >= 2 ? (
+                  <Sparkline points={fills} tone={GOOD_TONE[good]} label={`Recent ${good} fills`} />
+                ) : (
+                  <small>No recent fills</small>
+                )}
+              </div>
+              <p className={styles['line']} data-testid="why">
+                {whyLine(view, hub, good, (id) => view.districts[id]?.name ?? id)}
+              </p>
+              <div className={styles['book']}>
+                <div>
+                  <span className={styles['cap']}>SELLERS (ASKS) - price / qty / depth</span>
+                  <Rows rows={table.asks} side="sell" max={table.maxDepth} />
+                </div>
+                <div>
+                  <span className={styles['cap']}>BUYERS (BIDS) - price / qty / depth</span>
+                  <Rows rows={table.bids} side="buy" max={table.maxDepth} />
+                </div>
+              </div>
+            </>
           )}
+          <p className={styles['line']}>
+            Your stash here: <b>{formatUnits(stashUnits(view, hub, good))}</b> {good}. Your credits:{' '}
+            <b>{formatUnits(toUnits(view.self.credits))}</b>.
+            {myCost !== null && (
+              <>
+                {' '}
+                Your cost: <b data-testid="my-cost">{credits(myCost)}</b> each.
+              </>
+            )}
+          </p>
+          <p className={styles['hint']}>
+            Goods you buy land in your stash at this hub. Haul them home to use them.
+          </p>
+          {onHaulHome && stashed > 0 && (
+            <div className={styles['actions']}>
+              <Button
+                disabled={!crewHere}
+                onClick={() => {
+                  onHaulHome(hub);
+                }}
+              >
+                HAUL HOME
+              </Button>
+              {!crewHere && <small>Park a ready crew at this hub first.</small>}
+            </div>
+          )}
+          <form
+            className={styles['form']}
+            onSubmit={(e) => {
+              e.preventDefault();
+              void submit();
+            }}
+          >
+            <Tabs
+              label="Side"
+              value={side}
+              onChange={(id) => {
+                setSide(id === 'sell' ? 'sell' : 'buy');
+              }}
+              tabs={[
+                { id: 'buy', label: 'BUY' },
+                { id: 'sell', label: 'SELL' },
+              ]}
+            />
+            <label>
+              <span className={styles['cap']}>PRICE (CREDITS EACH)</span>
+              <input
+                inputMode="decimal"
+                placeholder="e.g. 1.50"
+                value={price}
+                onChange={(e) => {
+                  setPrice(e.target.value);
+                }}
+              />
+            </label>
+            <label>
+              <span className={styles['cap']}>QUANTITY</span>
+              <input
+                inputMode="numeric"
+                placeholder="e.g. 10"
+                value={qty}
+                onChange={(e) => {
+                  setQty(e.target.value);
+                }}
+              />
+            </label>
+            {!check.ok && (shown || !empty) && (
+              <p className={styles['blocker']} role="alert">
+                {messageFor(check.code)}
+              </p>
+            )}
+            {verdict && (
+              <p
+                className={styles['line']}
+                data-testid="sale-verdict"
+                data-gain={verdict.perUnit >= 0}
+              >
+                {verdict.text}
+              </p>
+            )}
+            {check.ok && (
+              <p className={styles['line']}>
+                {placement(table, side, check.priceCents)} Sets aside {check.escrow}.
+              </p>
+            )}
+            <p className={styles['hint']}>{ESCROW_LINE}</p>
+            <div className={styles['actions']}>
+              <Button onClick={onClose}>CLOSE</Button>
+              <Button type="submit" variant="primary" disabled={busy || !check.ok}>
+                PLACE {side.toUpperCase()} ORDER
+              </Button>
+            </div>
+          </form>
+          <div>
+            <span className={styles['cap']}>YOUR OPEN ORDERS HERE</span>
+            {mine.length === 0 ? (
+              <p className={styles['none']}>None.</p>
+            ) : (
+              <ul className={styles['orders']}>
+                {mine.map((o) => (
+                  <li key={o.id}>
+                    <span>
+                      {o.side.toUpperCase()} {formatUnits(o.qty)} {o.good} at {credits(o.price)}
+                    </span>
+                    <Button
+                      variant="danger"
+                      onClick={() => {
+                        onCancel(o.id);
+                      }}
+                    >
+                      CANCEL
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       </div>
     </Panel>

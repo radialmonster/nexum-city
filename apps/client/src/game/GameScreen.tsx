@@ -4,6 +4,7 @@ import { balance } from '@nexum/sim';
 import { starterHookCopy, unitsToSend } from './contracts';
 import type { PlayerView as SimView } from '@nexum/sim';
 import { Tabs } from '../ui';
+import { api } from './api';
 import { MapScreen } from '../map/MapScreen';
 import { BattleReport } from './BattleReport';
 import { buildDossier } from './rivalDossier';
@@ -32,6 +33,9 @@ import { loadFirstSteps, mergeSteps, saveFirstSteps, type FirstStepsState } from
 type Drawer = 'map' | 'feed' | 'orders' | 'district';
 
 /** The playing field: top bar, feed, map, district panel and an empty slot for the timeline. */
+/** Hourly price history for the price board (a stable function, so the trends load once). */
+const loadHistory = (hub: string, good: GoodName) => api.history(hub, good);
+
 export function GameScreen() {
   const session = useSession();
   const store = useStore();
@@ -377,6 +381,8 @@ export function GameScreen() {
                 hub={panel.hub}
                 good={panel.good}
                 tab={panel.tab}
+                loadHistory={loadHistory}
+                onOpenHub={openMarket}
                 names={state.names}
                 onContract={(order) => session.placeOrder(order)}
                 onDeliver={deliver}
@@ -453,6 +459,11 @@ export function GameScreen() {
               draft={state.draft}
               nowMs={nowMs}
               onRoute={setRoute}
+              onBuyPower={(hub) => {
+                session.openDraft(null);
+                setRoute(null);
+                openMarket(hub, 'power');
+              }}
               onClose={() => {
                 session.openDraft(null);
                 setRoute(null);
