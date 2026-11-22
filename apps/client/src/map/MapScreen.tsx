@@ -233,15 +233,6 @@ export function MapScreen({
     };
   }, []);
 
-  // the renderer keeps its own-ambush tags clear of the HUD card
-  useEffect(() => {
-    if (!ready) return;
-    rendererRef.current?.setHudBox(() => {
-      const i = hudInset();
-      return { w: i.x * 2, h: i.y * 2 };
-    });
-  }, [ready, hudInset]);
-
   const mineBounds = useCallback((s: Scene) => {
     const mine = s.districts.filter((d) => d.mine);
     if (mine.length === 0) return s.bounds;
@@ -485,6 +476,12 @@ export function MapScreen({
       });
     return out;
   }, []);
+
+  // the renderer keeps its own-ambush tags clear of the HUD cards
+  useEffect(() => {
+    if (!ready) return;
+    rendererRef.current?.setHudBox(hudRects);
+  }, [ready, hudRects]);
 
   // Selecting a plot pans the camera, only if needed, so the plot and its whole ring sit in the
   // clear part of the map. Once per selection; waits for a running camera move to finish.

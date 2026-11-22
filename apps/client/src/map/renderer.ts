@@ -115,7 +115,7 @@ export class MapRenderer {
   }[] = [];
   private readonly flashed = new Set<string>();
   private hudScale = 1;
-  private hudBox: (() => { w: number; h: number }) | null = null;
+  private hudBox: (() => readonly { x: number; y: number; w: number; h: number }[]) | null = null;
   private dirty = true;
   private baseDirty = true;
   private builtZoom = 0;
@@ -234,10 +234,9 @@ export class MapRenderer {
   }
 
   /**
-   * Where the HUD card sits over the map's top-left corner, as its right and bottom edges in
-   * map pixels. Read each frame, so labels can keep out from under it without the renderer knowing the HUD layout.
+   * Where the HUD cards sit over the map, as rectangles in map pixels. Read each frame, so labels can keep out from under it without the renderer knowing the HUD layout.
    */
-  setHudBox(read: (() => { w: number; h: number }) | null): void {
+  setHudBox(read: (() => readonly { x: number; y: number; w: number; h: number }[]) | null): void {
     this.hudBox = read;
     this.dirty = true;
   }
@@ -909,9 +908,15 @@ export class MapRenderer {
       const topY = worldToScreen(cam, vp, a.x1, topWorld).y;
       const maxPx = m.pitchX * cam.zoom;
       let y = Math.min(s.y - tagSize * 1.6, topY - tagSize * 1.2);
-      // a top-row street puts the tag under the sector card: use the street's lower side instead
-      const hud = this.hudBox?.();
-      if (hud && y < hud.h && s.x - maxPx / 2 < hud.w) y = s.y + tagSize * 0.8;
+      // a street near the top puts the tag under a HUD card: use the street's lower side instead
+      const under = (this.hudBox?.() ?? []).some(
+        (r) =>
+          s.x + maxPx / 2 > r.x &&
+          s.x - maxPx / 2 < r.x + r.w &&
+          y + tagSize > r.y &&
+          y - tagSize < r.y + r.h,
+      );
+      if (under) y = s.y + tagSize * 0.8;
       this.place(t, s.x, y, maxPx);
     }
     this.flashes.forEach((f, i) => {
