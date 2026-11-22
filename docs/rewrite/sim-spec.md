@@ -719,7 +719,7 @@ Honest misses: the hub gap is a map-geometry limit (two hubs), and the money sup
 
 ### Credit sinks
 
-- **Daily levy.** Once a day (`upkeep.day`) each player pays 40 percent (`levyPercent`) of the credits held above 300 (`levyFreeCredits`). The take is added to `state.sink.levyAtoms`.
+- **Daily levy: removed (2026-11-22).** The owner took the nightly city tax out. It had taken 40 percent (`levyPercent`) of credits held above 300 (`levyFreeCredits`) once a day. It felt like a punishment for saving and hit newcomers on their first night. `levyPercent` is now 0; the field, `levyFreeCredits` and `sink.levyAtoms` stay so older snapshots still read (the levy code runs and takes nothing).
 - **Upkeep.** The same tick charges 20 credits a day (`upkeepCreditsPerDay`) for each district beyond the first (`freeDistricts`), into `sink.upkeepAtoms`.
 - **Hub fee.** Built (`feeOn`, `sink.feesAtoms`) but set to 0 percent. It taxes each filled trade and is the knob to turn if trade becomes too rich.
 - Credits are not score, so the sinks cost no points directly. They slow what a rich player can buy, and the invariants check that the ledger never goes negative.
@@ -727,18 +727,18 @@ Honest misses: the hub gap is a map-geometry limit (two hubs), and the money sup
 
 #### Why this set
 
-- The levy is the smallest change that bends the curve: money that sits above 300 credits is the money that piles up, and most of it was idle on the turtle and the hunter.
+- (Historical, the levy is now off.) The levy was the smallest change that bent the curve: money that sits above 300 credits is the money that piles up, and most of it was idle on the turtle and the hunter.
 - Upkeep makes a big empire cost something every day, a gentle brake on the raider.
-- Together they bring money growth from 15x to 4.0x. That is above the 3x flag but inside the 5x limit; 3x would have needed a heavier levy that pushed the hunter and merchant floors down.
+- Together they brought money growth from 15x to 4.0x while the levy ran. With the levy off, money growth day 1 to 7 is about 10x on seeds 1 to 8 (4.1x on the same seeds with the levy): upkeep alone is small, and a hub fee of 5 to 8 percent barely moved it (11x to 13x), so it stays at 0. A real sink that is not a tax on saving is an open follow-up. That is above the 3x flag but inside the 5x limit; 3x would have needed a heavier levy that pushed the hunter and merchant floors down.
 - Three balance values moved with it, to keep the raider lead under 1.4 once the levy slowed the merchants and turtles that buy districts: `siege.neutralGuard` 20 to 23 (the guard on unowned plots, so new plots cost a little more to take), `raid.mendHours` 6 to 7 (a crew weakened in a siege mends an hour slower) and `contracts.civicEveryHours` 3 to 2 (civic contracts post half as far apart, a faucet that helps hunters and merchants). No floor was lowered.
 
 ### Plain-language pros and cons
 
 - Pro: shortages give a reason to check in and a spot trade to chase; the price board says why a price is high.
 - Pro: fuel makes a haul a real cost and ties power to the whole economy, and a newcomer can still make the first trips.
-- Pro: the levy stops money piling up, so late-game credits stay worth earning.
+- Pro: with no nightly tax, saving is safe and a newcomer's first night costs nothing.
 - Con: a player who runs dry of power cannot send a carrier at all, so the warnings must be clear.
-- Con: the levy punishes saving. A player who hoards credits for a big purchase loses part of it each day.
+- Con: with the levy gone, credits pile up (about 10x from day 1 to day 7), so late-game credits are worth less.
 - Con: fuel is too small to squeeze trade margins (see the conflict above).
 
 ### Results (seeds 1 to 16, before on origin/main, after with this change)
@@ -756,6 +756,10 @@ Honest misses: the hub gap is a map-geometry limit (two hubs), and the money sup
 | Invariant problems               | 0      | 0     | yes                             |
 
 Credits per player per day, after: 1637, 5041, 7772, 7847, 6739, 6965, 6598 (before 1421, 4271, 6838, 10254, 12969, 16859, 21276): the curve now flattens after day 3. Sinks per seed: levy about 17,200 credits, upkeep about 1,350. Districts (16 seeds): merchant 2.56, raider 5.56, turtle 3.63, hunter 2.31. On seeds 1 to 8, which the harness test uses: merchant 2.44, raider 6.13, turtle 3.25, hunter 3.25, raid success 66 percent, lead 1.24. Honest misses: money growth is over 3x, and fuel is far under its 5 to 10 percent target. A North Hub (a third hub) was not built; it is a follow-up.
+
+#### Levy removed: retune (2026-11-22)
+
+Without the levy, merchants and hunters kept about 2,200 credits idle and the harness fell under its floors (a bot type at 2.375 against 2.4; the newcomer raid probe met 1 world of 2 needed). Nothing was lowered. The fix is in the merchant bot: its shop reserve (credits it keeps back before buying buildings) went from 400 to 50 and its outer districts now get walls, so idle money turns into walls and workshops the way a player would spend it. The hunter keeps the old 400 reserve (`HUNTER_SHOP_RESERVE`). The hub fee stays 0 (a 3 to 8 percent fee was tried and did not help), upkeep stays 20, the neutral guard stays 23 and civic cadence 2. Seeds 1 to 8: merchant 2.69, raider 6.00, turtle 4.13, hunter 3.13 districts; raid success 62 percent; raider lead 1.09. Seeds 1 to 32: merchant 2.81, raider 5.84, turtle 4.06, hunter 2.25. Money growth day 1 to 7: about 10x (over the 5x cap; see above).
 
 ## Playtest fixes (task 83)
 

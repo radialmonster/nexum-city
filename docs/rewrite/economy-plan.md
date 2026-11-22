@@ -92,7 +92,7 @@ Status: approved by the owner on 2026-11-22 ("make a plan file and proceed all")
 ### Later (optional)
 
 - A third hub (North Hub) when the city grows big enough.
-- A small trade fee at hubs as a money sink: built and set to 0 percent; the levy and upkeep did the job instead.
+- A small trade fee at hubs as a money sink: built and set to 0 percent. The nightly levy was removed by the owner on 2026-11-22 (it punished saving and hit newcomers on night one), so only upkeep (20 cr a day per extra district) remains and money growth day 1 to 7 is about 10x. A fee of 3 to 8 percent barely moves that; a better sink is an open follow-up.
 
 ## Harness targets (seeds 1 to 16, invariants 0, no floor lowered)
 
