@@ -41,7 +41,7 @@ export interface BuildingSpec {
 export const balance = {
   carriers: {
     foot: { speed: 40, cargo: 5, toughness: 0, seats: 1, locked: false },
-    van: { speed: 100, cargo: 40, toughness: 10, seats: 2, locked: false },
+    van: { speed: 100, cargo: 40, toughness: 12, seats: 2, locked: false },
     hauler: { speed: 60, cargo: 150, toughness: 25, seats: 2, locked: false },
     runner: { speed: 180, cargo: 15, toughness: 3, seats: 1, locked: true },
   } satisfies Record<CarrierKind, CarrierSpec>,

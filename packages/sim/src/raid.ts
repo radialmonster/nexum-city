@@ -43,8 +43,7 @@ const carriesGoods = (m: Movement): boolean => m.kind === 'haul' || m.kind === '
 
 /**
  * New-player protection shields a player's convoys: a player is protected while any district it
- * owns still is. Like sieges, protection is a shield on the target only; a protected player can
- * still set ambushes of its own.
+ * owns still is. A protected player may not set ambushes (`protected_no_raid`).
  */
 export function isPlayerProtected(state: GameState, player: Id): boolean {
   return Object.values(state.districts).some(
@@ -176,8 +175,11 @@ function strike(ctx: Ctx, ambush: Movement, haul: Movement): void {
   const escort = crewsOf(ctx, haul);
   const raiderStrength = raiders.reduce((n, c) => n + c.strength, 0);
   let guard = balance.carriers[haul.carrierKind].toughness;
+  // A settle carrier's crew is armed settlers, not a driver: every crew counts at full strength.
+  // On a haul the first crew drives and counts at half.
+  const driver = haul.kind === 'settle' ? 100 : cfg.driverPercent;
   escort.forEach((c, i) => {
-    guard += i === 0 ? (c.strength * cfg.driverPercent) / 100 : c.strength;
+    guard += i === 0 ? (c.strength * driver) / 100 : c.strength;
   });
   // Two draws every time, so the number of RNG calls never depends on the outcome.
   const raiderRoll = roll(ctx);
