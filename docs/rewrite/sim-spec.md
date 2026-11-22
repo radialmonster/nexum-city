@@ -700,6 +700,63 @@ Credits per player per day, after: 1423, 4019, 7080, 10711, 13173, 16612, 19713.
 
 Honest misses: the hub gap is a map-geometry limit (two hubs), and the money supply was already far above 3x before this change; fixing it is a sink job for stage 5.
 
+## Economy stages 3 and 4 and the credit sink (tasks 81, 82)
+
+### Shortages
+
+- `shortageSystem` runs a `shortage.check` every 6 hours (`balance.shortage.everyHours`). It draws a hub and a good from the seeded RNG and starts a shortage lasting 4 to 8 hours, at most 2 at once and skips the draw if the pair is already short.
+- While a pair is short, the book's reference is 40 percent higher (`refPercent`), the `why` gains a `shortage` part, and the civic bid depth is doubled (`bidDepthFactor`).
+- Events: `market.shortage {hub, good, hours, endMs, refPercent, refCents}` and `market.shortage.ended {hub, good}`, both sent to every player. `PlayerView.shortages` lists the active ones (`{hub, good, startMs, endMs}`).
+- Bots: merchants and hunters weigh a short pair when they choose where to haul and sell; raiders lean toward routes into a shortage hub.
+
+### Fuel
+
+- A carrier burns power per km of street: `balance.fuel.milliPerKm` is van 50, hauler 100, runner 20 (thousandths of a unit of power per km); crews on foot burn none. `fuelFor(kind, distM)` (atoms) and `fuelUnitsFor` (units, for display) are exported and pure.
+- The fuel is taken when the trip is ordered. **Pooled rule:** the start store pays first (the start warehouse, or the stash), then the owner's other district warehouses in id order, so one thin store does not block a trip. Only if the total is short is the order refused, with the typed error `no_fuel`. A trip never stalls half way.
+- The fuel's cost goes into the cargo's cost basis on arrival (`addFuelCost`, on the good carried most), so a haul's profit is honest.
+- The starter rush kit carries 20 power (with 30 parts and 30 supplies), enough for the first trips. `scripts/first-session.mjs` still settles 8 of 8. Every bot keeps a power reserve and buys more when low.
+- **Target conflict.** The plan asked a 20-minute van trip to cost 5 to 10 percent of a typical cargo. Hub trips here are 4 to 15 km and bots work to a thin margin, so that price (about 0.3 power per km) collapsed the bots' trade and their districts under the floors. Measured at 50 milli per km, fuel is about 1.5 percent of cargo value. Fuel is therefore mostly a gate (no power, no trip) and a flavour cost, not a margin squeeze. A future change that adds a bigger power sink should raise it with the floors in mind.
+
+### Credit sinks
+
+- **Daily levy.** Once a day (`upkeep.day`) each player pays 40 percent (`levyPercent`) of the credits held above 300 (`levyFreeCredits`). The take is added to `state.sink.levyAtoms`.
+- **Upkeep.** The same tick charges 20 credits a day (`upkeepCreditsPerDay`) for each district beyond the first (`freeDistricts`), into `sink.upkeepAtoms`.
+- **Hub fee.** Built (`feeOn`, `sink.feesAtoms`) but set to 0 percent. It taxes each filled trade and is the knob to turn if trade becomes too rich.
+- Credits are not score, so the sinks cost no points directly. They slow what a rich player can buy, and the invariants check that the ledger never goes negative.
+- Rising recruit costs were not built: they would hit the raider (the only bot that recruits a lot) and push the lead over 1.4.
+
+#### Why this set
+
+- The levy is the smallest change that bends the curve: money that sits above 300 credits is the money that piles up, and most of it was idle on the turtle and the hunter.
+- Upkeep makes a big empire cost something every day, a gentle brake on the raider.
+- Together they bring money growth from 15x to 4.0x. That is above the 3x flag but inside the 5x limit; 3x would have needed a heavier levy that pushed the hunter and merchant floors down.
+- Three balance values moved with it, to keep the raider lead under 1.4 once the levy slowed the merchants and turtles that buy districts: `siege.neutralGuard` 20 to 23 (the guard on unowned plots, so new plots cost a little more to take), `raid.mendHours` 6 to 7 (a crew weakened in a siege mends an hour slower) and `contracts.civicEveryHours` 3 to 2 (civic contracts post half as far apart, a faucet that helps hunters and merchants). No floor was lowered.
+
+### Plain-language pros and cons
+
+- Pro: shortages give a reason to check in and a spot trade to chase; the price board says why a price is high.
+- Pro: fuel makes a haul a real cost and ties power to the whole economy, and a newcomer can still make the first trips.
+- Pro: the levy stops money piling up, so late-game credits stay worth earning.
+- Con: a player who runs dry of power cannot send a carrier at all, so the warnings must be clear.
+- Con: the levy punishes saving. A player who hoards credits for a big purchase loses part of it each day.
+- Con: fuel is too small to squeeze trade margins (see the conflict above).
+
+### Results (seeds 1 to 16, before on origin/main, after with this change)
+
+| Target                           | Before | After | Met                             |
+| -------------------------------- | ------ | ----- | ------------------------------- |
+| Parts cheaper at the nearest hub | 88%    | 69%   | yes (still a clear majority)    |
+| Hours with a 1.25 hub ratio      | 92%    | 93%   | yes (target 50%)                |
+| Van trade run vs contract pay    | 0.74   | 1.02  | yes (0.7 to 1.3)                |
+| Money growth day 1 to 7          | 15.0x  | 4.0x  | partly (flag 3x, cap 5x)        |
+| Raid success                     | 46%    | 61%   | yes (40 to 70)                  |
+| Raider lead                      | 1.23   | 1.14  | yes (at most 1.4)               |
+| Shortages per day                | 0      | 3.7   | yes (about 4 expected)          |
+| Fuel as share of cargo value     | 0      | 1.6%  | no (target 5 to 10%; see above) |
+| Invariant problems               | 0      | 0     | yes                             |
+
+Credits per player per day, after: 1637, 5041, 7772, 7847, 6739, 6965, 6598 (before 1421, 4271, 6838, 10254, 12969, 16859, 21276): the curve now flattens after day 3. Sinks per seed: levy about 17,200 credits, upkeep about 1,350. Districts (16 seeds): merchant 2.56, raider 5.56, turtle 3.63, hunter 2.31. On seeds 1 to 8, which the harness test uses: merchant 2.44, raider 6.13, turtle 3.25, hunter 3.25, raid success 66 percent, lead 1.24. Honest misses: money growth is over 3x, and fuel is far under its 5 to 10 percent target. A North Hub (a third hub) was not built; it is a follow-up.
+
 ## Playtest fixes (task 83)
 
 From a scripted playtest as a newcomer. `RULES_VERSION` stays 3; no snapshot change.

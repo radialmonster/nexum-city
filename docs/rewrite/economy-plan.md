@@ -58,14 +58,14 @@ Status: approved by the owner on 2026-11-22 ("make a plan file and proceed all")
 - **Movement.** The existing drift toward fills and the hourly reversion now pull toward the hub's own base. The base is recalculated hourly, so it follows settles, captures, Workshops and raids.
 - **Civic depth** becomes import and export capacity: limited stock per hour, so floods and shortages really move the price.
 
-### Stage 3 (task 81): shortages
+### Stage 3 (task 81): shortages (built)
 
 - Every 6 hours or so, the seeded RNG picks one hub and one good for a shortage lasting 4 to 8 hours.
 - During it, the reference is 40% higher and the civic bid depth is doubled.
 - Event `market.shortage {hub, good, percent, untilMs}`, sent to everyone. A `market.shortage.ended` event follows.
 - Raids on a route into a hub can also trigger a small premium, as already noted in the spec.
 
-### Stage 4 (task 82): carrier fuel
+### Stage 4 (task 82): carrier fuel (built)
 
 - Carriers burn power per km driven. Foot crews burn nothing.
 - The fuel cost is added to the cargo's cost basis on arrival.
@@ -73,6 +73,7 @@ Status: approved by the owner on 2026-11-22 ("make a plan file and proceed all")
 - **No power:** the order is refused with a plain error. A carrier never stalls mid-trip.
 - **Starter kit:** it carries enough power for the first trips. The tutorial warns early.
 - Power gains demand everywhere vans run, which ties the grid districts into the whole economy.
+- **As built:** fuel is pooled across the owner's warehouses (start store first), and the rate is small (van 50 milli-power per km, about 1.5% of cargo) because the 5 to 10% target collapsed the bots. A credit sink (daily levy and upkeep) was added to bring money growth from 15x to 4x. See sim-spec, "Economy stages 3 and 4 and the credit sink".
 
 ### Stage 5 (tasks 79b to 82b): UI
 
@@ -89,7 +90,7 @@ Status: approved by the owner on 2026-11-22 ("make a plan file and proceed all")
 ### Later (optional)
 
 - A third hub (North Hub) when the city grows big enough.
-- A small trade fee at hubs as a money sink, if the harness shows credits piling up.
+- A small trade fee at hubs as a money sink: built and set to 0 percent; the levy and upkeep did the job instead.
 
 ## Harness targets (seeds 1 to 16, invariants 0, no floor lowered)
 
