@@ -1,4 +1,5 @@
 import { MS_PER_HOUR, balance, toAtoms } from './balance.js';
+import { take } from './cost.js';
 import { rushDuration } from './rush.js';
 import { emit, schedule, type Ctx } from './ctx.js';
 import { afterWarehouseChange, buildingLevel } from './production.js';
@@ -25,7 +26,7 @@ export function buildDurationMs(building: BuildingType, level: number): number {
 export function startConstruction(ctx: Ctx, d: District, building: BuildingType): void {
   const level = buildingLevel(d, building) + 1;
   const cost = buildCost(building, level);
-  for (const g of GOODS) d.warehouse[g] -= cost[g];
+  take(d.warehouse, d.warehouseValue, cost);
   const completesAtMs =
     ctx.state.nowMs + rushDuration(ctx.state, d.owner, buildDurationMs(building, level));
   d.construction = { building, level, completesAtMs };

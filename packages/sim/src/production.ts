@@ -1,4 +1,5 @@
 import { ATOMS_PER_UNIT, MS_PER_HOUR, balance, toUnits } from './balance.js';
+import { put, refCentsNear, share, valueAtNode } from './cost.js';
 import { emit, schedule, unschedule, type Ctx } from './ctx.js';
 import {
   GOODS,
@@ -81,6 +82,8 @@ export function settleProduction(ctx: Ctx, fromMs: number, toMs: number): void {
     const room = Math.max(0, warehouseCapacity(d) - totalGoods(d.warehouse));
     const kept = Math.min(room, made);
     d.warehouse[good] += kept;
+    // Made goods are worth the local hub's reference price at this moment (exact, no rounding).
+    d.warehouseValue[good] += kept * refCentsNear(ctx.state, d, good);
     d.wasted += made - kept;
   }
 }
@@ -137,13 +140,26 @@ export function storeAt(ctx: Ctx, owner: Id, nodeId: Id, create = false): Goods 
   return d.owner === owner ? d.warehouse : null;
 }
 
+/** The cost-basis record that goes with `storeAt`'s goods record. */
+export function valueStoreAt(ctx: Ctx, owner: Id, nodeId: Id): Goods | null {
+  const d = ctx.state.districts[nodeId];
+  if (!d) return null;
+  if (d.kind === 'hub') {
+    const player = ctx.state.players[owner];
+    return player ? (player.stashValue[nodeId] ??= emptyGoods()) : null;
+  }
+  return d.owner === owner ? d.warehouseValue : null;
+}
+
 /**
  * Puts goods into an owner's store at a node. Anything beyond a district
  * warehouse's capacity is lost and reported as `production.wasted`.
  */
-export function deposit(ctx: Ctx, owner: Id, nodeId: Id, goods: Goods): void {
+export function deposit(ctx: Ctx, owner: Id, nodeId: Id, goods: Goods, cost?: Goods): void {
   const d = ctx.state.districts[nodeId];
   const store = storeAt(ctx, owner, nodeId, true);
+  const worth = cost ?? valueAtNode(ctx.state, nodeId, goods);
+  const storeWorth = valueStoreAt(ctx, owner, nodeId);
   if (!d || !store) {
     // Not ours any more (siege, a later task): the cargo is lost.
     const lost = totalGoods(goods);
@@ -158,7 +174,7 @@ export function deposit(ctx: Ctx, owner: Id, nodeId: Id, goods: Goods): void {
     return;
   }
   if (d.kind === 'hub') {
-    for (const g of GOODS) store[g] += goods[g];
+    if (storeWorth) put(store, storeWorth, goods, worth);
     return;
   }
   let room = Math.max(0, warehouseCapacity(d) - totalGoods(store));
@@ -166,6 +182,7 @@ export function deposit(ctx: Ctx, owner: Id, nodeId: Id, goods: Goods): void {
   for (const g of GOODS) {
     const kept = Math.min(room, goods[g]);
     store[g] += kept;
+    if (storeWorth) storeWorth[g] += share(worth[g], kept, goods[g]);
     room -= kept;
     lost += goods[g] - kept;
   }

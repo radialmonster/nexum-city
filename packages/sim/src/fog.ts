@@ -1,29 +1,33 @@
 import { PROGRESS_SCALE } from './balance.js';
+import { costCents, emptyValue } from './cost.js';
 import type { Ctx } from './ctx.js';
 import { civicAsk, civicBid } from './market.js';
 import { movementPosition, movementSegment } from './routing.js';
 import { progressAt } from './siege.js';
-import type {
-  Building,
-  Carrier,
-  Contract,
-  Construction,
-  Crew,
-  District,
-  Edge,
-  GraphNode,
-  FrontierState,
-  GameState,
-  Good,
-  Goods,
-  Id,
-  JobOffer,
-  MarketOrder,
-  Movement,
-  Owner,
-  Pos,
-  Season,
-  Stance,
+import {
+  GOODS,
+  type BaseWhy,
+  type Building,
+  type Carrier,
+  type Contract,
+  type Construction,
+  type Crew,
+  type District,
+  type Edge,
+  type GraphNode,
+  type FrontierState,
+  type GameState,
+  type Good,
+  type Goods,
+  type Id,
+  type JobOffer,
+  type MarketOrder,
+  type Movement,
+  type Owner,
+  type Player,
+  type Pos,
+  type Season,
+  type Stance,
 } from './types.js';
 
 /** Extra street hops of sight per level of a Watchtower. */
@@ -248,6 +252,19 @@ export interface MarketBookView {
   civic: { bid: number; ask: number; bidDepth: number; askDepth: number };
   refCents: number;
   lastCents: number | null;
+  /** The hub's own long-run price for the good, and the parts that make it up (why it is high or low). */
+  baseCents: number;
+  why: BaseWhy;
+}
+
+/** Average cost per unit (centi-credits) of your own piles of goods; 0 for an empty pile. */
+export interface CostView {
+  /** By hub id: what your hub stash cost you. */
+  stash: Record<Id, Goods>;
+  /** By district id: your warehouses. */
+  districts: Record<Id, Goods>;
+  /** By movement id: what the cargo of your own movements cost you. */
+  cargo: Record<Id, Goods>;
 }
 
 /**
@@ -266,6 +283,8 @@ export interface PlayerView {
   self: {
     credits: number;
     stash: Record<Id, Goods>;
+    /** What your goods cost you per unit, so the screens can show profit. */
+    costs: CostView;
     score: number;
     /** The newcomer rush ends at this time (0 or in the past: no rush). */
     rushUntilMs: number;
@@ -294,6 +313,23 @@ export interface PlayerView {
   contracts: Record<Id, ContractView>;
   /** The street graph is public: every node and street, and which nodes are hubs. */
   graph: { nodes: Record<Id, GraphNode>; edges: Edge[]; hubs: Id[] };
+}
+
+function costGoods(goods: Goods, value: Goods): Goods {
+  const out = emptyValue();
+  for (const g of GOODS) out[g] = costCents(goods[g], value[g]);
+  return out;
+}
+
+function costsFor(state: GameState, player: Player): CostView {
+  const costs: CostView = { stash: {}, districts: {}, cargo: {} };
+  for (const [hub, goods] of Object.entries(player.stash))
+    costs.stash[hub] = costGoods(goods, player.stashValue[hub] ?? emptyValue());
+  for (const d of Object.values(state.districts))
+    if (d.owner === player.id) costs.districts[d.id] = costGoods(d.warehouse, d.warehouseValue);
+  for (const m of Object.values(state.movements))
+    if (m.owner === player.id) costs.cargo[m.id] = costGoods(m.cargo, m.value);
+  return costs;
 }
 
 const copy = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
@@ -431,6 +467,8 @@ export function viewFor(state: GameState, playerId: Id): PlayerView {
         },
         refCents: book.refCents,
         lastCents: book.lastCents,
+        baseCents: book.baseCents,
+        why: { ...book.why },
       };
       for (const o of [...book.bids, ...book.asks]) if (o.owner === playerId) orders.push(copy(o));
     }
@@ -463,6 +501,7 @@ export function viewFor(state: GameState, playerId: Id): PlayerView {
     self: {
       credits: player.credits,
       stash: copy(player.stash),
+      costs: costsFor(state, player),
       score: player.score / 3_600_000,
       rushUntilMs: player.rushUntilMs,
       jobs: copy(player.jobs),

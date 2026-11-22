@@ -1,6 +1,8 @@
 import { MS_PER_HOUR, balance, toAtoms, toUnits } from './balance.js';
 import { emit, schedule, unschedule, type Ctx } from './ctx.js';
 import { towerSight } from './fog.js';
+import { emptyValue, share, totalCents } from './cost.js';
+import { addHeat } from './regional.js';
 import { nudgeRef } from './market.js';
 import { nextFloat } from './rng.js';
 import { shortestRoute, travelMs } from './routing.js';
@@ -118,6 +120,7 @@ export function beginAmbush(ctx: Ctx, m: Movement): void {
   m.to = r.near;
   m.departMs = state.nowMs;
   m.arriveMs = r.untilMs;
+  addHeat(state, r.a, r.b, balance.market.regional.heatPerAmbush);
   schedule(ctx, r.untilMs, { kind: 'raid.end', movementId: m.id });
   emit(ctx, 'raid.set', [m.owner], [r.a, r.b], {
     movementId: m.id,
@@ -277,12 +280,20 @@ function strike(ctx: Ctx, ambush: Movement, haul: Movement): void {
   const wantTotal = sumGoods(want);
   const stolen: Goods = { parts: 0, power: 0, data: 0, supplies: 0 };
   const destroyed: Goods = { parts: 0, power: 0, data: 0, supplies: 0 };
+  const stolenValue = emptyValue();
+  const destroyedValue = emptyValue();
   for (const g of GOODS) {
     stolen[g] = wantTotal <= room ? want[g] : Math.floor((want[g] * room) / wantTotal);
     const left = haul.cargo[g] - stolen[g];
     destroyed[g] = Math.floor((left * cfg.destroyPercent) / 100);
+    // The cost basis follows the goods: the thief's share, the burned share, and what remains.
+    stolenValue[g] = share(haul.value[g], stolen[g], haul.cargo[g]);
+    destroyedValue[g] = share(haul.value[g] - stolenValue[g], destroyed[g], left);
+    haul.value[g] -= stolenValue[g] + destroyedValue[g];
     haul.cargo[g] = left - destroyed[g];
+    if (haul.cargo[g] <= 0) haul.value[g] = 0;
     ambush.cargo[g] += stolen[g];
+    ambush.value[g] += stolenValue[g];
   }
   const escortLost = applyLoss(
     escort,
@@ -297,12 +308,14 @@ function strike(ctx: Ctx, ambush: Movement, haul: Movement): void {
     haulId: haul.id,
     stolen: goodsUnits(stolen),
     destroyed: goodsUnits(destroyed),
+    lostCents: totalCents(stolenValue) + totalCents(destroyedValue),
     remaining: goodsUnits(haul.cargo),
     raiderStrength,
     guard,
     escortLost,
     target: targetLabel(haul),
   });
+  addHeat(state, r.a, r.b, balance.market.regional.heatPerHit);
   const dest = state.districts[haul.to];
   if (dest && dest.kind === 'hub') {
     for (const g of GOODS) if (stolen[g] > 0) nudgeRef(state, dest.id, g, cfg.priceNudgePercent);

@@ -43,6 +43,7 @@ export function newDistrict(
     buildings: [],
     slots,
     warehouse: emptyGoods(),
+    warehouseValue: emptyGoods(),
     frontier: 'built',
     construction: null,
     overflowing: false,

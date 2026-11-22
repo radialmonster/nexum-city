@@ -78,6 +78,10 @@ export interface District {
   slots: number;
   /** Goods in atoms. Capacity is derived: `warehouseCapacity`. */
   warehouse: Goods;
+  /** Cost basis of `warehouse`: per good, atoms times centi-credits per unit (see `cost.ts`). */
+  warehouseValue: Goods;
+  /** The hub this district is priced against (street-nearest; refreshed hourly). */
+  nearHub?: Id;
   protectedUntilMs?: number;
   frontier: FrontierState;
   /** Set while a settler holds this open plot and the settle timer runs (task 54). */
@@ -103,6 +107,8 @@ export interface Player {
   credits: number;
   /** Goods the player holds at each hub, by hub id. */
   stash: Record<Id, Goods>;
+  /** Cost basis of `stash`, per hub (see `cost.ts`). */
+  stashValue: Record<Id, Goods>;
   /** Season score in district-milliseconds: 1 point = `MS_PER_HOUR` of one owned district. */
   score: number;
   /** Part of `score` that came from trade, in district-milliseconds. */
@@ -222,6 +228,8 @@ export interface Movement {
   carrierKind: CarrierKind;
   crewIds: Id[];
   cargo: Goods;
+  /** Cost basis of `cargo` (see `cost.ts`). */
+  value: Goods;
   route: Id[];
   lengthM: number;
   from: Id;
@@ -307,6 +315,8 @@ export interface MarketOrder {
   price: number;
   /** Units still open. The escrow for them is held by the order. */
   qty: number;
+  /** Sell orders: cost basis of the escrowed goods (see `cost.ts`); 0 for buys. */
+  value: number;
   /** Placement number; breaks price ties (earlier first). */
   seq: number;
 }
@@ -324,6 +334,26 @@ export interface Book {
   askDepth: number;
   /** Price of the latest fill, or `null`. */
   lastCents: number | null;
+  /** The hub's own long-run price for this good (delivered cost, see `regional.ts`). */
+  baseCents: number;
+  /** Why the base is what it is: the parts that add up to `baseCents`. */
+  why: BaseWhy;
+}
+
+/** The parts of a hub's base price for one good, in centi-credits per unit. */
+export interface BaseWhy {
+  /** The nearest producing district the cheapest supply comes from, or `null`. */
+  from: Id | null;
+  /** Street distance from that district to the hub, in metres. */
+  distM: number;
+  /** The good's global base price. */
+  global: number;
+  /** Added for the haul from `from`. */
+  transport: number;
+  /** Added because nearby neutral districts consume the good. */
+  demand: number;
+  /** Added for recent raids on the streets of that haul. */
+  raid: number;
 }
 
 /**
@@ -418,6 +448,8 @@ export interface GameState {
   season: Season;
   /** Order books by hub id, then good. */
   markets: Record<Id, Record<Good, Book>>;
+  /** Recent raid activity per street (`a|b`, a < b): ambushes set and convoys hit; decays hourly. */
+  heat: Record<string, number>;
   /** Live contracts by id (open offers and taken jobs). */
   contracts: Record<Id, Contract>;
   /** What each player last saw of each district's owner (fog memory). */

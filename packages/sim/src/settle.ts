@@ -32,7 +32,7 @@ export function beginSettle(ctx: Ctx, m: Movement, crews: readonly Crew[]): void
   if (raided || d.owner !== 'neutral' || d.frontier !== 'open' || d.settling) {
     const home = nearestOwned(ctx, m.owner, d.id, d.id);
     if (home) {
-      deposit(ctx, m.owner, home.id, m.cargo);
+      deposit(ctx, m.owner, home.id, m.cargo, m.value);
       for (const crew of crews) walkHome(ctx, crew, d.id, home.id);
     }
     emit(ctx, 'settle.failed', [m.owner], [d.id], {

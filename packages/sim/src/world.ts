@@ -1,4 +1,6 @@
 import { MS_PER_HOUR, balance, toAtoms } from './balance.js';
+import { refCentsNear } from './cost.js';
+import { refreshRegional } from './regional.js';
 import { afterWarehouseChange } from './production.js';
 import { createRng, nextRange, shuffle } from './rng.js';
 import { emit, type Ctx } from './ctx.js';
@@ -15,16 +17,17 @@ import { observe } from './fog.js';
 import { startNewcomer } from './jobs.js';
 import { rushEndsAt } from './rush.js';
 import { placeCrew } from './travel.js';
-import type {
-  Carrier,
-  Crew,
-  District,
-  DistrictKind,
-  Edge,
-  GameState,
-  GraphNode,
-  Id,
-  SimEvent,
+import {
+  GOODS,
+  type Carrier,
+  type Crew,
+  type District,
+  type DistrictKind,
+  type Edge,
+  type GameState,
+  type GraphNode,
+  type Id,
+  type SimEvent,
 } from './types.js';
 
 export interface WorldOptions {
@@ -124,6 +127,7 @@ export function createWorld(seed: number, options: WorldOptions = {}): GameState
       belowMedian: [],
     },
     markets: { hubW: newHubBooks(), hubE: newHubBooks() },
+    heat: {},
     contracts: {},
     memory: {},
     // The first hourly score and market ticks; each tick schedules the next.
@@ -137,6 +141,7 @@ export function createWorld(seed: number, options: WorldOptions = {}): GameState
       },
     ],
   };
+  refreshRegional(state);
   // The first open plots along the edge. Their events are not part of the game's history.
   ensureFrontier({ state, events: [] }, true);
   state.counters.event = 0;
@@ -181,6 +186,7 @@ export function addPlayerWithEvents(
     id: opts.id,
     credits: toAtoms(opts.credits ?? balance.player.startCredits),
     stash: {},
+    stashValue: {},
     score: 0,
     tradeMs: 0,
     tradeDay: 0,
@@ -198,6 +204,8 @@ export function addPlayerWithEvents(
   d.warehouse.parts += toAtoms(balance.rush.kit.parts);
   d.warehouse.power += toAtoms(balance.rush.kit.power);
   d.warehouse.supplies += toAtoms(balance.rush.kit.supplies);
+  // The start kit is worth the local reference price.
+  for (const g of GOODS) d.warehouseValue[g] = d.warehouse[g] * refCentsNear(next, d, g);
   const hours = opts.protectedHours ?? balance.player.protectedHours;
   if (hours > 0) d.protectedUntilMs = next.nowMs + hours * MS_PER_HOUR;
   for (let i = 0; i < (opts.crews ?? balance.player.startCrews); i++) {
@@ -251,6 +259,8 @@ export function relocatePlayer(ctx: Ctx, playerId: Id, from: District): District
   best.frontier = 'built';
   best.stance = 'hold';
   best.warehouse.supplies += toAtoms(balance.player.startSupplies);
+  best.warehouseValue.supplies +=
+    toAtoms(balance.player.startSupplies) * refCentsNear(state, best, 'supplies');
   best.protectedUntilMs = state.nowMs + balance.player.protectedHours * MS_PER_HOUR;
   const here = (loc: Crew['loc']): boolean => 'at' in loc && loc.at === from.id;
   for (const crew of Object.values(state.crews)) {

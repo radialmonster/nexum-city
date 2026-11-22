@@ -4,6 +4,7 @@ export { observe, sightOf, strengthRange, towerReach, towerSight, viewFor } from
 export type {
   BookLevel,
   ContractView,
+  CostView,
   DistrictView,
   MarketBookView,
   OwnDistrictView,

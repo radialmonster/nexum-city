@@ -2,6 +2,7 @@ import { MS_PER_HOUR, balance, toUnits } from './balance.js';
 import { emit, schedule, unschedule, type Ctx } from './ctx.js';
 import { deliverToContract } from './contracts.js';
 import { finishJob } from './jobs.js';
+import { valueAtNode } from './cost.js';
 import { deposit } from './production.js';
 import { wearCarrier } from './wear.js';
 import { resolveClear } from './clear.js';
@@ -43,6 +44,8 @@ export interface MovementSpec {
   carrier: Carrier | null;
   crews: Crew[];
   cargo: Goods;
+  /** The cost basis that travels with the cargo; defaults to the reference value at the start. */
+  value?: Goods;
   route: Route;
   durationMs: number;
   /** Raids only. */
@@ -70,6 +73,7 @@ export function startMovement(ctx: Ctx, spec: MovementSpec): Movement {
     carrierKind: spec.carrier?.kind ?? 'foot',
     crewIds: spec.crews.map((c) => c.id),
     cargo: spec.cargo,
+    value: spec.value ?? valueAtNode(state, from, spec.cargo),
     route: spec.route.route,
     lengthM: spec.route.lengthM,
     from,
@@ -141,7 +145,7 @@ export const travelSystem: System = {
       }
       // Settlers spend their supplies on arrival; a recalled trip brings them home.
       if (m.contractId && !recalled) deliverToContract(ctx, m);
-      else if (m.kind !== 'settle' || recalled) deposit(ctx, m.owner, m.to, m.cargo);
+      else if (m.kind !== 'settle' || recalled) deposit(ctx, m.owner, m.to, m.cargo, m.value);
       if (m.kind === 'settle' && !recalled) {
         beginSettle(
           ctx,

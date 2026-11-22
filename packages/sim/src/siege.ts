@@ -1,6 +1,7 @@
 import { ATOMS_PER_UNIT, MS_PER_HOUR, MS_PER_MINUTE, PROGRESS_SCALE, balance } from './balance.js';
 import { emit, schedule, unschedule, type Ctx } from './ctx.js';
 import { afterWarehouseChange, buildingLevel, emptyGoods } from './production.js';
+import { take } from './cost.js';
 import { nextFloat } from './rng.js';
 import { scheduleMend } from './raid.js';
 import { shortestRoute, travelMs } from './routing.js';
@@ -338,14 +339,15 @@ function loot(ctx: Ctx, d: District, attacker: Id): Goods {
       want[g] -= n;
       room -= n;
       taken[g] += n;
-      d.warehouse[g] -= n;
     }
+    const worth = take(d.warehouse, d.warehouseValue, cargo);
     startMovement(ctx, {
       owner: attacker,
       kind: 'haul',
       carrier,
       crews: [],
       cargo,
+      value: worth,
       route,
       durationMs: travelMs(route.lengthM, carrier.kind, wearOf(carrier)),
     });

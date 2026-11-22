@@ -1,4 +1,5 @@
 import { MS_PER_HOUR, balance, toAtoms } from './balance.js';
+import { take } from './cost.js';
 import { emit, type Ctx } from './ctx.js';
 import type { System } from './systems.js';
 import type { GameState, Id } from './types.js';
@@ -51,9 +52,13 @@ export function stripNewcomerPerks(s: GameState, options: { jobs?: boolean } = {
   // The starter kit sits in each newcomer's first district; take it back out.
   for (const d of Object.values(s.districts)) {
     if (d.kind === 'hub' || d.owner === 'neutral') continue;
-    d.warehouse.parts = Math.max(0, d.warehouse.parts - toAtoms(balance.rush.kit.parts));
-    d.warehouse.power = Math.max(0, d.warehouse.power - toAtoms(balance.rush.kit.power));
-    d.warehouse.supplies = Math.max(0, d.warehouse.supplies - toAtoms(balance.rush.kit.supplies));
+    const kit = {
+      parts: Math.min(d.warehouse.parts, toAtoms(balance.rush.kit.parts)),
+      power: Math.min(d.warehouse.power, toAtoms(balance.rush.kit.power)),
+      data: 0,
+      supplies: Math.min(d.warehouse.supplies, toAtoms(balance.rush.kit.supplies)),
+    };
+    take(d.warehouse, d.warehouseValue, kit);
   }
   const dropped = new Set<Id>();
   for (const id of Object.keys(s.contracts)) {

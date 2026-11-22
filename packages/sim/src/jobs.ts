@@ -187,7 +187,7 @@ export function finishJob(ctx: Ctx, m: Movement): void {
   if (job.kind === 'courier') {
     const sent = m.sent ?? 0;
     const back = sum(m.cargo);
-    deposit(ctx, m.owner, nodeId, m.cargo);
+    deposit(ctx, m.owner, nodeId, m.cargo, m.value);
     data.sent = toUnits(sent);
     data.returned = toUnits(back);
     if (back < sent) failed = 'raided';

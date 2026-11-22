@@ -195,8 +195,8 @@ export const balance = {
     destroyPercent: 15,
     /** Percent of the raiders' strength lost when they are beaten. */
     raiderLossPercent: 30,
-    /** A crew hurt in a raid regains 1 strength every this many hours while it rests at a district, up to its starting strength. */
-    mendHours: 1.5,
+    /** A crew hurt in a raid or a siege round regains 1 strength every this many hours while it rests at a district, up to its starting strength. Was 1.5 before siege rounds mended too; at 1.5 the raider ran away (task 80). */
+    mendHours: 6,
     /** Percent of the escort's strength lost when the raiders win. */
     escortLossPercent: 10,
     /** Each side's strength is rolled between 100 minus and 100 plus this percent. */
@@ -279,6 +279,37 @@ export const balance = {
     refMaxPercent: 200,
     /** Starting civic reference prices in centi-credits per unit. */
     baseRefCents: { parts: 1800, power: 1400, data: 2400, supplies: 1000 },
+    /**
+     * Regional prices (economy plan, stage 2; docs/rewrite/sim-spec.md "Regional prices"). Each
+     * hub's own base price for a good is the cheapest delivered cost: the global base, plus a
+     * transport charge for the street distance from the nearest producing district, plus a raid
+     * premium for recent ambushes and hits on the streets of that haul, plus a demand push from
+     * the neutral residential districts that count that hub as their nearest. Recomputed hourly.
+     */
+    regional: {
+      /**
+       * Producer price: the share of the starting reference (baseRefCents) that a good costs at
+       * its producer, in percent. The transport charge is added on top, so a hub's base lands
+       * near the old single reference at the map's usual distances (about 3.4 km, +80 percent)
+       * and the economy keeps its pre-regional balance.
+       */
+      producerPercent: 60,
+      /** Transport charge: percent of the good's global base per kilometre of street. */
+      transportPercentPerKm: 32,
+      /** Heat (raid activity per street) added by a set ambush and by a convoy hit. */
+      heatPerAmbush: 1,
+      heatPerHit: 3,
+      /** Each hour the heat on every street keeps this percent of itself (rounded down). */
+      heatKeepPercent: 85,
+      /** Raid premium: percent of the global base per heat point on the haul's streets. */
+      raidPercentPerHeat: 1,
+      /** The raid premium never exceeds this percent of the global base. */
+      raidCapPercent: 25,
+      /** Demand: percent of the global base each neutral residential district adds at its hub. */
+      demandPercentPerDistrict: 1,
+      /** The demand push never exceeds this percent of the global base. */
+      demandCapPercent: 15,
+    },
   },
 
   /**

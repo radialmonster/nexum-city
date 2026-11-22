@@ -1,6 +1,8 @@
 import { ATOMS_PER_UNIT, MS_PER_HOUR, balance, toAtoms } from './balance.js';
 import { emit, schedule, type Ctx } from './ctx.js';
+import { put, share, take } from './cost.js';
 import { emptyGoods } from './production.js';
+import { refreshRegional } from './regional.js';
 import { addTradeScore } from './score.js';
 import type { System } from './systems.js';
 import {
@@ -24,6 +26,8 @@ export function newBook(good: Good): Book {
     bids: [],
     asks: [],
     refCents: M.baseRefCents[good],
+    baseCents: M.baseRefCents[good],
+    why: { from: null, distM: 0, global: M.baseRefCents[good], transport: 0, demand: 0, raid: 0 },
     bidDepth: M.civicDepthCap,
     askDepth: M.civicDepthCap,
     lastCents: null,
@@ -46,8 +50,9 @@ export const civicBid = (book: Book): number =>
 export const civicAsk = (book: Book): number =>
   Math.floor((book.refCents * (100 + M.civicSpreadPercent) + 99) / 100);
 
-function clampRef(good: Good, ref: number): number {
-  const base = M.baseRefCents[good];
+/** Keeps a reference price within the band around the hub's own base for the good. */
+function clampRef(book: Book, ref: number): number {
+  const base = book.baseCents;
   const lo = Math.ceil((base * M.refMinPercent) / 100);
   const hi = Math.floor((base * M.refMaxPercent) / 100);
   return Math.min(hi, Math.max(lo, ref));
@@ -57,7 +62,7 @@ function clampRef(good: Good, ref: number): number {
 export function nudgeRef(state: GameState, hub: Id, good: Good, percent: number): void {
   const book = state.markets[hub]?.[good];
   if (!book) return;
-  book.refCents = clampRef(good, book.refCents + Math.ceil((book.refCents * percent) / 100));
+  book.refCents = clampRef(book, book.refCents + Math.ceil((book.refCents * percent) / 100));
 }
 
 /** Checks a placement without changing anything. */
@@ -119,6 +124,12 @@ function insertSorted(list: MarketOrder[], order: MarketOrder, side: Side): void
   list.splice(i, 0, order);
 }
 
+function stashValue(ctx: Ctx, owner: Id, hub: Id) {
+  const player = ctx.state.players[owner];
+  if (!player) throw new Error(`unknown player ${owner}`);
+  return (player.stashValue[hub] ??= emptyGoods());
+}
+
 function stash(ctx: Ctx, owner: Id, hub: Id) {
   const player = ctx.state.players[owner];
   if (!player) throw new Error(`unknown player ${owner}`);
@@ -142,10 +153,15 @@ function fill(
   taker: Side,
 ): void {
   const { state } = ctx;
+  let costOfSold = 0;
   if (buy) {
     const buyer = state.players[buy.owner];
     if (buyer) buyer.credits += (buy.price - price) * qty * ATOMS_PER_CENT;
-    stash(ctx, buy.owner, hub)[good] += toAtoms(qty);
+    const bought = emptyGoods();
+    const boughtValue = emptyGoods();
+    bought[good] = toAtoms(qty);
+    boughtValue[good] = toAtoms(qty) * price;
+    put(stash(ctx, buy.owner, hub), stashValue(ctx, buy.owner, hub), bought, boughtValue);
     buy.qty -= qty;
   } else {
     book.bidDepth -= qty;
@@ -153,13 +169,17 @@ function fill(
   if (sell) {
     const seller = state.players[sell.owner];
     if (seller) seller.credits += price * qty * ATOMS_PER_CENT;
+    // The goods leave with their share of the escrowed cost basis.
+    const part = share(sell.value, toAtoms(qty), toAtoms(sell.qty));
+    sell.value -= part;
     sell.qty -= qty;
+    costOfSold = part;
   } else {
     book.askDepth -= qty;
   }
   book.lastCents = price;
   book.refCents = clampRef(
-    good,
+    book,
     book.refCents + Math.trunc((price - book.refCents) / M.refDriftDivisor),
   );
   // Trade earns score, but a player trading with themselves does not.
@@ -178,6 +198,7 @@ function fill(
     taker,
     buyOrder: buy?.id ?? null,
     sellOrder: sell?.id ?? null,
+    costCents: sell && qty > 0 ? Math.floor(costOfSold / toAtoms(qty)) : null,
   });
 }
 
@@ -231,8 +252,12 @@ export function placeOrder(
   if (!player) throw new Error(`unknown player ${actorId}`);
   const book = state.markets[o.hub]?.[o.good];
   if (!book) throw new Error(`no book for ${o.good} at ${o.hub}`);
-  if (o.side === 'sell') stash(ctx, actorId, o.hub)[o.good] -= toAtoms(o.qty);
-  else player.credits -= o.price * o.qty * ATOMS_PER_CENT;
+  let value = 0;
+  if (o.side === 'sell') {
+    const want = emptyGoods();
+    want[o.good] = toAtoms(o.qty);
+    value = take(stash(ctx, actorId, o.hub), stashValue(ctx, actorId, o.hub), want)[o.good];
+  } else player.credits -= o.price * o.qty * ATOMS_PER_CENT;
   state.counters.order += 1;
   const order: MarketOrder = {
     id: `o${state.counters.order}`,
@@ -243,6 +268,7 @@ export function placeOrder(
     price: o.price,
     qty: o.qty,
     seq: state.counters.order,
+    value,
   };
   match(ctx, book, order);
   if (order.qty > 0) insertSorted(o.side === 'buy' ? book.bids : book.asks, order, o.side);
@@ -256,8 +282,18 @@ export function cancelOrder(ctx: Ctx, order: MarketOrder, book: Book): void {
   if (i >= 0) list.splice(i, 1);
   const player = ctx.state.players[order.owner];
   if (!player) return;
-  if (order.side === 'sell') stash(ctx, order.owner, order.hub)[order.good] += toAtoms(order.qty);
-  else player.credits += order.price * order.qty * ATOMS_PER_CENT;
+  if (order.side === 'sell') {
+    const back = emptyGoods();
+    const backValue = emptyGoods();
+    back[order.good] = toAtoms(order.qty);
+    backValue[order.good] = order.value;
+    put(
+      stash(ctx, order.owner, order.hub),
+      stashValue(ctx, order.owner, order.hub),
+      back,
+      backValue,
+    );
+  } else player.credits += order.price * order.qty * ATOMS_PER_CENT;
 }
 
 /** Resting orders that now cross the civic prices trade with the civic traders. */
@@ -278,15 +314,16 @@ function sweep(ctx: Ctx, hub: Id, good: Good, book: Book): void {
 
 /** Hourly: refill civic depth, pull references back toward their base, then sweep resting orders. */
 function hourly(ctx: Ctx): void {
+  refreshRegional(ctx.state);
   for (const hub of Object.keys(ctx.state.markets).sort()) {
     for (const good of GOODS) {
       const book = ctx.state.markets[hub]?.[good];
       if (!book) continue;
       book.bidDepth = Math.min(M.civicDepthCap, book.bidDepth + M.civicRefillPerHour);
       book.askDepth = Math.min(M.civicDepthCap, book.askDepth + M.civicRefillPerHour);
-      const base = M.baseRefCents[good];
+      const base = book.baseCents;
       book.refCents = clampRef(
-        good,
+        book,
         book.refCents + Math.trunc(((base - book.refCents) * M.reversionPercent) / 100),
       );
       sweep(ctx, hub, good, book);

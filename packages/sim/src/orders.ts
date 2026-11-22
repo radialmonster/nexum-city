@@ -13,7 +13,8 @@ import { buildCost, startConstruction } from './construction.js';
 import { emit, type Ctx } from './ctx.js';
 import { jobTaken, resolveJob } from './jobs.js';
 import { cancelOrder, findOrder, placeOrder, validatePlace } from './market.js';
-import { afterWarehouseChange, buildingLevel, storeAt } from './production.js';
+import { take } from './cost.js';
+import { afterWarehouseChange, buildingLevel, storeAt, valueStoreAt } from './production.js';
 import { shortestRoute, travelMs, type Route } from './routing.js';
 import { pickClearCrews, visibleAmbush } from './clear.js';
 import { endAmbush, isPlayerProtected } from './raid.js';
@@ -465,8 +466,12 @@ export function applyOrder(ctx: Ctx, input: Input): Validation {
         plan.kind === 'haul' || plan.kind === 'settle'
           ? storeAt(ctx, plan.owner, plan.route.route[0] as Id)
           : null;
-      if (source) for (const g of GOODS) source[g] -= plan.cargo[g];
-      startMovement(ctx, plan);
+      const sourceValue =
+        source && (plan.kind === 'haul' || plan.kind === 'settle')
+          ? valueStoreAt(ctx, plan.owner, plan.route.route[0] as Id)
+          : null;
+      const carried = source && sourceValue ? take(source, sourceValue, plan.cargo) : undefined;
+      startMovement(ctx, carried ? { ...plan, value: carried } : plan);
       if (plan.job) jobTaken(ctx, plan.owner, plan.job);
       const from = state.districts[plan.route.route[0] as Id];
       if (source && from && from.kind !== 'hub') afterWarehouseChange(ctx, from);
@@ -524,7 +529,12 @@ export function applyOrder(ctx: Ctx, input: Input): Validation {
       const { district } = plan;
       const player = state.players[input.actorId] as { credits: number };
       player.credits -= toAtoms(balance.recruit.credits);
-      district.warehouse.supplies -= toAtoms(balance.recruit.supplies);
+      take(district.warehouse, district.warehouseValue, {
+        parts: 0,
+        power: 0,
+        data: 0,
+        supplies: toAtoms(balance.recruit.supplies),
+      });
       state.counters.crew += 1;
       const catchUp = state.season.belowMedian.includes(input.actorId);
       const readyMinutes =

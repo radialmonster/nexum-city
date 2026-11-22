@@ -1,6 +1,15 @@
 import { balance, toAtoms } from './balance.js';
+import { costCents } from './cost.js';
 import { totalGoods, warehouseCapacity } from './production.js';
 import { GOODS, type GameState } from './types.js';
+
+/** A pile's cost basis must be a safe non-negative integer, zero when empty, and sane per unit. */
+function costProblem(problems: string[], what: string, atoms: number, value: number): void {
+  if (!Number.isSafeInteger(value) || value < 0) problems.push(`${what} has bad cost ${value}`);
+  else if (atoms <= 0 && value > 0) problems.push(`${what} is empty but has a cost`);
+  else if (atoms > 0 && costCents(atoms, value) > balance.market.maxPrice)
+    problems.push(`${what} costs more per unit than the price cap`);
+}
 
 /** Returns a list of broken invariants (empty when the state is sound). Used by tests and the harness. */
 export function checkInvariants(s: GameState): string[] {
@@ -34,14 +43,20 @@ export function checkInvariants(s: GameState): string[] {
         problems.push(`${id} listed in ${m.id} but located elsewhere`);
       }
     }
-    for (const g of GOODS) if (m.cargo[g] < 0) problems.push(`${m.id} has negative ${g}`);
+    for (const g of GOODS) {
+      if (m.cargo[g] < 0) problems.push(`${m.id} has negative ${g}`);
+      costProblem(problems, `${m.id} cargo ${g}`, m.cargo[g], m.value[g]);
+    }
   }
   for (const [unit, locs] of where) {
     if (locs.length !== 1) problems.push(`${unit} has ${locs.length} locations`);
   }
 
   for (const d of Object.values(s.districts)) {
-    for (const g of GOODS) if (d.warehouse[g] < 0) problems.push(`${d.id} has negative ${g}`);
+    for (const g of GOODS) {
+      if (d.warehouse[g] < 0) problems.push(`${d.id} has negative ${g}`);
+      costProblem(problems, `${d.id} ${g}`, d.warehouse[g], d.warehouseValue[g]);
+    }
     if (d.kind !== 'hub' && totalGoods(d.warehouse) > warehouseCapacity(d) && !d.overflowing) {
       // Starting stock may exceed capacity; production never pushes past it.
     }
@@ -87,6 +102,13 @@ export function checkInvariants(s: GameState): string[] {
     for (const [hub, goods] of Object.entries(p.stash)) {
       for (const g of GOODS)
         if (goods[g] < 0) problems.push(`${p.id} stash at ${hub} negative ${g}`);
+      for (const g of GOODS)
+        costProblem(
+          problems,
+          `${p.id} stash at ${hub} ${g}`,
+          goods[g],
+          p.stashValue[hub]?.[g] ?? 0,
+        );
     }
   }
   for (const c of Object.values(s.contracts)) {
@@ -127,6 +149,7 @@ export function checkInvariants(s: GameState): string[] {
           if (orderIds.has(o.id)) problems.push(`order ${o.id} is listed twice`);
           orderIds.add(o.id);
           if (o.qty <= 0) problems.push(`order ${o.id} has no open quantity`);
+          if (side === 'sell') costProblem(problems, `order ${o.id}`, toAtoms(o.qty), o.value);
           if (o.side !== side || o.hub !== hub || o.good !== good)
             problems.push(`order ${o.id} is in the wrong book`);
           if (!s.players[o.owner]) problems.push(`order ${o.id} has no owner`);

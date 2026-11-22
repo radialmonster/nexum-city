@@ -1,4 +1,12 @@
-import { MS_PER_HOUR, MS_PER_MINUTE, balance, toAtoms, toUnits } from './balance.js';
+import { share } from './cost.js';
+import {
+  ATOMS_PER_UNIT,
+  MS_PER_HOUR,
+  MS_PER_MINUTE,
+  balance,
+  toAtoms,
+  toUnits,
+} from './balance.js';
 import { emit, schedule, unschedule, type Ctx } from './ctx.js';
 import { ATOMS_PER_CENT } from './market.js';
 import { deposit, emptyGoods } from './production.js';
@@ -237,7 +245,7 @@ export function deliverToContract(ctx: Ctx, m: Movement): void {
   const { state } = ctx;
   const c = m.contractId ? state.contracts[m.contractId] : undefined;
   if (!c || c.taker !== m.owner) {
-    deposit(ctx, m.owner, m.to, m.cargo);
+    deposit(ctx, m.owner, m.to, m.cargo, m.value);
     return;
   }
   const want = toAtoms(c.qty);
@@ -245,17 +253,22 @@ export function deliverToContract(ctx: Ctx, m: Movement): void {
   const accepted = Math.min(arrived, want - c.delivered);
   const extra = emptyGoods();
   for (const g of GOODS) extra[g] = g === c.good ? arrived - accepted : m.cargo[g];
-  deposit(ctx, m.owner, m.to, extra);
-  if (c.poster !== 'civic') {
-    const goods = emptyGoods();
-    goods[c.good] = accepted;
-    deposit(ctx, c.poster, c.hub, goods);
-  }
+  // The taker's leftover keeps its cost; the poster's goods are worth what the contract paid.
+  const extraValue = { ...m.value };
+  extraValue[c.good] -= share(m.value[c.good], accepted, arrived);
+  deposit(ctx, m.owner, m.to, extra, extraValue);
   c.delivered += accepted;
   const complete = c.delivered >= want;
   const owed = complete
     ? c.reward - c.paid
     : Number((big(c.reward) * big(c.delivered)) / big(want)) - c.paid;
+  if (c.poster !== 'civic') {
+    const goods = emptyGoods();
+    goods[c.good] = accepted;
+    const worth = emptyGoods();
+    worth[c.good] = Math.floor(owed / ATOMS_PER_CENT) * ATOMS_PER_UNIT;
+    deposit(ctx, c.poster, c.hub, goods, worth);
+  }
   const taker = state.players[m.owner] as { credits: number };
   taker.credits += owed;
   c.paid += owed;

@@ -459,9 +459,7 @@ function resupply(
   );
   if (home && wantsPlot && !hasStash && !inFlight) {
     const have = toUnits(budget.warehouse[home.id]?.supplies ?? 0);
-    const hub = Object.values(s.districts)
-      .filter((d) => d.kind === 'hub')
-      .sort((a, b) => length(s, home.id, a.id) - length(s, home.id, b.id))[0];
+    const hub = cheapestHubFor(s, home.id, 'supplies');
     const book = hub ? s.markets[hub.id]?.supplies : undefined;
     if (hub && book && have < balance.settle.supplies + 30) {
       // Buy a little over the target: crew upkeep eats supplies while the van is on the road.
@@ -580,15 +578,15 @@ function shopOrders(
   ) {
     return [];
   }
-  const hub = nearestHubTo(s, home.id);
-  if (!hub) return [];
+  if (!nearestHubTo(s, home.id)) return [];
   // A full warehouse turns goods away at the door: only buy what fits (keeping a little slack
   // for what the district makes while the van is on the road).
   const free = roomFor(want);
   for (const good of GOODS) {
     const short = Math.ceil(toUnits(want.short[good]));
-    const book = s.markets[hub.id]?.[good];
-    if (short < 1 || !book) continue;
+    const hub = cheapestHubFor(s, home.id, good);
+    const book = hub && s.markets[hub.id]?.[good];
+    if (short < 1 || !hub || !book) continue;
     // Another own warehouse that can hand the goods over is free (see stageGoods).
     if (mine(s, me).some((b) => b.id !== want.district.id && toUnits(b.warehouse[good]) >= short)) {
       continue;
@@ -627,10 +625,25 @@ function haulToHub(s: GameState, me: Id, keep: Set<Good>, escort = false): Order
       if (spare >= 10 && (!best || spare > best.qty)) best = { good, qty: spare };
     }
     if (!best) continue;
-    const hubs = Object.values(s.districts)
-      .filter((d) => d.kind === 'hub')
-      .sort((a, b) => length(s, base.id, a.id) - length(s, base.id, b.id));
-    const hub = hubs[0];
+    // Delivered profit: each hub's civic bid less the transport charge for the street distance
+    // (the same rate that sets the regional base), so a farther hub that pays more wins.
+    const good = best.good;
+    const rate = balance.market.regional.transportPercentPerKm;
+    const net = (d: District): number => {
+      const book = s.markets[d.id]?.[good];
+      const bid = book ? civicBid(book) : 0;
+      return bid - Math.floor((bid * rate * length(s, base.id, d.id)) / 100_000);
+    };
+    // Sell low when the warehouse is nearly full or the bot is starved of cash: the nearest hub
+    // takes the goods now, rather than a longer trip to the best-paying one.
+    const crowded = totalGoods(base.warehouse) >= 0.85 * warehouseCapacity(base);
+    const short = starved(s, me, SETTLE_RESERVE);
+    const hub =
+      crowded || short
+        ? nearestHubTo(s, base.id)
+        : Object.values(s.districts)
+            .filter((d) => d.kind === 'hub')
+            .sort((a, b) => net(b) - net(a) || a.id.localeCompare(b.id))[0];
     if (!hub) continue;
     const qty = Math.min(best.qty, 40);
     // A valuable load gets a second crew riding along as escort (the van has two seats).
@@ -657,6 +670,23 @@ function starved(s: GameState, me: Id, reserve: number): boolean {
   const need = Math.ceil(balance.settle.supplies + reserve - toUnits(home.warehouse.supplies));
   if (need <= 0) return false;
   return (s.players[me]?.credits ?? 0) < toAtoms((civicAsk(book) * need) / 100);
+}
+
+/**
+ * The hub where a good costs least delivered to the `from` district: the civic ask plus the
+ * transport charge for the street distance (the rate that builds the regional base), ties to the
+ * nearer hub.
+ */
+function cheapestHubFor(s: GameState, from: Id, good: Good): District | undefined {
+  const rate = balance.market.regional.transportPercentPerKm;
+  const cost = (d: District): number => {
+    const book = s.markets[d.id]?.[good];
+    const ask = book ? civicAsk(book) : Number.MAX_SAFE_INTEGER;
+    return ask + Math.floor((ask * rate * length(s, from, d.id)) / 100_000);
+  };
+  return Object.values(s.districts)
+    .filter((d) => d.kind === 'hub')
+    .sort((x, y) => cost(x) - cost(y) || length(s, from, x.id) - length(s, from, y.id))[0];
 }
 
 function nearestHubTo(s: GameState, from: Id): District | undefined {

@@ -17,7 +17,10 @@ function cloneForQuietStep(prev: GameState): GameState {
   const districts: GameState['districts'] = {};
   for (const id of Object.keys(prev.districts)) {
     const d = prev.districts[id] as GameState['districts'][string];
-    districts[id] = d.owner === 'neutral' ? d : { ...d, warehouse: { ...d.warehouse } };
+    districts[id] =
+      d.owner === 'neutral'
+        ? d
+        : { ...d, warehouse: { ...d.warehouse }, warehouseValue: { ...d.warehouseValue } };
   }
   const players: GameState['players'] = {};
   for (const id of Object.keys(prev.players)) {
