@@ -32,7 +32,7 @@ npm run dev            # game server on :8080 and the Vite dev server on :5173 (
 docker compose up --build   # the production image on http://localhost:8080 (set APP_PORT to change it)
 ```
 
-The UI kit gallery is at `/kit`. `npm run check` runs lint, format, typecheck, tests and build.
+Game data (SQLite database and backups) lives in `DATA_DIR`, a Docker volume under compose. Set `COOKIE_SECURE=true` behind HTTPS and `TRUST_PROXY=true` behind a reverse proxy. The UI kit gallery is at `/kit`. `npm run check` runs lint, format, typecheck, tests and build.
 
 ## Licence
 

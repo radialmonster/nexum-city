@@ -8,5 +8,13 @@
     "tsBuildInfoFile": "dist/.tsbuildinfo"
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": ["src/**/*.test.ts"],
+  "references": [
+    {
+      "path": "../../packages/sim"
+    },
+    {
+      "path": "../../packages/contracts"
+    }
+  ]
 }

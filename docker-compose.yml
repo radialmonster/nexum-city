@@ -10,6 +10,10 @@ services:
       NODE_ENV: production
       PORT: '8080'
       DATA_DIR: /app/data
+      # Set COOKIE_SECURE=true behind HTTPS, and TRUST_PROXY=true behind a reverse proxy.
+      COOKIE_SECURE: '${COOKIE_SECURE:-false}'
+      TRUST_PROXY: '${TRUST_PROXY:-false}'
+      TICK_MS: '${TICK_MS:-2000}'
     volumes:
       - nexum-data:/app/data
     mem_limit: 256m

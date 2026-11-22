@@ -10,7 +10,7 @@ Live status for [`plan.md`](plan.md). Update this file in the same commit as the
 - `blocked`: add the reason
 - `owner`: needs the owner's decision
 
-**Current phase:** 0 (skeleton, theme and UI kit). A5 is still open.
+**Current phase:** 2 (server and persistence). A5 is still open.
 
 ## Phase A: Fresh public repository
 
@@ -52,15 +52,15 @@ Live status for [`plan.md`](plan.md). Update this file in the same commit as the
 
 ## Phase 2: Server and persistence
 
-| ID  | Task                                                 | Status | Notes |
-| --- | ---------------------------------------------------- | ------ | ----- |
-| 21  | SQLite schema and migrations                         | todo   |       |
-| 22  | Accounts and sessions                                | todo   |       |
-| 23  | Tick loop, with catch-up after downtime              | todo   |       |
-| 24  | Order API validated against `packages/contracts`     | todo   |       |
-| 25  | Per-player view (fog) and "while you were away" feed | todo   |       |
-| 26  | Server-sent events, with a polling fallback          | todo   |       |
-| 27  | SQLite backups                                       | todo   |       |
+| ID  | Task                                                 | Status | Notes                                                                             |
+| --- | ---------------------------------------------------- | ------ | --------------------------------------------------------------------------------- |
+| 21  | SQLite schema and migrations                         | done   | 2026-11-22 HASH                                                                   |
+| 22  | Accounts and sessions                                | done   | 2026-11-22 HASH                                                                   |
+| 23  | Tick loop, with catch-up after downtime              | done   | 2026-11-22 HASH                                                                   |
+| 24  | Order API validated against `packages/contracts`     | done   | 2026-11-22 HASH                                                                   |
+| 25  | Per-player view (fog) and "while you were away" feed | done   | 2026-11-22 HASH; view is an adapter until `viewFor` exists in the sim, no fog yet |
+| 26  | Server-sent events, with a polling fallback          | done   | 2026-11-22 HASH                                                                   |
+| 27  | SQLite backups                                       | done   | 2026-11-22 HASH                                                                   |
 
 ## Phase 3: The map
 
@@ -110,3 +110,4 @@ Live status for [`plan.md`](plan.md). Update this file in the same commit as the
 - 2026-11-22: Phase 0 tasks 04–05 done (2637f15). `apps/client` is a Vite and React 19 app that injects the theme into a `<style>` element at boot, switches between `neon` and `highContrast` live, and has a user scale setting driving `--s-user`. The 13 UI kit components live in `apps/client/src/ui/` (CSS Modules, tokens only) and the `/kit` gallery shows every variant. `packages/theme` gained a `size` group (fixed component dimensions) and the `dangerSurface`, `track` and `trackLine` colours. Vitest now runs a `node` project and the jsdom `apps/client` project.
 - 2026-11-22: Phase 0 tasks 06–07 done (743baf2). `apps/server` (`@nexum/server`) is a Hono server on `@hono/node-server`: zod-validated `PORT`/`DATA_DIR` config, `GET /api/health`, JSON 404 for unknown `/api` routes, the built client with an SPA fallback, one JSON log line per request and graceful SIGTERM/SIGINT shutdown. `src/game/` is the placeholder for the tick loop and SQLite. `npm run dev` runs the server and the Vite dev server (with an `/api` proxy) together. The multi-stage `Dockerfile` (node:22-alpine, production deps only, non-root `node` user, healthcheck) and `docker-compose.yml` (256 MB limit, `nexum-data` volume at `/app/data`) work locally: image 254 MB, about 20 MiB RAM idle, container healthy. `package-lock.json` was regenerated because the Alpine image's npm 10 rejected the old one.
 - 2026-11-22: Phase 1 tasks 11–15 done (`59b7800`). `packages/sim` has the world model, a seeded RNG, an exact integer `step` (2 s ticks and one jump hash the same), the seven orders with typed validation, Dijkstra travel with ETAs, and production with warehouses. Siege, markets, fog, scoring and the frontier are left as extension points. Decisions are in `sim-spec.md`.
+- 2026-11-22: Phase 2 tasks 21–27 done (HASH). `apps/server/src/game/` persists the authoritative in-memory sim to SQLite (`node:sqlite`, WAL): numbered migrations, JSON snapshots every 5 minutes and on shutdown, an append-only `inputs` log replayed on boot, then a catch-up `step` to the wall clock. Accounts use scrypt with per-user salts and hashed httpOnly session cookies; auth routes are rate limited. New `packages/contracts` holds the zod schemas for every request, response and order. API: register/login/logout, `/me`, `/orders`, `/eta`, `/feed`, `/stream` (SSE with heartbeat and `Last-Event-ID` replay). Nightly `VACUUM INTO` backups keep 7. Restart recovery hashes identically to an uninterrupted run (tested). Docker: state and in-flight movements survive a container restart, about 25 MiB RAM idle. `/me` uses a `viewForPlayer` adapter until the sim gains `viewFor`.

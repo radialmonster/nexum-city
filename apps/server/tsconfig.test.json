@@ -9,5 +9,15 @@
     "emitDeclarationOnly": true
   },
   "include": ["src/**/*.test.ts"],
-  "references": [{ "path": "./tsconfig.json" }]
+  "references": [
+    {
+      "path": "./tsconfig.json"
+    },
+    {
+      "path": "../../packages/sim"
+    },
+    {
+      "path": "../../packages/contracts"
+    }
+  ]
 }

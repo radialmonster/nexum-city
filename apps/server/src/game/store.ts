@@ -1,0 +1,216 @@
+import type { DatabaseSync, StatementSync } from 'node:sqlite';
+import type { GameState, Input, Order, SimEvent } from '@nexum/sim';
+import { transaction } from './db.js';
+
+export interface StoredInput {
+  readonly seq: number;
+  readonly atMs: number;
+  readonly actorId: string;
+  readonly order: Order;
+}
+
+export interface StoredSnapshot {
+  readonly id: number;
+  readonly atMs: number;
+  readonly lastSeq: number;
+  readonly hash: string;
+  readonly state: GameState;
+}
+
+export interface StoredEvent {
+  readonly seq: number;
+  readonly event: SimEvent;
+}
+
+export interface AccountRow {
+  readonly id: number;
+  readonly username: string;
+  readonly pwHash: string;
+  readonly playerId: string;
+  readonly createdMs: number;
+}
+
+export interface FeedQuery {
+  readonly playerId: string;
+  readonly sinceMs?: number | undefined;
+  readonly afterSeq?: number | undefined;
+  readonly limit: number;
+}
+
+type Row = Record<string, unknown>;
+
+/** Typed access to the game tables. Statements are prepared once. */
+export class Store {
+  private readonly stmts = new Map<string, StatementSync>();
+
+  readonly db: DatabaseSync;
+
+  constructor(db: DatabaseSync) {
+    this.db = db;
+  }
+
+  private q(sql: string): StatementSync {
+    let s = this.stmts.get(sql);
+    if (!s) {
+      s = this.db.prepare(sql);
+      this.stmts.set(sql, s);
+    }
+    return s;
+  }
+
+  transaction<T>(fn: () => T): T {
+    return transaction(this.db, fn);
+  }
+
+  // ---- meta
+
+  getMeta(key: string): string | undefined {
+    const r = this.q('SELECT value FROM meta WHERE key = ?').get(key) as Row | undefined;
+    return r ? String(r['value']) : undefined;
+  }
+
+  setMeta(key: string, value: string): void {
+    this.q(
+      'INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value',
+    ).run(key, value);
+  }
+
+  // ---- snapshots
+
+  insertSnapshot(state: GameState, hash: string, lastSeq: number, keep = 3): number {
+    const r = this.q(
+      'INSERT INTO snapshots (at_ms, last_seq, hash, state) VALUES (?, ?, ?, ?)',
+    ).run(state.nowMs, lastSeq, hash, JSON.stringify(state));
+    const id = Number(r.lastInsertRowid);
+    this.q('DELETE FROM snapshots WHERE id <= ?').run(id - keep);
+    return id;
+  }
+
+  latestSnapshot(): StoredSnapshot | undefined {
+    const r = this.q('SELECT * FROM snapshots ORDER BY id DESC LIMIT 1').get() as Row | undefined;
+    if (!r) return undefined;
+    return {
+      id: Number(r['id']),
+      atMs: Number(r['at_ms']),
+      lastSeq: Number(r['last_seq']),
+      hash: String(r['hash']),
+      state: JSON.parse(String(r['state'])) as GameState,
+    };
+  }
+
+  // ---- inputs
+
+  appendInput(atMs: number, actorId: string, order: Order): number {
+    const r = this.q('INSERT INTO inputs (at_ms, actor_id, order_json) VALUES (?, ?, ?)').run(
+      atMs,
+      actorId,
+      JSON.stringify(order),
+    );
+    return Number(r.lastInsertRowid);
+  }
+
+  inputsAfter(seq: number): StoredInput[] {
+    const rows = this.q('SELECT * FROM inputs WHERE seq > ? ORDER BY seq').all(seq) as Row[];
+    return rows.map((r) => ({
+      seq: Number(r['seq']),
+      atMs: Number(r['at_ms']),
+      actorId: String(r['actor_id']),
+      order: JSON.parse(String(r['order_json'])) as Order,
+    }));
+  }
+
+  static toInput(i: StoredInput): Input {
+    return { actorId: i.actorId, order: i.order, atMs: i.atMs };
+  }
+
+  // ---- events
+
+  /** Stores events (ignoring ones already stored, so replay is idempotent); returns each with its seq. */
+  insertEvents(events: readonly SimEvent[]): StoredEvent[] {
+    const out: StoredEvent[] = [];
+    for (const e of events) {
+      this.q('INSERT OR IGNORE INTO events (id, at_ms, kind, json) VALUES (?, ?, ?, ?)').run(
+        e.id,
+        e.at,
+        e.kind,
+        JSON.stringify(e),
+      );
+      const row = this.q('SELECT seq FROM events WHERE id = ?').get(e.id) as Row;
+      const seq = Number(row['seq']);
+      for (const actor of new Set(e.actors)) {
+        this.q(
+          'INSERT OR IGNORE INTO event_actors (player_id, at_ms, event_seq) VALUES (?, ?, ?)',
+        ).run(actor, e.at, seq);
+      }
+      out.push({ seq, event: e });
+    }
+    return out;
+  }
+
+  /** Events concerning a player, oldest first; fetches one extra row to report `hasMore`. */
+  feed(q: FeedQuery): { items: StoredEvent[]; hasMore: boolean } {
+    const rows = this.q(
+      `SELECT e.seq AS seq, e.json AS json
+         FROM event_actors a JOIN events e ON e.seq = a.event_seq
+        WHERE a.player_id = ? AND a.at_ms > ? AND a.event_seq > ?
+        ORDER BY a.event_seq
+        LIMIT ?`,
+    ).all(q.playerId, q.sinceMs ?? -1, q.afterSeq ?? 0, q.limit + 1) as Row[];
+    const items = rows.slice(0, q.limit).map((r) => ({
+      seq: Number(r['seq']),
+      event: JSON.parse(String(r['json'])) as SimEvent,
+    }));
+    return { items, hasMore: rows.length > q.limit };
+  }
+
+  // ---- accounts and sessions
+
+  private static account(r: Row): AccountRow {
+    return {
+      id: Number(r['id']),
+      username: String(r['username']),
+      pwHash: String(r['pw_hash']),
+      playerId: String(r['player_id']),
+      createdMs: Number(r['created_ms']),
+    };
+  }
+
+  insertAccount(username: string, pwHash: string, playerId: string, nowMs: number): AccountRow {
+    const r = this.q(
+      'INSERT INTO accounts (username, pw_hash, player_id, created_ms) VALUES (?, ?, ?, ?)',
+    ).run(username, pwHash, playerId, nowMs);
+    return { id: Number(r.lastInsertRowid), username, pwHash, playerId, createdMs: nowMs };
+  }
+
+  accountByUsername(username: string): AccountRow | undefined {
+    const r = this.q('SELECT * FROM accounts WHERE username = ?').get(username) as Row | undefined;
+    return r && Store.account(r);
+  }
+
+  accountById(id: number): AccountRow | undefined {
+    const r = this.q('SELECT * FROM accounts WHERE id = ?').get(id) as Row | undefined;
+    return r && Store.account(r);
+  }
+
+  insertSession(tokenHash: string, accountId: number, createdMs: number, expiresMs: number): void {
+    this.q(
+      'INSERT INTO sessions (token_hash, account_id, created_ms, expires_ms) VALUES (?, ?, ?, ?)',
+    ).run(tokenHash, accountId, createdMs, expiresMs);
+  }
+
+  accountForSession(tokenHash: string, nowMs: number): AccountRow | undefined {
+    const r = this.q(
+      `SELECT a.* FROM sessions s JOIN accounts a ON a.id = s.account_id
+        WHERE s.token_hash = ? AND s.expires_ms > ?`,
+    ).get(tokenHash, nowMs) as Row | undefined;
+    return r && Store.account(r);
+  }
+
+  deleteSession(tokenHash: string): void {
+    this.q('DELETE FROM sessions WHERE token_hash = ?').run(tokenHash);
+  }
+
+  pruneSessions(nowMs: number): void {
+    this.q('DELETE FROM sessions WHERE expires_ms <= ?').run(nowMs);
+  }
+}

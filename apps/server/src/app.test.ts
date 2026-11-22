@@ -70,7 +70,13 @@ describe('server app', () => {
 
 describe('loadConfig', () => {
   it('applies defaults', () => {
-    expect(loadConfig({})).toEqual({ port: 8080, dataDir: './data', clientDir: undefined });
+    expect(loadConfig({})).toMatchObject({
+      port: 8080,
+      dataDir: './data',
+      clientDir: undefined,
+      tickMs: 2000,
+      cookieSecure: false,
+    });
   });
   it('reads and coerces env', () => {
     expect(loadConfig({ PORT: '9000', DATA_DIR: '/d' })).toMatchObject({

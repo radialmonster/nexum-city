@@ -1,10 +1,14 @@
 import { Hono } from 'hono';
+import { gameRoutes } from './game/routes.js';
+import type { Game } from './game/index.js';
 import { serveClient } from './static.js';
 
 export interface AppOptions {
   /** Directory of the built client; omit to serve the API only. */
   readonly clientDir?: string;
   readonly version: string;
+  /** The game services; omit to serve only `/api/health` and the client. */
+  readonly game?: Game;
   /** Called with one JSON-serialisable record per request. */
   readonly log?: (entry: Record<string, unknown>) => void;
   /** Injectable for tests. */
@@ -38,7 +42,8 @@ export function createApp(options: AppOptions): Hono {
     }),
   );
 
-  // Future game API routes mount here (see src/game/).
+  if (options.game) app.route('/api', gameRoutes(options.game));
+
   app.all('/api/*', (c) => c.json({ ok: false, error: 'not_found' }, 404));
 
   if (options.clientDir) app.use(serveClient(options.clientDir));
