@@ -104,14 +104,15 @@ Live status for [`plan.md`](plan.md). Update this file in the same commit as the
 
 ## Phase 7: Milestone 2 mechanics
 
-| ID  | Task                                                                 | Status | Notes                                                                       |
-| --- | -------------------------------------------------------------------- | ------ | --------------------------------------------------------------------------- |
-| 71  | Raids and escorts (sim, contracts, server validation, bots, harness) | done   | 2026-11-22; RULES_VERSION 2 (71b follow-ups kept it at 2: nothing deployed) |
-| 72  | Raids UI (set an ambush, see ambushes and hits, battle report)       | done   |                                                                             |
-| 73  | Contracts board                                                      | todo   |                                                                             |
-| 74  | Runner carrier                                                       | todo   |                                                                             |
-| 75  | Watchtower and Garage (sight, wear and repair)                       | todo   |                                                                             |
-| 76  | Hunter bot                                                           | todo   |                                                                             |
+| ID  | Task                                                                       | Status | Notes                                                                       |
+| --- | -------------------------------------------------------------------------- | ------ | --------------------------------------------------------------------------- |
+| 71  | Raids and escorts (sim, contracts, server validation, bots, harness)       | done   | 2026-11-22; RULES_VERSION 2 (71b follow-ups kept it at 2: nothing deployed) |
+| 72  | Raids UI (set an ambush, see ambushes and hits, battle report)             | done   |                                                                             |
+| 73a | Contracts board (sim, contracts, server snapshot upgrade, bots, harness)   | done   | 2026-11-22; RULES_VERSION 3, SNAPSHOT_VERSION 2                             |
+| 73b | Contracts UI (board at a hub, post, take, haul for a contract, feed cards) | todo   | needs the order and view shapes in sim-spec                                 |
+| 74  | Runner carrier                                                             | todo   |                                                                             |
+| 75  | Watchtower and Garage (sight, wear and repair)                             | todo   |                                                                             |
+| 76  | Hunter bot                                                                 | todo   |                                                                             |
 
 ## Playtest findings
 
@@ -165,3 +166,4 @@ QA playthrough of the production build as a new player (2026-11-22). Fixed in th
 - 2026-11-22: Raid tuning round 3. Protected players cannot set ambushes (`protected_no_raid`, client message, bots respect it). Settle carrier crews count at full strength as guard, and the van's toughness rises 10 to 12, so overall strike success falls from 88 to 63 percent on seeds 1 to 8 (raider lead 1.12x, invariants 0). `RULES_VERSION` stays 2 (nothing deployed). See sim-spec, "Raid tuning, round 3".
 - 2026-11-22: Task 72 done. Raids UI: RAID radial item and order card (street picker, crews, carrier, 1 to 8 h stepper, ETA, plain-language errors), escort hint on the haul card, red dashed ambush streets (own ones in faction colour with a countdown tag), hit flash with callout (map tokens `ambushPulseMs`, `flashMs`), feed cards for the four raid events with a click-through battle report, and distinct raid, ambush and return timeline bars. Verified in Docker with bots (set ambushes, fast-forward, repelled report); a live raid.hit flash and an escorted haul by the player were not captured.
 - 2026-11-22: Raids UI polish. One feed headline per ambush: a `raid.ended` card shows only for an ambush that expired unused or that brought loot home (a strike already has its own card). Street wording is now "between Sector 1-1 and 2-1" in the feed, order card, timeline and report, via `streetEnds` in `derive.ts`. Timeline bars size to their label (ellipsis plus a `title` for the full text). The "blank or grey report modal" did not reproduce: live, the modal shows a full-colour map behind a token-styled panel at 2560, 1920 and 390 wide, so the earlier screenshot was a capture artifact. Verified live in Docker with bots: a `raid.hit` flash ("Ambush hit: +12 supplies"), the player's own ambush with its countdown tag, the escort hint on the haul card, and the report modal at 1920 and on a phone.
+- 2026-11-22: Task 73a done. Contracts board in the sim (see sim-spec, "Contracts board (M2)"): civic jobs on a 3 h cadence, player jobs with escrow, taker deposit, one taker, partial delivery, late failure, raidable hauls, daily score cap, fog, six events, merchant and turtle bot behaviour, conservation checks. `RULES_VERSION` is 3 (civic ticks shift the shared RNG) and `SNAPSHOT_VERSION` is 2 with an upgrade step. The harness test now uses seeds 1 to 8. Seeds 1 to 8: raider lead 1.08x, merchant credits at 48 h 843 to 1716, merchants complete 3.4 contracts each, invariants 0. Client touched only to compile (error messages).

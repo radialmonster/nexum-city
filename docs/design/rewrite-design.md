@@ -208,7 +208,7 @@ All combat resolves automatically from strengths plus some randomness, and produ
 - Prices move with supply and demand, and with events: raids on routes into the Docks make parts scarce there, so the price rises.
 - To use a market you must have goods physically at that hub. Hauling them there is the order; trading once there is instant.
 - Player listings sit in escrow at the hub. A buyer collects them at the hub and hauls them home.
-- **Contracts** let you post or take a delivery job: "bring 50 power cells to Ember Market by tonight for 900 credits". Bots post contracts too, which gives new players early income.
+- **Contracts** (built in task 73a, UI in 73b): each hub board holds up to 4 delivery jobs, for example "bring 30 power to Ember Market within 12 hours for 500 credits". The city posts jobs on a cadence, which gives new players early income, and players and merchant bots post their own by escrowing the reward. Taking a job costs a small deposit (10 percent) that is lost if you are late. One taker per job, and partial deliveries count. Contract hauls are raidable like any other. Completed jobs give score, capped per day. Boards and takers are public, but the progress of someone else's job is hidden. Details and numbers are in `docs/rewrite/sim-spec.md`.
 
 ## Bots
 

@@ -154,6 +154,54 @@ Here "before" is the first raids version (task 71), "after" is with protection, 
 
 Balance notes: with the first bot cadence (an ambush every 3 hours) merchants lost about 12 percent of districts and 24 percent of trade; raising the raider cadence to hourly made the raiders pay for losses more often and left merchants at or above the earlier numbers. Merchants do not collapse. Numbers are in `balance.raid` and can be tuned freely.
 
+## Contracts board (M2)
+
+Built in task 73a (sim, contracts package, server snapshot upgrade and bots; the contracts UI is task 73b). This is proposal D in `balance-proposals.md` ("Contracts at hubs"). `RULES_VERSION` is 3 and `SNAPSHOT_VERSION` is 2. Why 3: the civic posting tick draws from the shared seeded RNG, which shifts every later random stream, so a season started under version 2 would not replay under the new rules. The server closes the running season on the first deploy and starts a new one; the snapshot upgrade (1 to 2) adds an empty board and schedules the first civic tick, so older snapshots still load.
+
+### The rules
+
+- **Boards:** each hub shows at most 4 open contracts (`balance.contracts.boardCap`). Live means open or taken. An untaken offer lapses after 24 h (`offerHours`).
+- **Civic jobs:** every 3 h each hub with room (fewer than 4 live jobs and fewer than 3 civic ones, `civicCap`) may get a job drawn from the seeded RNG: 10 to 40 units (steps of 5) of a good, reward 130 percent of the good's reference value. The city pays from nowhere and consumes the goods; both are shown in the event data. These give newcomers early income.
+- **Player jobs:** `{ type: 'contract.post', hub, good, qty, reward, hours }`. The reward (whole credits) is escrowed at once. Quantity 5 to 150; reward 50 to 300 percent of the reference value; the `hours` field is the delivery window (6 to 18). At most 2 posted at a time. Merchant bots post too.
+- **Taking:** `{ type: 'contract.take', contractId }` locks a deposit of 10 percent of the reward. One taker per contract, at most 2 taken at a time, and not your own. The poster (or the city) sets a delivery window of 6 to 18 h, which starts running when the job is taken.
+- **Delivering:** a normal haul with `contractId`, whose `to` is the contract's hub and whose cargo is only the contract's good (`wrong_cargo`). Only the taker can haul for it (`not_taker`). Partial deliveries count and pay pro rata until the quantity is met; extra goods go to the taker's hub stash. The poster's hub stash gets the accepted goods (civic goods are consumed). On completion the deposit is returned and the taker scores.
+- **Late:** at the deadline the contract fails. The deposit is forfeited to the poster (burnt for civic jobs), the unpaid part of the escrow goes back to the poster, and anything already paid stays paid.
+- **Cancel:** `{ type: 'contract.cancel', contractId }` by the poster while untaken refunds the escrow. Untaken contracts expire the same way.
+- **Raids:** a contract haul is a haul like any other: it can be ambushed and escorted, and what is stolen or destroyed does not count towards the quantity.
+- **Score:** 1 point per 50 credits of reward, on completion only, capped at 12 points per player per day. Standings carry `contractScore` and `contractMs`.
+- **Fog:** every board and the taker's name are public. Progress on someone else's contract (`delivered`, `paid`) is hidden (null in the view) unless you are the poster or taker. `contract.posted` is a public event only when notable (reward of 1000 credits or more); otherwise only the poster and anyone with the hub in sight see it. The other contract events go to the poster and taker, and to anyone with the hub in sight.
+- **Errors:** `unknown_contract`, `contract_taken`, `contract_closed`, `not_taker`, `own_contract`, `board_full`, `too_many_contracts`, `bad_reward`, `wrong_cargo`; `bad_window`, `bad_quantity`, `insufficient_credits` and `not_owner` are reused.
+
+### Views and events
+
+`PlayerView.contracts` is a map from contract id to the contract (hub, good, qty, reward, deposit, civic, poster, taker, state, due time, plus `delivered` and `paid` in atoms, or null if hidden). Events: `contract.posted`, `.taken`, `.progress`, `.done`, `.failed`, `.expired`, each with whole credits and units in its data; `arrived` gains `contractId`.
+
+### Bots
+
+- Merchants take contracts (up to 40 units, trips up to 60 percent of the deadline, prefer the best pay), escort contract hauls, and post a 20-unit supply contract at 110 percent of the reference value when they hold at least 4 times the reward in credits.
+- Turtles take small nearby jobs (up to 20 units, trips up to 50 percent of the deadline).
+- Raiders never take contracts, but prefer streets that lead to hubs with active contracts.
+- All of it goes through the normal order path.
+
+### Pros and cons, in plain words
+
+- Taking a job: a steady income for a hauler and early money for a newcomer, but the trip is on the clock and the deposit is lost if you are late or raided short.
+- Posting a job: you get goods delivered without hauling them yourself, but the reward is locked up until it ends, and a failure refunds you with only the deposit as compensation.
+- Hauling for a contract is a predictable trip to a known hub, which makes it a target. An escort halves the risk, at the price of a second crew.
+- The daily score cap stops contracts from becoming the only way to win; merchants get a real path to score without an army.
+
+### Harness results (`node scripts/sim-seeds.mjs 1 8`)
+
+The harness test now evaluates seeds 1 to 8 (it used 5), because five seeds are too noisy to judge the raider lead. Before is the raids version, after is with contracts.
+
+| Bot type | Districts per player, before | after | Credits at 48 h, before | after | Score per player, before | after |
+| -------- | ---------------------------- | ----- | ----------------------- | ----- | ------------------------ | ----- |
+| merchant | 3.44                         | 3.19  | 843                     | 1716  | 461.7                    | 445.3 |
+| raider   | 3.75                         | 3.94  | 430                     | 417   | 543.9                    | 562.1 |
+| turtle   | 3.25                         | 3.44  | 231                     | 272   | 485.7                    | 521.9 |
+
+Trade per player: merchant 47.7 (47.7 before), turtle 59.5 (62.5), raider 0. The raider lead over the best other type is 1.08x (1.12x before), under the 1.4x limit. Per player: merchants take 3.75 contracts, complete 3.38 and fail 0.31; turtles take 2.25, complete 1.81 and fail 0.44; raiders take none. Per season: 49.6 civic and 2.8 player contracts posted, 34.8 expired untaken or cancelled. Raids per season 21.3, success 59 percent (63 before), 14.5 hits and 10.1 repelled. Invariant problems are 0; the harness also checks that every reward is paid or refunded exactly, and that a contract haul's arrived cargo equals what was accepted plus the excess. Merchants hold double the credits at 48 h, which is the early income the design asked for. Numbers are in `balance.contracts`.
+
 ## Markets
 
 - **One order book per hub per good:** price-time priority, and orders fill instantly when they cross.
