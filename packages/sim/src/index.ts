@@ -11,6 +11,7 @@ export type {
   SeenConvoyView,
   SeenDistrictView,
   SiegeView,
+  SettlingView,
 } from './fog.js';
 export { hashState, canonicalJson } from './hash.js';
 export { addTradeScore, inFinale, settleScore, standings } from './score.js';

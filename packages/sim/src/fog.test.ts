@@ -177,3 +177,46 @@ describe('scouting', () => {
     expect(JSON.stringify(view)).not.toContain(String(toAtoms(4242)));
   });
 });
+
+describe('frontier and settling in the view', () => {
+  it('marks open neutral plots in sight and shows who is settling, without leaking private data', () => {
+    const s = world();
+    const plot = s.districts['d1_1'];
+    if (plot) {
+      plot.owner = 'neutral';
+      plot.frontier = 'open';
+    }
+    let seen = viewFor(s, 'p1').districts['d1_1'];
+    expect(seen?.relation).toBe('visible');
+    if (seen?.relation === 'visible') {
+      expect(seen.open).toBe(true);
+      expect(seen.settling).toBeNull();
+    }
+    if (plot) {
+      plot.settling = {
+        owner: 'p2',
+        crewIds: ['secret-crew'],
+        startedMs: 0,
+        completesAtMs: 99_000,
+      };
+    }
+    const json = JSON.stringify(viewFor(s, 'p1'));
+    seen = viewFor(s, 'p1').districts['d1_1'];
+    if (seen?.relation === 'visible') {
+      expect(seen.settling).toEqual({ owner: 'p2', completesAtMs: 99_000 });
+    }
+    expect(json).not.toContain('secret-crew');
+    expect(json).not.toContain('startedMs');
+    // Out of sight, a plot is only a memory: no frontier or settling detail.
+    const far = viewFor(s, 'p1').districts['d0_0'];
+    expect(far?.relation).toBe('remembered');
+    expect(far).not.toHaveProperty('open');
+    expect(far).not.toHaveProperty('settling');
+  });
+
+  it('does not call a claimed or surveyed plot open', () => {
+    const s = world();
+    const view = viewFor(s, 'p1').districts['d1_1'];
+    if (view?.relation === 'visible') expect(view.open).toBe(false);
+  });
+});

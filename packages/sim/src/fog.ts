@@ -135,6 +135,15 @@ export interface SeenDistrictView {
   /** Crews present by owner, as counts (their strength stays hidden). */
   presence: Record<Id, number>;
   siege: SiegeView | null;
+  /** An unclaimed plot that anyone can settle: neutral and open (not surveying, not built). */
+  open: boolean;
+  /** A settlement under way here, and who is making it (public inside your sight). */
+  settling: SettlingView | null;
+}
+
+export interface SettlingView {
+  owner: Id;
+  completesAtMs: number;
 }
 
 export interface RememberedDistrictView {
@@ -257,6 +266,10 @@ export function viewFor(state: GameState, playerId: Id): PlayerView {
         protected: d.protectedUntilMs !== undefined && d.protectedUntilMs > state.nowMs,
         presence,
         siege: sieges(d.id),
+        open: d.owner === 'neutral' && d.frontier === 'open',
+        settling: d.settling
+          ? { owner: d.settling.owner, completesAtMs: d.settling.completesAtMs }
+          : null,
       };
     } else {
       districts[d.id] = { relation: 'remembered', ...base, lastKnownOwner: memory[d.id] ?? null };

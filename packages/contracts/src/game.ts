@@ -161,6 +161,10 @@ export const districtViewSchema = z.discriminatedUnion('relation', [
     /** Crews present by owner, as counts. */
     presence: z.record(idSchema, z.number()),
     siege: siegeViewSchema.nullable(),
+    /** An unclaimed plot anyone can settle. */
+    open: z.boolean(),
+    /** A settlement under way: who, and when it completes. */
+    settling: z.object({ owner: idSchema, completesAtMs: z.number() }).nullable(),
   }),
   z.object({
     relation: z.literal('remembered'),
