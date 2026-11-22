@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { GoodName } from '@nexum/contracts';
+import type { ContractView, GoodName } from '@nexum/contracts';
+import { remainingUnits } from './contracts';
 import type { PlayerView as SimView } from '@nexum/sim';
 import { Tabs } from '../ui';
 import { MapScreen } from '../map/MapScreen';
@@ -36,7 +37,7 @@ export function GameScreen() {
   const [chosenDrawer, setDrawer] = useState<Drawer>('map');
   const [route, setRoute] = useState<readonly string[] | null>(null);
   const [panel, setPanel] = useState<
-    | { kind: 'market'; hub: string; good?: GoodName }
+    | { kind: 'market'; hub: string; good?: GoodName; tab?: 'contracts' }
     | { kind: 'report'; seq: number }
     | { kind: 'dossier'; playerId: string }
     | null
@@ -108,6 +109,19 @@ export function GameScreen() {
     if (!steps.openedMarket) updateSteps({ openedMarket: true });
     setPanel({ kind: 'market', hub, ...(good ? { good } : {}) });
   };
+  /** Opens a haul card for a contract you took: its hub, its good, and what is still owed. */
+  const deliver = (c: ContractView) => {
+    setPanel(null);
+    store.dispatch({
+      type: 'draft',
+      draft: {
+        kind: 'haul',
+        districtId: c.hub,
+        contractId: c.id,
+        cargo: { [c.good]: remainingUnits(c) },
+      },
+    });
+  };
   const closePanel = () => {
     setPanel(null);
   };
@@ -145,6 +159,10 @@ export function GameScreen() {
       onFly={fly}
       onMarket={(hub) => {
         openMarket(hub);
+      }}
+      onDeliver={deliver}
+      onBoard={(hub) => {
+        setPanel({ kind: 'market', hub, tab: 'contracts' });
       }}
       onRival={(playerId) => {
         setPanel({ kind: 'dossier', playerId });
@@ -206,6 +224,12 @@ export function GameScreen() {
                     hint: 'Click a hub, or a resource chip at the top, to buy and sell.',
                     done: steps.openedMarket,
                   },
+                  {
+                    id: 'contract',
+                    label: 'Take a contract',
+                    hint: 'Open a hub market, pick the CONTRACTS tab and take a job.',
+                    done: Object.values(view.contracts).some((c) => c.taker === view.playerId),
+                  },
                 ]}
                 onDismiss={() => {
                   updateSteps({ dismissed: true });
@@ -259,6 +283,10 @@ export function GameScreen() {
                 feed={state.feed}
                 hub={panel.hub}
                 good={panel.good}
+                tab={panel.tab}
+                names={state.names}
+                onContract={(order) => session.placeOrder(order)}
+                onDeliver={deliver}
                 onPlace={(order) => session.placeOrder(order)}
                 onCancel={(orderId) => {
                   void session.placeOrder({ type: 'market.cancel', orderId });

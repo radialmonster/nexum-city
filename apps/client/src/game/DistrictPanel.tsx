@@ -1,4 +1,4 @@
-import type { DistrictView, PlayerView } from '@nexum/contracts';
+import type { ContractView, DistrictView, PlayerView } from '@nexum/contracts';
 import { balance, toUnits } from '@nexum/sim';
 import { Bar, Button, Chip, Gauge, Panel, StanceSwitch, Tag, type Tone } from '../ui';
 import { cx } from '../ui/util';
@@ -10,14 +10,17 @@ import {
   ownDistricts,
   isOwn,
   KIND_GOOD,
+  NEARLY_FULL,
   nearby,
   productionPerHour,
+  storageFill,
   toKitStance,
   warehouseCapacity,
   type OwnDistrict,
 } from './derive';
 import { crewName, empireSummary, formatEta, type CrewNames } from './derive';
 import { formatUnits } from './feed';
+import { MyContracts } from './MyContracts';
 import styles from './DistrictPanel.module.css';
 
 export const GOOD_TONE: Readonly<Record<(typeof GOOD_KEYS)[number], Tone>> = {
@@ -39,6 +42,10 @@ export interface DistrictPanelProps {
   readonly onMarket?: ((hubId: string) => void) | undefined;
   /** Opens the dossier of a rival. */
   readonly onRival?: ((playerId: string) => void) | undefined;
+  /** Opens the haul card for a contract you took. */
+  readonly onDeliver?: ((contract: ContractView) => void) | undefined;
+  /** Opens a hub's contracts board. */
+  readonly onBoard?: ((hubId: string) => void) | undefined;
 }
 
 const relationLabel = (d: DistrictView, me: string): string => {
@@ -59,9 +66,14 @@ export function DistrictPanel({
   onFly,
   onMarket,
   onRival,
+  onDeliver,
+  onBoard,
 }: DistrictPanelProps) {
   const d = districtId ? view.districts[districtId] : undefined;
-  if (!d) return <Empire view={view} onFly={onFly} />;
+  if (!d)
+    return (
+      <Empire view={view} nowMs={nowMs} onFly={onFly} onDeliver={onDeliver} onBoard={onBoard} />
+    );
   return (
     <Panel
       title={d.name}
@@ -97,6 +109,7 @@ function status(d: OwnDistrict, nowMs: number): { label: string; tone: Tone }[] 
     out.push({ label: 'PROTECTED', tone: 'ok' });
   if (d.construction) out.push({ label: 'BUILDING', tone: 'accentAlt' });
   if (d.overflowing) out.push({ label: 'FULL', tone: 'warn' });
+  else if (storageFill(d) >= NEARLY_FULL) out.push({ label: 'STORAGE NEARLY FULL', tone: 'warn' });
   if (d.frontier !== 'built') out.push({ label: d.frontier.toUpperCase(), tone: 'special' });
   if (out.length === 0) out.push({ label: 'QUIET', tone: 'accent' });
   return out;
@@ -364,7 +377,13 @@ function Nearby({
 }
 
 /** Nothing selected: what the whole empire adds up to, and a way to jump to each district. */
-function Empire({ view, onFly }: Pick<DistrictPanelProps, 'view' | 'onFly'>) {
+function Empire({
+  view,
+  nowMs,
+  onFly,
+  onDeliver,
+  onBoard,
+}: Pick<DistrictPanelProps, 'view' | 'nowMs' | 'onFly' | 'onDeliver' | 'onBoard'>) {
   const e = empireSummary(view);
   const own = ownDistricts(view);
   return (
@@ -391,6 +410,9 @@ function Empire({ view, onFly }: Pick<DistrictPanelProps, 'view' | 'onFly'>) {
           <span className={styles['status']} data-tone="danger">
             {e.besieged} UNDER SIEGE
           </span>
+        )}
+        {onDeliver && (
+          <MyContracts view={view} nowMs={nowMs} onDeliver={onDeliver} onBoard={onBoard} />
         )}
         <div className={styles['block']}>
           <span className={styles['cap']}>YOUR DISTRICTS</span>

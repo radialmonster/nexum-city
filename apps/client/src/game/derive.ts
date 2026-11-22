@@ -32,6 +32,15 @@ export function warehouseCapacity(d: OwnDistrict): number {
   return balance.warehouse.baseCapacity + depot * balance.warehouse.depotBonusPerLevel;
 }
 
+/** How full a warehouse is, 0 to 1 and beyond when it overflows. */
+export function storageFill(d: OwnDistrict): number {
+  const held = GOOD_KEYS.reduce((n, g) => n + toUnits(d.warehouse[g]), 0);
+  return held / warehouseCapacity(d);
+}
+
+/** The warehouse is this full (0 to 1) before the "nearly full" hint shows. */
+export const NEARLY_FULL = 0.9;
+
 /** Units per hour of the district's main good, with the workshop bonus. */
 export function productionPerHour(d: OwnDistrict): number {
   if (d.kind === 'hub' || d.kind === 'residential' || d.frontier !== 'built') return 0;

@@ -167,6 +167,8 @@ export const neonSize = {
   spark: 90,
   radial: 380,
   toggle: 160,
+  /** The narrowest a form field gets before a row of fields wraps. */
+  field: 150,
   column: 380,
   page: 2400,
 } satisfies Record<string, number>;

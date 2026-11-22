@@ -1,0 +1,147 @@
+import type { ContractView, GoodName, PlayerView } from '@nexum/contracts';
+import { balance, toAtoms, toUnits } from '@nexum/sim';
+import { crewName, formatHours, whoIs, type CrewNames } from './derive';
+import { formatUnits } from './feed';
+
+const C = balance.contracts;
+const HOUR_MS = 3_600_000;
+
+/** The contracts on one hub's board, nearest deadline first (open ones by offer end). */
+export function hubBoard(view: PlayerView, hub: string): ContractView[] {
+  return Object.values(view.contracts)
+    .filter((c) => c.hub === hub)
+    .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+}
+
+/** Contracts you have taken and not yet finished. */
+export const myTaken = (view: PlayerView): ContractView[] =>
+  Object.values(view.contracts)
+    .filter((c) => c.taker === view.playerId)
+    .sort((a, b) => a.dueMs - b.dueMs);
+
+/** Contracts you posted that are still live. */
+export const myPosted = (view: PlayerView): ContractView[] =>
+  Object.values(view.contracts).filter((c) => c.poster === view.playerId);
+
+/** Whole credits. */
+export const creditsOf = (atoms: number): number => Math.round(toUnits(atoms));
+
+/** Units of the good still to bring. Only known for your own contracts, else the full amount. */
+export function remainingUnits(c: ContractView): number {
+  return Math.max(0, c.qty - Math.floor(toUnits(c.delivered ?? 0)));
+}
+
+/** Milliseconds left on the deadline (taken) or the offer (open). */
+export function msLeft(c: ContractView, nowMs: number): number {
+  return Math.max(0, (c.status === 'taken' ? c.dueMs : c.offerEndsMs) - nowMs);
+}
+
+export const timeLeft = (c: ContractView, nowMs: number): string =>
+  formatHours(msLeft(c, nowMs) / HOUR_MS);
+
+const hubName = (view: PlayerView, hub: string): string => view.districts[hub]?.name ?? hub;
+
+/** The plain-language sentence for a contract. */
+export function contractSentence(view: PlayerView, c: ContractView): string {
+  return (
+    `Bring ${formatUnits(c.qty)} ${c.good} to ${hubName(view, c.hub)} within ${String(c.hours)} h. ` +
+    `Pays ${formatUnits(creditsOf(c.reward))} cr. ` +
+    `Deposit ${formatUnits(creditsOf(c.deposit > 0 ? c.deposit : depositFor(c.reward)))} cr, lost if late.`
+  );
+}
+
+/** The deposit a taker puts up (10% of the reward, rounded down). */
+export const depositFor = (rewardAtoms: number): number =>
+  Math.floor((rewardAtoms * C.depositPercent) / 100);
+
+/** Who posted it, for display. */
+export const posterName = (names: CrewNames, me: string, c: ContractView): string =>
+  c.poster === 'civic' ? 'The city' : whoIs(names, me, c.poster);
+
+export const takerName = (names: CrewNames, me: string, c: ContractView): string =>
+  c.taker === null ? 'nobody yet' : c.taker === me ? 'you' : crewName(names, c.taker);
+
+/** What the job is worth in goods at the hub's city price, in whole credits. */
+export function referenceCredits(
+  view: PlayerView,
+  hub: string,
+  good: GoodName,
+  qty: number,
+): number {
+  const cents = view.markets[hub]?.[good].refCents ?? balance.market.baseRefCents[good];
+  return Math.round((qty * cents) / balance.market.priceScale);
+}
+
+export interface PostDraft {
+  readonly hub: string;
+  readonly good: GoodName;
+  readonly qty: string;
+  readonly reward: string;
+  readonly hours: string;
+}
+
+export type PostCheck =
+  | {
+      readonly ok: true;
+      readonly qty: number;
+      readonly reward: number;
+      readonly hours: number;
+      /** The credits set aside until the job ends (the reward). */
+      readonly escrow: number;
+    }
+  | { readonly ok: false; readonly message: string };
+
+const whole = (s: string): number | null => {
+  const t = s.trim();
+  if (!/^\d+$/.test(t)) return null;
+  return Number(t);
+};
+
+/** Mirrors the server's `validatePost`, so the form can say what is wrong before sending. */
+export function checkPost(view: PlayerView, d: PostDraft): PostCheck {
+  const qty = whole(d.qty);
+  if (qty === null || qty < C.minQty || qty > C.maxQty) {
+    return {
+      ok: false,
+      message: `Ask for between ${String(C.minQty)} and ${String(C.maxQty)} whole units.`,
+    };
+  }
+  const reward = whole(d.reward);
+  const ref = referenceCredits(view, d.hub, d.good, qty);
+  const lo = Math.max(1, Math.ceil((ref * C.minRewardPercent) / 100));
+  const hi = Math.floor((ref * C.maxRewardPercent) / 100);
+  if (reward === null || reward < lo || reward > hi) {
+    return {
+      ok: false,
+      message: `Offer between ${formatUnits(lo)} and ${formatUnits(hi)} credits. The goods are worth about ${formatUnits(ref)}.`,
+    };
+  }
+  const hours = whole(d.hours);
+  if (hours === null || hours < C.minHours || hours > C.maxHours) {
+    return {
+      ok: false,
+      message: `Give the taker between ${String(C.minHours)} and ${String(C.maxHours)} whole hours.`,
+    };
+  }
+  if (myPosted(view).length >= C.maxPosted) {
+    return { ok: false, message: `You can have ${String(C.maxPosted)} jobs posted at once.` };
+  }
+  if (hubBoard(view, d.hub).length >= C.boardCap) {
+    return { ok: false, message: 'This board is full. Try again when a job ends.' };
+  }
+  if (view.self.credits < toAtoms(reward)) {
+    return { ok: false, message: `You need ${formatUnits(reward)} credits to set aside.` };
+  }
+  return { ok: true, qty, reward, hours, escrow: reward };
+}
+
+/** Why you cannot take this contract right now, or null. */
+export function takeBlocker(view: PlayerView, c: ContractView): string | null {
+  if (c.status !== 'open') return 'Already taken.';
+  if (c.poster === view.playerId) return 'This is your own job.';
+  if (myTaken(view).length >= C.maxTaken) {
+    return `You can hold ${String(C.maxTaken)} jobs at once.`;
+  }
+  if (view.self.credits < depositFor(c.reward)) return 'Not enough credits for the deposit.';
+  return null;
+}

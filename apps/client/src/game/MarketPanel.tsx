@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { toUnits } from '@nexum/sim';
-import type { GoodName, PlayerView, FeedItem } from '@nexum/contracts';
+import type { ContractView, GoodName, PlayerView, FeedItem } from '@nexum/contracts';
 import { Button, Panel, Sparkline, Tabs } from '../ui';
 import { vars } from '../ui/util';
-import { crewsAt, GOOD_KEYS } from './derive';
+import { ContractsBoard } from './ContractsBoard';
+import { crewsAt, GOOD_KEYS, type CrewNames } from './derive';
 import { GOOD_TONE } from './DistrictPanel';
 import { formatUnits } from './feed';
 import styles from './MarketPanel.module.css';
@@ -38,7 +39,27 @@ export interface MarketPanelProps {
   readonly onClose: () => void;
   /** Opens a haul order that carries your stash from this hub to one of your districts. */
   readonly onHaulHome?: ((hub: string) => void) | undefined;
+  /** Crew names, for the contracts tab. */
+  readonly names?: CrewNames | undefined;
+  /** Sends a contract order; without it the contracts tab is hidden. */
+  readonly onContract?: ((order: ContractOrder) => Promise<boolean>) | undefined;
+  /** Opens the haul card for a contract you took. */
+  readonly onDeliver?: ((contract: ContractView) => void) | undefined;
+  /** Starts on this tab. */
+  readonly tab?: 'market' | 'contracts' | undefined;
 }
+
+type ContractOrder =
+  | {
+      type: 'contract.post';
+      hub: string;
+      good: GoodName;
+      qty: number;
+      reward: number;
+      hours: number;
+    }
+  | { type: 'contract.take'; contractId: string }
+  | { type: 'contract.cancel'; contractId: string };
 
 function Rows({ rows, side, max }: { rows: readonly BookRow[]; side: Side; max: number }) {
   if (rows.length === 0) return <p className={styles['none']}>Nothing here.</p>;
@@ -71,7 +92,12 @@ export function MarketPanel({
   onCancel,
   onClose,
   onHaulHome,
+  names,
+  onContract,
+  onDeliver,
+  tab: initialTab,
 }: MarketPanelProps) {
+  const [tab, setTab] = useState<'market' | 'contracts'>(initialTab ?? 'market');
   const [good, setGood] = useState<GoodName>(initial ?? 'parts');
   const [side, setSide] = useState<Side>('buy');
   const [price, setPrice] = useState('');
@@ -113,7 +139,36 @@ export function MarketPanel({
 
   return (
     <Panel title="Market" tag={hubName.toUpperCase()} className={styles['panel']}>
-      <div className={styles['stack']}>
+      {onContract && (
+        <Tabs
+          label="Hub"
+          value={tab}
+          onChange={(id) => {
+            setTab(id === 'contracts' ? 'contracts' : 'market');
+          }}
+          tabs={[
+            { id: 'market', label: 'MARKET' },
+            { id: 'contracts', label: 'CONTRACTS' },
+          ]}
+        />
+      )}
+      {onContract && tab === 'contracts' && (
+        <div className={styles['stack']}>
+          <ContractsBoard
+            view={view}
+            hub={hub}
+            names={names ?? {}}
+            onPost={onContract}
+            onTake={(contractId) => onContract({ type: 'contract.take', contractId })}
+            onCancel={(contractId) => onContract({ type: 'contract.cancel', contractId })}
+            onDeliver={onDeliver ?? (() => undefined)}
+          />
+          <div className={styles['actions']}>
+            <Button onClick={onClose}>CLOSE</Button>
+          </div>
+        </div>
+      )}
+      <div className={styles['stack']} hidden={onContract !== undefined && tab === 'contracts'}>
         <Tabs
           label="Good"
           value={good}

@@ -14,7 +14,9 @@ import {
   readyNodes,
   seatsFor,
 } from './derive';
+import { contractSentence } from './contracts';
 import { formatUnits } from './feed';
+import { messageFor } from './messages';
 import { siegeOdds } from './odds';
 import type { OrderDraft } from './store';
 import styles from './OrderCard.module.css';
@@ -109,6 +111,7 @@ export function buildOrder(draft: OrderDraft, pick: Pick): OrderBody | null {
             crewIds: [...pick.crewIds],
             to: draft.districtId,
             cargo,
+            ...(draft.contractId ? { contractId: draft.contractId } : {}),
           }
         : null;
     }
@@ -132,6 +135,7 @@ export function carrierKindOf(view: PlayerView, id: string | null): CarrierKind 
 /** The confirm card for an order opened from the map's radial menu. */
 export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: OrderCardProps) {
   const target = view.districts[draft.districtId];
+  const contract = draft.contractId ? view.contracts[draft.contractId] : undefined;
   const nodes = useMemo(
     () =>
       draft.kind === 'build'
@@ -144,7 +148,7 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
   );
   const [picked, setPicked] = useState<readonly string[] | null>(null);
   const [carrierId, setCarrierId] = useState<string | null>(null);
-  const [cargo, setCargo] = useState<Record<string, number>>({});
+  const [cargo, setCargo] = useState<Record<string, number>>({ ...draft.cargo });
   const [building, setBuilding] = useState<Pick['building']>('workshop');
   const [busy, setBusy] = useState(false);
   const [streetIdx, setStreetIdx] = useState(0);
@@ -264,6 +268,8 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
   } else if (draft.kind === 'haul') {
     if (cargoTotal === 0) blocker = 'Choose something to carry.';
     else if (cargoTotal > carry) blocker = `This carrier holds ${String(carry)} units.`;
+    else if (contract && GOOD_KEYS.some((g) => g !== contract.good && (cargo[g] ?? 0) > 0))
+      blocker = messageFor('wrong_cargo');
     else if (stock && GOOD_KEYS.some((g) => toUnits(stock[g]) < (cargo[g] ?? 0)))
       blocker = 'The source warehouse does not hold that much.';
   }
@@ -436,6 +442,11 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
                   ))}
                 </div>
               </fieldset>
+            )}
+            {contract && (
+              <p className={styles['line']} data-testid="contract-line">
+                For contract: {contractSentence(view, contract)}
+              </p>
             )}
             {draft.kind === 'haul' && (
               <p className={styles['line']} data-testid="escort-hint">

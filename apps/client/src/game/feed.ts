@@ -1,5 +1,6 @@
 import type { FeedItem, PlayerView } from '@nexum/contracts';
 import type { Tone } from '../ui';
+import { contractIdOf, describeContract } from './contractFeed';
 import { streetEnds, whoIs, type CrewNames } from './derive';
 
 /** One line of the "While you were away" column. */
@@ -286,7 +287,7 @@ export function describeEvent(
         kind: 'FULL',
         glyph: '!',
         tone: 'warn',
-        text: `${formatUnits(amount)} units were lost at ${name(placeId)}.`,
+        text: `Storage full at ${name(placeId)}: ${formatUnits(amount)} units spoiled. Build storage or sell sooner.`,
       };
     }
     case 'protection.ended':
@@ -363,7 +364,7 @@ export function describeEvent(
       };
     }
     default:
-      return null;
+      return event.kind.startsWith('contract.') ? describeContract(item, view, names) : null;
   }
 }
 
@@ -384,7 +385,7 @@ const num2 = (v: unknown): number => (typeof v === 'number' ? v : 0);
  * The feed column's entries, newest first. Combat rounds are not lines of their own: the latest
  * round of a siege that is still running is folded into its `siege.started` card, which then
  * sits at the top as one running entry. A card is "running" until a capture or break closes it.
- * Likewise an ambush's end card is folded into its hit or repelled card unless loot came home.
+ * A contract's events fold into one card showing its latest state. Likewise an ambush's end card is folded into its hit or repelled card unless loot came home.
  */
 export function buildFeedEntries(
   view: PlayerView,
@@ -395,8 +396,16 @@ export function buildFeedEntries(
   const out: FeedEntry[] = [];
   /** district id -> index in `out` of the siege card still open there */
   const open = new Map<string, number>();
+  /** contract id -> seq of its latest event that makes a card: older ones fold into it */
+  const lastContract = new Map<string, number>();
+  for (const item of feed) {
+    const id = contractIdOf(item);
+    if (id !== undefined && describeContract(item, view, names)) lastContract.set(id, item.seq);
+  }
   for (const item of feed) {
     const { event } = item;
+    const cid = contractIdOf(item);
+    if (cid !== undefined && lastContract.get(cid) !== item.seq) continue;
     const place = event.districts[0];
     if (event.kind === 'combat.round') {
       const i = place === undefined ? undefined : open.get(place);

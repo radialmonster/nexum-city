@@ -122,7 +122,7 @@ export function timelineEntries(
           ? `AMBUSH ${streetEnds(name(m.raid.a), name(m.raid.b))}, ends in ${shortDuration(m.arriveMs - nowMs)}`
           : m.kind === 'raid' && m.raid
             ? `RAID ${streetEnds(name(m.raid.a), name(m.raid.b))}, ETA ${shortDuration(m.arriveMs - nowMs)}`
-            : `${returning ? 'RETURN' : (verb[m.kind] ?? 'MOVE')} to ${name(target)}  ETA ${shortDuration(m.arriveMs - nowMs)}`,
+            : `${returning ? 'RETURN' : m.kind === 'haul' && m.contractId ? 'CONTRACT HAUL' : (verb[m.kind] ?? 'MOVE')} to ${name(target)}  ETA ${shortDuration(m.arriveMs - nowMs)}`,
       state: m.kind === 'siege' && !returning ? 'hot' : 'running',
       recallId: returning ? null : m.id,
       districtId: target,

@@ -23,6 +23,10 @@ export interface OrderDraft {
   readonly districtId: string;
   /** Pre-picks where the crews set out from (e.g. a hub, to haul its stash home). */
   readonly from?: string;
+  /** A haul for a contract you took: tags the order and locks the cargo to the contract's good. */
+  readonly contractId?: string;
+  /** Pre-filled cargo, in whole units by good. */
+  readonly cargo?: Readonly<Record<string, number>>;
 }
 
 export type SessionStatus = 'loading' | 'anon' | 'ready';
