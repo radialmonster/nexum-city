@@ -10,7 +10,7 @@ Live status for [`plan.md`](plan.md). Update this file in the same commit as the
 - `blocked`: add the reason
 - `owner`: needs the owner's decision
 
-**Current phase:** A (fresh public repository)
+**Current phase:** 0 (skeleton, theme and UI kit). A5 is still open.
 
 ## Phase A: Fresh public repository
 
@@ -24,15 +24,15 @@ Live status for [`plan.md`](plan.md). Update this file in the same commit as the
 
 ## Phase 0: Skeleton, theme and UI kit
 
-| ID  | Task                                                                                                                                      | Status | Notes                   |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------ | ----------------------- |
-| 01  | Lean CI workflow (`npm run check`, cached); root npm workspaces, TypeScript project references, ESLint, Prettier, Vitest, `npm run check` | todo   |                         |
-| 02  | `packages/theme`: tokens, CSS variable generator, Pixi palette, `--s` scale rules, high-contrast set                                      | todo   | rule #1                 |
-| 03  | Lint rule: no raw colour literals or px font sizes outside `packages/theme`                                                               | todo   | rule #1                 |
-| 04  | `apps/client` (Vite and React), with tokens injected at boot and live theme switching                                                     | todo   |                         |
-| 05  | UI kit components from the mockup, plus the `/kit` gallery page                                                                           | todo   | screenshot at 2560×1440 |
-| 06  | `apps/server`: minimal Node server that serves the client, plus `/health`                                                                 | todo   | Hono by default         |
-| 07  | Dockerfile (multi-stage, small image) and `docker-compose.yml` (memory limit, SQLite volume); `docker compose up` works locally           | todo   |                         |
+| ID  | Task                                                                                                                                      | Status | Notes                          |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------ | ------------------------------ |
+| 01  | Lean CI workflow (`npm run check`, cached); root npm workspaces, TypeScript project references, ESLint, Prettier, Vitest, `npm run check` | done   | 2026-11-22, `1b88308`          |
+| 02  | `packages/theme`: tokens, CSS variable generator, Pixi palette, `--s` scale rules, high-contrast set                                      | done   | 2026-11-22, `1b88308`; rule #1 |
+| 03  | Lint rule: no raw colour literals or px font sizes outside `packages/theme`                                                               | done   | 2026-11-22, `1b88308`; rule #1 |
+| 04  | `apps/client` (Vite and React), with tokens injected at boot and live theme switching                                                     | todo   |                                |
+| 05  | UI kit components from the mockup, plus the `/kit` gallery page                                                                           | todo   | screenshot at 2560×1440        |
+| 06  | `apps/server`: minimal Node server that serves the client, plus `/health`                                                                 | todo   | Hono by default                |
+| 07  | Dockerfile (multi-stage, small image) and `docker-compose.yml` (memory limit, SQLite volume); `docker compose up` works locally           | todo   |                                |
 
 ## Phase 1: Simulation core
 
@@ -106,3 +106,4 @@ Live status for [`plan.md`](plan.md). Update this file in the same commit as the
 
 - 2026-11-22: Old repo renamed to the private `nexum-city-prototype`. This public repo was started fresh so Actions minutes are unlimited and the private docs stay private.
 - 2026-11-22: Plan and tracker created. Owner approved: rewrite in this repo, keep docs and ADRs, archive the prototype under a tag, tear down Cloudflare (it has no users), host with Docker Compose on the FlyWP server. FlyWP can deploy a compose app straight from the GitHub repo, so `docker-compose.yml` lives at the repo root.
+- 2026-11-22: Phase 0 tasks 01–03 done (`1b88308`). Root npm workspace with strict TypeScript project references, ESLint, Prettier, Vitest and `npm run check`; CI runs it on Node 22. `packages/theme` has the `neon` and `highContrast` token sets, the CSS variable and `--s` scale generators and the Pixi palette. The `nexum/no-raw-colors` ESLint rule (`tools/eslint-plugin-nexum`) and stylelint reject raw colours and px font sizes outside the theme. TypeScript is pinned to 6.0.x because typescript-eslint does not support TypeScript 7 yet.

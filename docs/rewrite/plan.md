@@ -7,7 +7,7 @@ How we turn the design (`docs/design/rewrite-design.md`) and the mockup
 
 - **Owner:** radialmonster
 - **Started:** 2026-11-22
-- **Status:** Phase A (fresh public repository)
+- **Status:** Phase 0 (skeleton, theme and UI kit); Phase A task A5 is still open
 
 ## Goal
 
