@@ -86,7 +86,7 @@ A player who checks in twice a day and queues sensible orders gets about as much
 - Streets glow faintly, and traffic pulses along routes that are in use.
 - Convoys are small glowing icons moving along the streets, each showing an ETA tag. Each carrier type has its own silhouette, coloured by owner: a cluster of dots for On foot, a short wedge for a Van, a cab and trailer for a Hauler, a chevron with speed streaks for a Runner.
 - An incoming enemy convoy shows its remaining route as a red dotted line ending in an ETA tag on the district it is heading for. The threatened district's outline pulses red.
-- A raid in progress shows on the street where it happens: the stopped carrier, the raiders, a red pulse and a short callout naming both sides and the cargo at risk.
+- Ambushes show as red dashed streets (your own in your faction colour with a countdown tag); when a raid resolves the street flashes with a short callout naming both sides, and the feed card opens a battle report.
 - A siege is a ring around the district that fills clockwise, with a spark at its leading end.
 - Production shows as small particles flowing into each district's warehouse gauge. A full warehouse blinks amber.
 - Fog of war has three levels:

@@ -99,7 +99,7 @@ There is a single capture bar per district, from 0 to 1.
 
 ## Raids and escorts (M2)
 
-Built in task 71 (sim only: contracts, server validation and bots are done; there is no client UI yet, see tracker rows 72 to 76). `RULES_VERSION` is 2. A follow-up (task 71b) changed the rules below without bumping it: nothing containing version 2 has been deployed (the old hosting was torn down and the game is local and dev only), so no live season has to be closed. Bump it on the first deploy that follows any further rule change.
+Built in task 71 (sim only: contracts, server validation and bots are done; the raids client UI is done (tracker row 72); later raid rows are 73 to 76). `RULES_VERSION` is 2. A follow-up (task 71b) changed the rules below without bumping it: nothing containing version 2 has been deployed (the old hosting was torn down and the game is local and dev only), so no live season has to be closed. Bump it on the first deploy that follows any further rule change.
 
 ### The rules
 
