@@ -15,7 +15,7 @@
 
 .facts {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(var(--size-chip-min, 8em), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(var(--size-gauge), 1fr));
   gap: var(--space-md);
   margin: 0;
 }
