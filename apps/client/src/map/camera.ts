@@ -262,9 +262,14 @@ export class CameraController {
     this.vy = 0;
     if (overscroll) {
       // grow the pan limits just enough that the target is reachable
-      const inside = clampCamera(target, this.vp, this.bounds, this.tokens);
-      const need = Math.max(Math.abs(target.x - inside.x), Math.abs(target.y - inside.y));
-      this.overscroll = Math.max(this.overscroll, need);
+      // (a world smaller than the view is pinned to its centre, so the room needed can exceed the
+      // first shortfall: grow until the target is reachable)
+      for (let i = 0; i < 4; i++) {
+        const got = this.clamp(target);
+        const need = Math.max(Math.abs(target.x - got.x), Math.abs(target.y - got.y));
+        if (need < 1e-6) break;
+        this.overscroll += need;
+      }
     }
     if (duration <= 0) {
       this.tween = null;

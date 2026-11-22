@@ -150,3 +150,15 @@ describe('panToFit', () => {
     expect(panToFit({ x: 100, y: 100 }, 500, vp, [])).toBeNull();
   });
 });
+
+describe('animateTo with overscroll', () => {
+  it('reaches a target past the edge even when the world is smaller than the view', () => {
+    const small = { minX: 0, minY: 0, maxX: 800, maxY: 400 };
+    const zoom = 1;
+    const c = new CameraController(t, small, vp, { x: 400, y: 200, zoom });
+    const target = { x: 400, y: 200 - 300, zoom };
+    c.animateTo(target, 0, 100, true);
+    c.update(1000);
+    expect(c.cam.y).toBeCloseTo(target.y, 3);
+  });
+});
