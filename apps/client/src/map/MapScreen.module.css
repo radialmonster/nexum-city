@@ -269,10 +269,31 @@
   border: 0;
   box-shadow: none;
   align-items: stretch;
+  flex-direction: row;
+  gap: var(--space-xs);
 }
 
-.screen[data-compact='true'] .row > * {
-  flex: 1;
+/* phone: the level and zoom buttons share one slim row; the map keeps the room. The SECTOR
+   readout is not vital there, and RECENTRE is reachable from MY DISTRICTS. */
+.screen[data-compact='true'] .readout,
+.screen[data-compact='true'] .recentre {
+  display: none;
+}
+
+.screen[data-compact='true'] .row {
+  display: contents;
+}
+
+.screen[data-compact='true'] .controls button {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-inline: var(--space-xs);
+  letter-spacing: var(--letter-spacing-normal);
+  font-size: var(--font-size-sm);
+}
+
+.screen[data-compact='true'] .controls .step {
+  flex: 0 0 var(--size-touch);
 }
 
 .screen[data-compact='true'] .info {
