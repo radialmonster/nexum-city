@@ -156,3 +156,22 @@ The rules are planned but not built in Phase 1. Leave a hook: a convoy that pass
   - no negative stock or credits;
   - no unit in two places at once.
 - **Speed:** simulating a 7-day season with 30 districts and 6 actors finishes in under 5 seconds.
+
+## Decisions made while implementing tasks 11-15
+
+Where the spec was silent, these simple choices were made. Code: `packages/sim`.
+
+- **Exact integer arithmetic.** Stock and credits are integer "atoms" (`ATOMS_PER_UNIT` = 360 000 000). One unit per hour is exactly 100 atoms per millisecond, so any time split integrates to the same total. This is what makes 2 s ticks and one jump hash-identical.
+- **Capacity applies to total goods** in a district warehouse (parts + power + data + supplies), not per good. Base 120 plus 120 per Depot level.
+- **Residential credits** go straight to the owner's `credits`, not the warehouse, so they never overflow.
+- **`production.wasted`** is emitted once when a full warehouse starts losing output (`ongoing: true`, `amount: 0`) and once when it stops (`ongoing: false`, `amount` = total wasted), or at the moment a delivery overflows. Exact fill times come from a scheduled `production.full` queue event, so they do not depend on step size.
+- **Hubs** hold no district production. Cargo delivered to a hub goes to the owner's per-hub stash (`player.stash`).
+- **Crews drive.** Any move or haul needs at least one crew; crews must not exceed the carrier's seats, must be at the same node as the carrier, and must be ready (recruits take 30 minutes).
+- **Haul is a plain move that carries goods.** Cargo is deducted from the source warehouse at departure and deposited on arrival. Undeliverable cargo (e.g. the destination was lost) is lost.
+- **Recall** turns a movement around; the return takes as long as the outbound part already travelled. Cargo is deposited back at the origin.
+- **Scout** reveals the target district for 4 hours after the scouting crew arrives (not on recall).
+- **Inputs carry an optional `atMs`**, clamped to the current time; inputs later than `toMs` are ignored by that `step` call. Scheduled events run before inputs at the same millisecond.
+- **`order.rejected`** is an extra event kind emitted when `step` receives an invalid order.
+- **World layout.** `createWorld` makes a 6x4 grid (24 districts); the south row is Docks, other kinds are shuffled from the seed. Two hubs sit on the west and east edges, each joined to two edge districts. Street lengths are 1500-2300 m, giving 15-25 minutes by van between neighbours; crossing the city takes well over 90 minutes. The Sound is the line `y = rows`.
+- **Walls** can be built (they cost and take time) but have no effect until siege is implemented.
+- **`addPlayer`** is a minimal bootstrap (district, crews, vans, credits, supplies, protection). Frontier placement (task 1A) will replace it.
