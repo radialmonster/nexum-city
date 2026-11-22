@@ -9,8 +9,10 @@ import type { GameState } from '@nexum/sim';
  * - 1: players carry `tradeMs`, `tradeDay`, `tradeDayMs`; districts may carry `settling`.
  * - 2: contracts board (task 73): `contracts`, `counters.contract`, players carry `contractMs`,
  *   `contractDay`, `contractDayMs`, and the queue holds a `contract.civic` tick.
+ * - 3: newcomer rush and street jobs (task 77): players carry `rushUntilMs`, `jobs`, `jobNextMs`,
+ *   and `counters.job` exists. Players already in a season get no rush and no jobs.
  */
-export const SNAPSHOT_VERSION = 2;
+export const SNAPSHOT_VERSION = 3;
 
 /**
  * Version of the sim rules the stored state was produced under. Bump it whenever a sim change
@@ -27,6 +29,9 @@ export const SNAPSHOT_VERSION = 2;
  * - 3: contracts board (task 73): three new orders, civic posts that draw from the seeded RNG
  *   (so every later random roll shifts), contract score, and bot changes. Same inputs now play
  *   out differently, so an old season is archived rather than replayed.
+ *
+ * Task 77 (newcomer rush, street jobs, the Runner pricing pass) stayed at 3: nothing was deployed
+ * under 3 that must replay, and no live player exists yet.
  */
 export const RULES_VERSION = 3;
 
@@ -70,6 +75,15 @@ const UPGRADES: readonly ((state: Json) => Json)[] = [
       counters: { ...counters, seq, contract: 0 },
       queue: next,
     };
+  },
+  // 2 -> 3: no rush and no street jobs for players who joined before them.
+  (state) => {
+    const players: Json = {};
+    for (const [id, p] of Object.entries(isObject(state['players']) ? state['players'] : {})) {
+      players[id] = isObject(p) ? { rushUntilMs: 0, jobs: [], jobNextMs: 0, ...p } : p;
+    }
+    const counters = isObject(state['counters']) ? state['counters'] : {};
+    return { ...state, players, counters: { job: 0, ...counters } };
   },
 ];
 

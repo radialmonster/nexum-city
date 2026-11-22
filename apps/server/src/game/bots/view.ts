@@ -14,6 +14,8 @@ import type {
 const zeroGoods = (): Goods => ({ parts: 0, power: 0, data: 0, supplies: 0 });
 
 /** Trade-score bookkeeping (task 54). Bots only read it through the score, so it stays zero. */
+/** A bot's view of players has no rush and no street jobs (those are private to each player). */
+const noRush = { rushUntilMs: 0, jobs: [], jobNextMs: 0 };
 const noTrade = { tradeMs: 0, tradeDay: -1, tradeDayMs: 0 };
 /** Contract-score bookkeeping (task 73), likewise zero for bots. */
 const noContractScore = { contractMs: 0, contractDay: -1, contractDayMs: 0 };
@@ -101,6 +103,7 @@ export function stateFromView(view: PlayerView): GameState {
       score: s.score,
       ...noTrade,
       ...noContractScore,
+      ...noRush,
     };
   }
   players[view.playerId] = {
@@ -110,6 +113,9 @@ export function stateFromView(view: PlayerView): GameState {
     score: view.self.score,
     ...noTrade,
     ...noContractScore,
+    rushUntilMs: view.self.rushUntilMs,
+    jobs: view.self.jobs,
+    jobNextMs: view.self.jobNextMs,
   };
 
   const markets: GameState['markets'] = {};
@@ -139,7 +145,7 @@ export function stateFromView(view: PlayerView): GameState {
     seed: 0,
     nowMs: view.nowMs,
     rng: [0, 0, 0, 0],
-    counters: { crew: 0, carrier: 0, movement: 0, event: 0, seq: 0, order: 0, contract: 0 },
+    counters: { crew: 0, carrier: 0, movement: 0, event: 0, seq: 0, order: 0, contract: 0, job: 0 },
     world: { cols: 0, rows: 0, soundY: 0 },
     graph: { nodes: view.graph.nodes, edges: view.graph.edges },
     districts,

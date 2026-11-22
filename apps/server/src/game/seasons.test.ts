@@ -94,8 +94,31 @@ describe('snapshot upgrades', () => {
       contractMs: 0,
       contractDay: 0,
       contractDayMs: 0,
+      rushUntilMs: 0,
+      jobs: [],
+      jobNextMs: 0,
     });
     expect(up.players['p2']?.['tradeMs']).toBe(9);
+  });
+
+  it('gives a version 2 snapshot players with no rush and no jobs, and a job counter', () => {
+    const old = {
+      nowMs: 1000,
+      players: { p1: { id: 'p1', credits: 12, rushUntilMs: 77 } },
+      counters: { seq: 1 },
+    };
+    const up = upgradeSnapshot(old, 2) as unknown as {
+      players: Record<string, Record<string, unknown>>;
+      counters: Record<string, number>;
+    };
+    expect(up.players['p1']).toEqual({
+      id: 'p1',
+      credits: 12,
+      rushUntilMs: 77,
+      jobs: [],
+      jobNextMs: 0,
+    });
+    expect(up.counters['job']).toBe(0);
   });
 
   it('adds the contracts board to a version 1 snapshot and schedules the civic tick', () => {

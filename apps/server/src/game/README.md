@@ -98,7 +98,7 @@ Two numbers are stored with every snapshot:
 
 - `SNAPSHOT_VERSION` is the JSON shape. `upgradeSnapshot` walks the `UPGRADES` chain, so an old
   snapshot still loads. Add a step whenever `GameState` gains or changes a field.
-- `RULES_VERSION` is the sim's behaviour. Bump it whenever the same inputs would play out differently. History: 1 settle and trade score, 2 raids and escorts (task 71), 3 contracts board (73a) and the Runner carrier (74; the carrier order and its evasion draw changed play but nothing was deployed, so it stayed at 3).
+- `RULES_VERSION` is the sim's behaviour. Bump it whenever the same inputs would play out differently. History: 1 settle and trade score, 2 raids and escorts (task 71), 3 contracts board (73a) and the Runner carrier (74; the carrier order and its evasion draw changed play but nothing was deployed, so it stayed at 3), and the newcomer rush and street jobs (77a) also stayed at 3 because nothing was deployed under 3 that must replay. `SNAPSHOT_VERSION` 3 adds the player's `rushUntilMs`, `jobs` and `jobNextMs` and `counters.job`.
 
 Policy: **inputs are only replayed on a snapshot written under the same rules version.** If the stored
 rules version differs (or is missing, as in rows from before versioning), the old state is loaded and
