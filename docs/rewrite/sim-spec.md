@@ -271,9 +271,26 @@ Raiders lead turtles by about 1.17x (target: under 2x), every type averages at l
 
 **The season hash changed**, as expected: the bots, the neutral guard and scoring all differ. The determinism tests (same seed gives the same hash; one jump equals 60 s ticks and 2 s ticks) still pass.
 
+### Turtle resupply (strategy only)
+
+A turtle on a home that makes no supplies never settled: it had no way to get 60 of them. The turtle now does what a player would, with the same orders and no rule or number changes. When it wants a plot and its warehouse is short, it stops recruiting and building (those eat the supplies it is buying), sells a pile of what the district makes at the nearest hub (`haul`, then `market.place` sell) if it cannot afford the supplies, buys the shortfall plus a 10-unit margin for crew upkeep (`market.place` buy, partial when credits are short), `move`s a crew and van to the hub, and `haul`s the bought supplies home. The merchant shares the resupply code (it buys only what it needs and can afford now, so its numbers moved slightly).
+
+Districts and score at the end of a 7-day season, average per bot, before and after:
+
+| Seeds | Bot      | Districts before | Districts after | Score before | Score after | Stuck on 1 district (before, after) |
+| ----- | -------- | ---------------- | --------------- | ------------ | ----------- | ----------------------------------- |
+| 1-5   | raider   | 4.40             | 4.20            | 611          | 582         | 0 of 10, 0 of 10                    |
+| 1-5   | turtle   | 4.40             | 4.00            | 524          | 569         | 5 of 10, 3 of 10                    |
+| 1-5   | merchant | 3.40             | 3.40            | 436          | 413         | 4 of 10, 4 of 10                    |
+| 1-8   | raider   | 4.38             | 3.94            | 605          | 554         | 0 of 16, 0 of 16                    |
+| 1-8   | turtle   | 3.13             | 3.31            | 390          | 504         | 11 of 16, 4 of 16                   |
+| 1-8   | merchant | 3.63             | 3.56            | 482          | 465         | 4 of 16, 4 of 16                    |
+
+Raiders still lead on score (1.02x over the best other type, turtles, on seeds 1 to 5, and 1.10x on seeds 1 to 8; against merchants 1.41x and 1.19x), invariant problems stay 0 and the hash still matches as one jump and in 60 s ticks. Seed 1 is now `15b04693b956e0`.
+
 ### Known gaps
 
-- A turtle whose home district produces no supplies and that never trades never settles; turtles have no trading logic, so a few turtles stay at 1 district (seeds 3 to 5 show one each).
+- A few turtles and merchants still end at 1 district (4 of 16 each over seeds 1 to 8): they buy supplies one check-in at a time and a rival siege or a lost settle race can set them back. Not a rules problem.
 - `fog.ts` does not expose `settling` in player views yet, so a rival's running settle timer is invisible; the client shows a plot as open until the settle is done, and an order against it is refused with `already_settling`.
 
 ### What the server's bot adapter must supply

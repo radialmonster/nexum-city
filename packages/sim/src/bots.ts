@@ -141,6 +141,10 @@ function settleOrders(
   return [];
 }
 
+/** Supplies a bot keeps back when it settles. */
+const SETTLE_RESERVE = 20;
+const BUY_MARGIN = 10;
+
 /** What a van carries (balance.carriers.van.cargo), so a haul is never over capacity. */
 const VAN_CARGO = balance.carriers.van.cargo;
 
@@ -186,68 +190,15 @@ export const raider: Bot = (s, me) => {
   return orders;
 };
 
-/** Never attacks: recruits, walls and workshops everywhere, and keeps every district on hold. */
-export const turtle: Bot = (s, me) => {
-  const budget = budgetFor(s, me);
-  return [
-    ...economy(s, me, budget, 6, ['walls', 'workshop', 'depot']),
-    ...settleOrders(s, me, budget, 20, 1),
-    ...mine(s, me).map((d): Order => ({ type: 'stance', districtId: d.id, stance: 'hold' })),
-  ];
-};
-
 /**
- * Carries its best stocked good to the nearest hub, sells whatever it holds there to the civic
- * traders, and buys supplies back when it is rich.
+ * Keeps a base in supplies the way a player would: crews waiting at a hub carry the supplies
+ * bought there home, and when a settlement is wanted but the home warehouse is short, a van-load
+ * is bought from the civic traders at the nearest hub (spending from `budget`).
  */
-export const merchant: Bot = (s, me) => {
-  const budget = budgetFor(s, me);
-  const orders = [
-    ...economy(s, me, budget, 3, ['workshop']),
-    ...settleOrders(s, me, budget, 20, 1),
-  ];
+function resupply(s: GameState, me: Id, budget: Budget, reserve = SETTLE_RESERVE): Order[] {
+  const orders: Order[] = [];
   const player = s.players[me];
   if (!player) return orders;
-  // Sell what sits in the hub stash.
-  for (const [hub, stash] of Object.entries(player.stash)) {
-    for (const good of GOODS) {
-      // Supplies bought here are for settling, not for sale.
-      if (good === 'supplies') continue;
-      const qty = Math.floor(toUnits(stash[good]));
-      const book = s.markets[hub]?.[good];
-      if (qty >= 1 && book) {
-        orders.push({ type: 'market.place', hub, side: 'sell', good, price: civicBid(book), qty });
-      }
-    }
-  }
-  // Haul the biggest pile to a hub.
-  for (const base of mine(s, me)) {
-    const crew = idleCrews(s, base.id, me)[0];
-    const van = vanAt(s, base.id, me);
-    if (!crew || !van) continue;
-    let best: { good: (typeof GOODS)[number]; qty: number } | null = null;
-    for (const good of GOODS) {
-      // Keep supplies for recruiting.
-      const spare =
-        Math.floor(toUnits(base.warehouse[good])) -
-        (good === 'supplies' ? balance.settle.supplies + 25 : 0);
-      if (spare >= 10 && (!best || spare > best.qty)) best = { good, qty: spare };
-    }
-    if (!best) continue;
-    const hubs = Object.values(s.districts)
-      .filter((d) => d.kind === 'hub')
-      .sort((a, b) => length(s, base.id, a.id) - length(s, base.id, b.id));
-    const hub = hubs[0];
-    if (!hub) continue;
-    orders.push({
-      type: 'haul',
-      carrierId: van,
-      crewIds: [crew.id],
-      to: hub.id,
-      cargo: { [best.good]: Math.min(best.qty, 40) },
-    });
-    break;
-  }
   // The van waits at the hub: send the crew home once the hub stash is sold out.
   for (const crew of Object.values(s.crews)) {
     if (crew.owner !== me || !('at' in crew.loc) || crew.readyAtMs > s.nowMs) continue;
@@ -279,8 +230,11 @@ export const merchant: Bot = (s, me) => {
       .sort((a, b) => length(s, home.id, a.id) - length(s, home.id, b.id))[0];
     const book = hub ? s.markets[hub.id]?.supplies : undefined;
     if (hub && book && have < balance.settle.supplies + 30) {
-      const qty = Math.min(VAN_CARGO, Math.floor(book.askDepth));
+      // Buy a little over the target: crew upkeep eats supplies while the van is on the road.
+      const need = Math.ceil(balance.settle.supplies + reserve + BUY_MARGIN - have);
       const price = civicAsk(book);
+      const affordable = Math.floor((toUnits(budget.credits) * 100) / price);
+      const qty = Math.min(VAN_CARGO, Math.floor(book.askDepth), need, affordable);
       if (qty >= 1 && budget.credits >= toAtoms((price * qty) / 100)) {
         budget.credits -= toAtoms((price * qty) / 100);
         orders.push({
@@ -294,6 +248,130 @@ export const merchant: Bot = (s, me) => {
       }
     }
   }
+  return orders;
+}
+
+/**
+ * Sends an idle crew and van from home to the hub holding supplies it bought, so the next
+ * check-in can haul them home (a move, exactly what a player would order).
+ */
+function fetchOrders(s: GameState, me: Id): Order[] {
+  const player = s.players[me];
+  const home = mine(s, me)[0];
+  if (!player || !home) return [];
+  const inFlight = Object.values(s.movements).some((m) => m.owner === me);
+  if (inFlight) return [];
+  const hub = Object.entries(player.stash).find(([, st]) => toUnits(st.supplies) >= 1)?.[0];
+  if (!hub) return [];
+  const crew = idleCrews(s, home.id, me)[0];
+  const van = vanAt(s, home.id, me);
+  if (!crew || !van) return [];
+  return [{ type: 'move', carrierId: van, crewIds: [crew.id], to: hub }];
+}
+
+/** Sells whatever sits in the hub stash to the civic traders (supplies are kept for settling). */
+function sellStash(s: GameState, me: Id): Order[] {
+  const orders: Order[] = [];
+  const player = s.players[me];
+  if (!player) return orders;
+  for (const [hub, stash] of Object.entries(player.stash)) {
+    for (const good of GOODS) {
+      // Supplies bought here are for settling, not for sale.
+      if (good === 'supplies') continue;
+      const qty = Math.floor(toUnits(stash[good]));
+      const book = s.markets[hub]?.[good];
+      if (qty >= 1 && book) {
+        orders.push({ type: 'market.place', hub, side: 'sell', good, price: civicBid(book), qty });
+      }
+    }
+  }
+  return orders;
+}
+
+/** Hauls the biggest spare pile from a home warehouse to the nearest hub. */
+function haulToHub(s: GameState, me: Id): Order[] {
+  const orders: Order[] = [];
+  for (const base of mine(s, me)) {
+    const crew = idleCrews(s, base.id, me)[0];
+    const van = vanAt(s, base.id, me);
+    if (!crew || !van) continue;
+    let best: { good: (typeof GOODS)[number]; qty: number } | null = null;
+    for (const good of GOODS) {
+      // Keep supplies for recruiting.
+      const spare =
+        Math.floor(toUnits(base.warehouse[good])) -
+        (good === 'supplies' ? balance.settle.supplies + 25 : 0);
+      if (spare >= 10 && (!best || spare > best.qty)) best = { good, qty: spare };
+    }
+    if (!best) continue;
+    const hubs = Object.values(s.districts)
+      .filter((d) => d.kind === 'hub')
+      .sort((a, b) => length(s, base.id, a.id) - length(s, base.id, b.id));
+    const hub = hubs[0];
+    if (!hub) continue;
+    orders.push({
+      type: 'haul',
+      carrierId: van,
+      crewIds: [crew.id],
+      to: hub.id,
+      cargo: { [best.good]: Math.min(best.qty, 40) },
+    });
+    break;
+  }
+  return orders;
+}
+
+/** Settling is wanted but the home warehouse is short of supplies and the credits cannot cover them. */
+function starved(s: GameState, me: Id, reserve: number): boolean {
+  const home = mine(s, me)[0];
+  const hub = home && nearestHubTo(s, home.id);
+  const book = hub && s.markets[hub.id]?.supplies;
+  if (!home || !book) return false;
+  const need = Math.ceil(balance.settle.supplies + reserve - toUnits(home.warehouse.supplies));
+  if (need <= 0) return false;
+  return (s.players[me]?.credits ?? 0) < toAtoms((civicAsk(book) * need) / 100);
+}
+
+function nearestHubTo(s: GameState, from: Id): District | undefined {
+  return Object.values(s.districts)
+    .filter((d) => d.kind === 'hub')
+    .sort((x, y) => length(s, from, x.id) - length(s, from, y.id))[0];
+}
+
+/** Never attacks: recruits, walls and workshops everywhere, and keeps every district on hold. */
+export const turtle: Bot = (s, me) => {
+  const budget = budgetFor(s, me);
+  // Saving for a settlement: recruits and buildings would eat the supplies it is buying.
+  const home = mine(s, me)[0];
+  const saving =
+    !!home &&
+    toUnits(home.warehouse.supplies) < balance.settle.supplies + SETTLE_RESERVE &&
+    Object.values(s.districts).some(
+      (d) => d.kind !== 'hub' && d.owner === 'neutral' && d.frontier === 'open',
+    );
+  return [
+    ...(saving ? [] : economy(s, me, budget, 6, ['walls', 'workshop', 'depot'])),
+    ...settleOrders(s, me, budget, SETTLE_RESERVE, 1),
+    ...fetchOrders(s, me),
+    ...sellStash(s, me),
+    // Out of supplies and credits: sell a pile of what the district makes, as a player would.
+    ...(starved(s, me, SETTLE_RESERVE) ? haulToHub(s, me) : []),
+    ...resupply(s, me, budget, SETTLE_RESERVE),
+    ...mine(s, me).map((d): Order => ({ type: 'stance', districtId: d.id, stance: 'hold' })),
+  ];
+};
+
+/**
+ * Carries its best stocked good to the nearest hub, sells whatever it holds there to the civic
+ * traders, and buys supplies back when it is rich.
+ */
+export const merchant: Bot = (s, me) => {
+  const budget = budgetFor(s, me);
+  const orders = [
+    ...economy(s, me, budget, 3, ['workshop']),
+    ...settleOrders(s, me, budget, SETTLE_RESERVE, 1),
+  ];
+  orders.push(...sellStash(s, me), ...haulToHub(s, me), ...resupply(s, me, budget));
   return orders;
 };
 
