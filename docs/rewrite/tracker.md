@@ -24,15 +24,15 @@ Live status for [`plan.md`](plan.md). Update this file in the same commit as the
 
 ## Phase 0: Skeleton, theme and UI kit
 
-| ID  | Task                                                                                                                                      | Status | Notes                                       |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------- |
-| 01  | Lean CI workflow (`npm run check`, cached); root npm workspaces, TypeScript project references, ESLint, Prettier, Vitest, `npm run check` | done   | 2026-11-22, `1b88308`                       |
-| 02  | `packages/theme`: tokens, CSS variable generator, Pixi palette, `--s` scale rules, high-contrast set                                      | done   | 2026-11-22, `1b88308`; rule #1              |
-| 03  | Lint rule: no raw colour literals or px font sizes outside `packages/theme`                                                               | done   | 2026-11-22, `1b88308`; rule #1              |
-| 04  | `apps/client` (Vite and React), with tokens injected at boot and live theme switching                                                     | done   | 2026-11-22 2637f15                          |
-| 05  | UI kit components from the mockup, plus the `/kit` gallery page                                                                           | done   | 2026-11-22 2637f15, screenshot at 2560×1440 |
-| 06  | `apps/server`: minimal Node server that serves the client, plus `/health`                                                                 | done   | 2026-11-22 743baf2; Hono, `/api/health`        |
-| 07  | Dockerfile (multi-stage, small image) and `docker-compose.yml` (memory limit, SQLite volume); `docker compose up` works locally           | done   | 2026-11-22 743baf2; image 254 MB, ~20 MiB RAM  |
+| ID  | Task                                                                                                                                      | Status | Notes                                         |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------ | --------------------------------------------- |
+| 01  | Lean CI workflow (`npm run check`, cached); root npm workspaces, TypeScript project references, ESLint, Prettier, Vitest, `npm run check` | done   | 2026-11-22, `1b88308`                         |
+| 02  | `packages/theme`: tokens, CSS variable generator, Pixi palette, `--s` scale rules, high-contrast set                                      | done   | 2026-11-22, `1b88308`; rule #1                |
+| 03  | Lint rule: no raw colour literals or px font sizes outside `packages/theme`                                                               | done   | 2026-11-22, `1b88308`; rule #1                |
+| 04  | `apps/client` (Vite and React), with tokens injected at boot and live theme switching                                                     | done   | 2026-11-22 2637f15                            |
+| 05  | UI kit components from the mockup, plus the `/kit` gallery page                                                                           | done   | 2026-11-22 2637f15, screenshot at 2560×1440   |
+| 06  | `apps/server`: minimal Node server that serves the client, plus `/health`                                                                 | done   | 2026-11-22 743baf2; Hono, `/api/health`       |
+| 07  | Dockerfile (multi-stage, small image) and `docker-compose.yml` (memory limit, SQLite volume); `docker compose up` works locally           | done   | 2026-11-22 743baf2; image 254 MB, ~20 MiB RAM |
 
 ## Phase 1: Simulation core
 
