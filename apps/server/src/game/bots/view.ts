@@ -13,6 +13,9 @@ import type {
 
 const zeroGoods = (): Goods => ({ parts: 0, power: 0, data: 0, supplies: 0 });
 
+/** Trade-score bookkeeping (task 54). Bots only read it through the score, so it stays zero. */
+const noTrade = { tradeMs: 0, tradeDay: -1, tradeDayMs: 0 };
+
 /**
  * Rebuilds a `GameState`-shaped object from what a player may see, so the sim's bot decision
  * functions (which take a `GameState`) can run on a bot's fogged `PlayerView` and never on the
@@ -89,13 +92,14 @@ export function stateFromView(view: PlayerView): GameState {
 
   const players: Record<string, Player> = {};
   for (const s of view.standings) {
-    players[s.playerId] = { id: s.playerId, credits: 0, stash: {}, score: s.score };
+    players[s.playerId] = { id: s.playerId, credits: 0, stash: {}, score: s.score, ...noTrade };
   }
   players[view.playerId] = {
     id: view.playerId,
     credits: view.self.credits,
     stash: view.self.stash,
     score: view.self.score,
+    ...noTrade,
   };
 
   const markets: GameState['markets'] = {};
