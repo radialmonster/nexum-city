@@ -147,3 +147,23 @@ export function takeBlocker(view: PlayerView, c: ContractView): string | null {
   if (view.self.credits < depositFor(c.reward)) return 'Not enough credits for the deposit.';
   return null;
 }
+
+/** Your vans already carrying goods for a contract: how many units and when the last arrives. */
+export function inTransit(
+  view: PlayerView,
+  c: ContractView,
+): { readonly units: number; readonly arriveMs: number } | null {
+  let units = 0;
+  let arriveMs = 0;
+  for (const m of Object.values(view.movements)) {
+    if (m.owner !== view.playerId || m.kind !== 'haul' || m.contractId !== c.id) continue;
+    units += Math.floor(toUnits(m.cargo[c.good] ?? 0));
+    arriveMs = Math.max(arriveMs, m.arriveMs);
+  }
+  return units > 0 ? { units, arriveMs } : null;
+}
+
+/** What is still owed and not yet on its way: the amount a new DELIVER should carry. */
+export function unitsToSend(view: PlayerView, c: ContractView): number {
+  return Math.max(0, remainingUnits(c) - (inTransit(view, c)?.units ?? 0));
+}

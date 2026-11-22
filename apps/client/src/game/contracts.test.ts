@@ -101,3 +101,27 @@ describe('contract feed cards', () => {
     expect(text).toContain('Build storage or sell sooner');
   });
 });
+
+describe('in-transit deliveries', () => {
+  it('counts only your own hauls for the contract and leaves the rest to send', async () => {
+    const { inTransit, unitsToSend } = await import('./contracts');
+    const c = contract({ qty: 30, status: 'taken', taker: 'me' });
+    const none = makeView();
+    expect(inTransit(none, c)).toBeNull();
+    expect(unitsToSend(none, c)).toBe(30);
+    const v = makeView({
+      movements: {
+        m1: {
+          id: 'm1',
+          kind: 'haul',
+          owner: 'me',
+          contractId: 'k1',
+          cargo: { power: cr(20) },
+          arriveMs: 5_000_000,
+        },
+      } as never,
+    });
+    expect(inTransit(v, c)).toEqual({ units: 20, arriveMs: 5_000_000 });
+    expect(unitsToSend(v, c)).toBe(10);
+  });
+});

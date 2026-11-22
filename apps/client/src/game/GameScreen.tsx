@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ContractView, GoodName } from '@nexum/contracts';
-import { remainingUnits } from './contracts';
+import { unitsToSend } from './contracts';
 import type { PlayerView as SimView } from '@nexum/sim';
 import { Tabs } from '../ui';
 import { MapScreen } from '../map/MapScreen';
@@ -139,7 +139,7 @@ export function GameScreen() {
         kind: 'haul',
         districtId: c.hub,
         contractId: c.id,
-        cargo: { [c.good]: remainingUnits(c) },
+        cargo: { [c.good]: unitsToSend(view, c) },
       },
     });
   };

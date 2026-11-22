@@ -1,7 +1,16 @@
 import type { ContractView, PlayerView } from '@nexum/contracts';
 import { toUnits } from '@nexum/sim';
 import { Bar, Button } from '../ui';
-import { myPosted, myTaken, remainingUnits, timeLeft, creditsOf } from './contracts';
+import {
+  inTransit,
+  myPosted,
+  myTaken,
+  remainingUnits,
+  timeLeft,
+  creditsOf,
+  unitsToSend,
+} from './contracts';
+import { shortDuration } from './orderTimeline';
 import styles from './MyContracts.module.css';
 import { formatUnits } from './feed';
 
@@ -25,6 +34,8 @@ export function MyContracts({ view, nowMs, onDeliver, onBoard }: MyContractsProp
       <ul className={styles['list']}>
         {taken.map((c) => {
           const left = remainingUnits(c);
+          const toSend = unitsToSend(view, c);
+          const onWay = inTransit(view, c);
           const done = c.qty - left;
           const late = nowMs >= c.dueMs;
           return (
@@ -42,17 +53,24 @@ export function MyContracts({ view, nowMs, onDeliver, onBoard }: MyContractsProp
                 {formatUnits(done)}/{formatUnits(c.qty)} delivered. Due in{' '}
                 <b>{timeLeft(c, nowMs)}</b>. Paid so far {formatUnits(creditsOf(c.paid ?? 0))} cr.
               </span>
-              <div className={styles['actions']}>
-                <Button
-                  variant="primary"
-                  disabled={left <= 0}
-                  onClick={() => {
-                    onDeliver(c);
-                  }}
-                >
-                  DELIVER
-                </Button>
-              </div>
+              {onWay && (
+                <span className={styles['meta']} data-testid="contract-en-route">
+                  On the way, ETA {shortDuration(Math.max(0, onWay.arriveMs - nowMs))} (
+                  {onWay.units} units).
+                </span>
+              )}
+              {toSend > 0 && left > 0 && (
+                <div className={styles['actions']}>
+                  <Button
+                    variant="primary"
+                    onClick={() => {
+                      onDeliver(c);
+                    }}
+                  >
+                    {onWay ? `DELIVER ${String(toSend)} MORE` : 'DELIVER'}
+                  </Button>
+                </div>
+              )}
             </li>
           );
         })}
