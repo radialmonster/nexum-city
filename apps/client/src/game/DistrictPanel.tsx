@@ -20,6 +20,8 @@ import {
   warehouseCapacity,
   type OwnDistrict,
 } from './derive';
+import { costOf, taxNotice } from './economy';
+import { credits } from './market';
 import { crewName, empireSummary, formatEta, streetEnds, type CrewNames } from './derive';
 import { ambushesAt, clearUnderway } from './clearAmbush';
 import { formatUnits } from './feed';
@@ -245,6 +247,16 @@ function Own({
           <Chip key={g} label={g.toUpperCase()} value={formatUnits(toUnits(d.warehouse[g]))} />
         ))}
       </div>
+      {GOOD_KEYS.some((g) => costOf(view, 'districts', d.id, g) !== null) && (
+        <span className={styles['line']} data-testid="your-cost">
+          Your cost per unit:{' '}
+          {GOOD_KEYS.flatMap((g) => {
+            const c = costOf(view, 'districts', d.id, g);
+            return c === null ? [] : [`${g} ${credits(c)}`];
+          }).join(', ')}
+          .
+        </span>
+      )}
       <div className={styles['block']}>
         <span className={styles['cap']}>BUILDINGS</span>
         <ul className={styles['slots']}>
@@ -586,6 +598,12 @@ function Empire({
           ) : (
             <span className={styles['line']}>Nothing made yet.</span>
           )}
+        </div>
+        <div className={styles['block']}>
+          <span className={styles['cap']}>CITY TAX AND UPKEEP</span>
+          <span className={styles['line']} data-testid="tax-notice">
+            {taxNotice(view)}
+          </span>
         </div>
         {e.besieged > 0 && (
           <span className={styles['status']} data-tone="danger">

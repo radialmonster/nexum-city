@@ -4,6 +4,7 @@ import { Button, Chip } from '../ui';
 import { cx, factionColor, vars, type Faction } from '../ui/util';
 import type { CrewNames } from './derive';
 import { crewName, finaleClock, raceOf, seasonClock, warehouseTotals } from './derive';
+import { charges, taxNotice } from './economy';
 import { formatUnits } from './feed';
 import styles from './TopBar.module.css';
 
@@ -47,6 +48,7 @@ export function TopBar({
   const clock = seasonClock(view, nowMs);
   const finale = finaleClock(view, nowMs);
   const goods = warehouseTotals(view);
+  const tax = charges(view);
   const sorted = [...race.shares].sort((a, b) => b.share - a.share);
   return (
     <header className={styles['top']} data-compact={compact}>
@@ -95,9 +97,16 @@ export function TopBar({
       </div>
       <div
         className={styles['res']}
-        title="Credits are global. Goods are the totals sitting in your district warehouses."
+        title={`Credits are global. Goods are the totals sitting in your district warehouses. ${taxNotice(view)}`}
       >
         <Chip icon="$" label="CR" value={formatUnits(toUnits(view.self.credits))} />
+        {tax.levyCredits > 0 && (
+          <Chip
+            label="TAX"
+            value={`-${String(tax.levyCredits + tax.upkeepCredits)}`}
+            faction="raider"
+          />
+        )}
         {!compact && (
           <>
             {(

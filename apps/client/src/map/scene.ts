@@ -3,6 +3,7 @@
  * so it runs (and is tested) without WebGL. Sizes come from the theme's `map`
  * tokens, which the caller passes in as `MapTokens`.
  */
+import { timeLeft } from '../game/economy';
 import { myTowers, spottingTower, towerCoverage } from '../game/towers';
 import type { FactionRole, MapKey } from '@nexum/theme';
 import {
@@ -93,6 +94,8 @@ export interface SceneDistrict {
   siege: number | null;
   /** Relative prices for a hub, one 0 to 1 value per good, or null. */
   prices: number[] | null;
+  /** A hub's running shortage: a short tag such as "SHORT OF PARTS - 3H", or null. */
+  shortage: string | null;
 }
 
 /** One of your Watchtowers and the districts it covers, for the range highlight. */
@@ -408,6 +411,16 @@ function layoutStreets(view: MapView, t: MapTokens, by: Record<Id, SceneDistrict
 }
 
 /** Turn a view into everything the renderer and HUD need. Deterministic and pure. */
+/** The map tag for a hub's soonest-ending shortage, with the time left, or null. */
+export function shortageTag(p: MapView['player'], hub: Id): string | null {
+  const live = (p.shortages ?? [])
+    .filter((x) => x.hub === hub && x.endMs > p.nowMs)
+    .sort((a, b) => a.endMs - b.endMs)[0];
+  return live
+    ? `SHORT OF ${live.good.toUpperCase()} · ${timeLeft(live.endMs - p.nowMs).toUpperCase()}`
+    : null;
+}
+
 export function layoutWorld(view: MapView, t: MapTokens): Scene {
   const p = view.player;
   const roles = assignRoles(p);
@@ -479,6 +492,7 @@ export function layoutWorld(view: MapView, t: MapTokens): Scene {
       stock,
       garrison,
       siege,
+      shortage: shortageTag(view.player, id),
       prices: prices ? GOOD_ORDER.map((g) => Math.min(1, Math.max(0, prices[g] ?? 0))) : null,
     };
     districts.push(sd);

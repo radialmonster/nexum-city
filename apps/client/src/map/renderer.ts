@@ -722,6 +722,18 @@ export class MapRenderer {
       });
     }
 
+    // a hub in shortage glows warn, so a sell-here chance reads from across the map
+    for (const d of scene.districts) {
+      if (d.shortage === null) continue;
+      const r = Math.min(d.w, d.h) / 2 + m.ringGap;
+      g.circle(d.cx, d.cy, r).stroke({
+        width: m.ringWidth * px * 3,
+        ...pal.color.warn,
+        alpha: 0.25,
+      });
+      g.circle(d.cx, d.cy, r).stroke({ width: m.ringWidth * px, ...pal.color.warn });
+    }
+
     // watchtower range: a ring on each of your towers and a faint ring on what it covers
     for (const tw of scene.towers) {
       const own = scene.byId[tw.id];
@@ -988,16 +1000,18 @@ export class MapRenderer {
       if (!lod.sub) continue;
       // fog hides who holds a plot, never what it is: remembered plots show only their kind
       const text = d.isHub
-        ? 'PUBLIC MARKET'
+        ? (d.shortage ?? 'PUBLIC MARKET')
         : dim
           ? d.kind.toUpperCase()
           : `${d.ownerLabel} · ${d.kind.toUpperCase()}`;
       const subColour =
-        d.isHub || dim
-          ? pal.color.textDim
-          : d.owner === 'neutral'
+        d.shortage !== null
+          ? pal.color.warn
+          : d.isHub || dim
             ? pal.color.textDim
-            : pal.faction[d.role];
+            : d.owner === 'neutral'
+              ? pal.color.textDim
+              : pal.faction[d.role];
       const sub = this.label(`k:${d.id}`, text, subSize, subColour, true);
       this.place(sub, s.x, s.y + (d.isHub ? -d.h * 0.12 : d.h * 0.07) * cam.zoom, room);
     }
