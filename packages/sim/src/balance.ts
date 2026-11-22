@@ -320,7 +320,7 @@ export const balance = {
     hours: 24,
     factor: 10,
     /** The starter civic contract reserved for a newcomer. */
-    starter: { good: 'supplies', qty: 5, premiumPercent: 100, graceMinutes: 20 },
+    starter: { good: 'supplies', qty: 5, premiumPercent: 100, graceMinutes: 180 },
     /** Goods a new home district starts with, exactly one level-1 Workshop (so the first build is not a 30 minute haul away) and 30 supplies, which with the 30 bought at the hub make the 60 a first settle needs. */
     kit: { parts: 30, power: 10, supplies: 30 },
   },
@@ -334,7 +334,7 @@ export const balance = {
     /** How long a patrol keeps the streets it walked revealed. */
     patrolRevealMinutes: 60,
     courier: { minMinutes: 4, maxMinutes: 8, minQty: 4, maxQty: 10, minCredits: 6, maxCredits: 12 },
-    salvage: { minMinutes: 3, maxMinutes: 6, minParts: 1, maxParts: 2 },
+    salvage: { minMinutes: 3, maxMinutes: 6, minParts: 2, maxParts: 4 },
     patrol: { minMinutes: 5, maxMinutes: 10, minCredits: 4, maxCredits: 8 },
   },
 
