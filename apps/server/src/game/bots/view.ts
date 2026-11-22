@@ -15,6 +15,8 @@ const zeroGoods = (): Goods => ({ parts: 0, power: 0, data: 0, supplies: 0 });
 
 /** Trade-score bookkeeping (task 54). Bots only read it through the score, so it stays zero. */
 const noTrade = { tradeMs: 0, tradeDay: -1, tradeDayMs: 0 };
+/** Contract-score bookkeeping (task 73), likewise zero for bots. */
+const noContractScore = { contractMs: 0, contractDay: -1, contractDayMs: 0 };
 
 /**
  * Rebuilds a `GameState`-shaped object from what a player may see, so the sim's bot decision
@@ -92,7 +94,14 @@ export function stateFromView(view: PlayerView): GameState {
 
   const players: Record<string, Player> = {};
   for (const s of view.standings) {
-    players[s.playerId] = { id: s.playerId, credits: 0, stash: {}, score: s.score, ...noTrade };
+    players[s.playerId] = {
+      id: s.playerId,
+      credits: 0,
+      stash: {},
+      score: s.score,
+      ...noTrade,
+      ...noContractScore,
+    };
   }
   players[view.playerId] = {
     id: view.playerId,
@@ -100,6 +109,7 @@ export function stateFromView(view: PlayerView): GameState {
     stash: view.self.stash,
     score: view.self.score,
     ...noTrade,
+    ...noContractScore,
   };
 
   const markets: GameState['markets'] = {};
@@ -129,7 +139,7 @@ export function stateFromView(view: PlayerView): GameState {
     seed: 0,
     nowMs: view.nowMs,
     rng: [0, 0, 0, 0],
-    counters: { crew: 0, carrier: 0, movement: 0, event: 0, seq: 0, order: 0 },
+    counters: { crew: 0, carrier: 0, movement: 0, event: 0, seq: 0, order: 0, contract: 0 },
     world: { cols: 0, rows: 0, soundY: 0 },
     graph: { nodes: view.graph.nodes, edges: view.graph.edges },
     districts,
@@ -137,6 +147,13 @@ export function stateFromView(view: PlayerView): GameState {
     crews: view.crews,
     carriers: view.carriers,
     movements: view.movements,
+    // The board is public; progress on someone else's job is hidden, so it reads as zero.
+    contracts: Object.fromEntries(
+      Object.entries(view.contracts).map(([id, c]) => [
+        id,
+        { ...c, delivered: c.delivered ?? 0, paid: c.paid ?? 0 },
+      ]),
+    ),
     reveals,
     sieges,
     season: { ...view.season, leaderId: null, belowMedian: [] },

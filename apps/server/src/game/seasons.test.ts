@@ -91,8 +91,28 @@ describe('snapshot upgrades', () => {
       tradeMs: 0,
       tradeDay: 0,
       tradeDayMs: 0,
+      contractMs: 0,
+      contractDay: 0,
+      contractDayMs: 0,
     });
     expect(up.players['p2']?.['tradeMs']).toBe(9);
+  });
+
+  it('adds the contracts board to a version 1 snapshot and schedules the civic tick', () => {
+    const old = {
+      nowMs: 1000,
+      players: { p1: { id: 'p1', credits: 12 } },
+      queue: [{ atMs: 5_000_000_000, seq: 1, kind: 'x' }],
+      counters: { seq: 1 },
+    };
+    const up = upgradeSnapshot(old, 1) as unknown as {
+      contracts: Record<string, unknown>;
+      counters: Record<string, number>;
+      queue: { atMs: number; kind: string }[];
+    };
+    expect(up.contracts).toEqual({});
+    expect(up.counters['contract']).toBe(0);
+    expect(up.queue.some((q) => q.kind === 'contract.civic')).toBe(true);
   });
 
   it('is a no-op at the current version and rejects newer or malformed input', () => {

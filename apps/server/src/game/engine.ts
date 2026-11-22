@@ -28,7 +28,10 @@ export type AcceptResult =
 
 /** Events every player should see, not only the ones they act in. */
 const isPublic = (e: SimEvent): boolean =>
-  e.kind === 'frontier.opened' || (e.kind === 'player.joined' && e.data['reason'] === 'new');
+  e.kind === 'frontier.opened' ||
+  (e.kind === 'player.joined' && e.data['reason'] === 'new') ||
+  // A big job on a board is news for everyone; a small one is only on the board itself.
+  (e.kind === 'contract.posted' && e.data['notable'] === true);
 
 /** Which edge of the city a position is on, for the arrival message. */
 function sideOf(state: GameState, pos: { x: number; y: number }): string {
