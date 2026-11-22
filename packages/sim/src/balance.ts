@@ -82,8 +82,10 @@ export const balance = {
   siege: {
     /** Hours for an unopposed-ratio-1 bar (A much greater than D) to fill: base rate is 1/6 per hour. */
     baseHoursToFill: 4,
-    /** Defence added to every district, owned or neutral. */
+    /** Defence added to every owned district. */
     militia: 10,
+    /** Defence of an unowned plot (task 54: raised from 10 so raiders cannot farm empty land). */
+    neutralGuard: 20,
     wallsPercentPerLevel: 30,
     pullbackPercent: 50,
     /** The bar falls by 1/12 per hour with no attackers present. */
@@ -93,6 +95,8 @@ export const balance = {
     lossPercentPerRound: 1.5,
     noisePercent: 20,
     lootPercent: 30,
+    /** Loot share when the district was unowned. */
+    neutralLootPercent: 10,
     /** Capture rate bonus against the score leader, in percent. */
     leaderBonusPercent: 10,
   },
@@ -127,6 +131,22 @@ export const balance = {
     playersPerPlot: 3,
     /** A new plot is surveyed for this long before it opens. */
     surveyHours: 4,
+  },
+
+  /** Settling an open frontier plot without a fight (task 54). */
+  settle: {
+    /** Supplies the crew carries; spent on arrival, refunded if the trip fails or is recalled. */
+    supplies: 60,
+    /** Hours between arrival and the plot becoming the settler's district. */
+    hours: 10,
+  },
+
+  /** Trade earns score (task 54): only fills against the civic traders or other players count. */
+  tradeScore: {
+    /** Credits of trade per score point (1 point = 1 district-hour). */
+    creditsPerPoint: 100,
+    /** The most points a player can earn from trade in one season day. */
+    dailyCapPoints: 24,
   },
 
   market: {

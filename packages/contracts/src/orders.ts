@@ -57,6 +57,12 @@ export const orderSchema = z.discriminatedUnion('type', [
     target: idSchema,
   }),
   z.strictObject({
+    type: z.literal('settle'),
+    carrierId: idSchema.nullable(),
+    crewIds,
+    target: idSchema,
+  }),
+  z.strictObject({
     type: z.literal('reinforce'),
     carrierId: idSchema.nullable(),
     crewIds,
@@ -122,6 +128,8 @@ export const ORDER_ERROR_CODES = [
   'bad_price',
   'unknown_order',
   'too_many_orders',
+  'not_open_plot',
+  'already_settling',
 ] as const;
 export const orderErrorCodeSchema = z.enum(ORDER_ERROR_CODES);
 export type OrderErrorCode = z.infer<typeof orderErrorCodeSchema>;

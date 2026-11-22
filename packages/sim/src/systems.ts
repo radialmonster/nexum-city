@@ -5,6 +5,7 @@ import { frontierSystem } from './frontier.js';
 import { marketSystem } from './market.js';
 import { productionSystem } from './production.js';
 import { scoreSystem } from './score.js';
+import { settleSystem } from './settle.js';
 import { siegeSystem } from './siege.js';
 import { travelSystem } from './travel.js';
 import type { QueuedEvent, QueuedKind } from './types.js';
@@ -39,6 +40,7 @@ export const systems: readonly System[] = [
   scoreSystem,
   marketSystem,
   frontierSystem,
+  settleSystem,
   fogSystem,
 ];
 

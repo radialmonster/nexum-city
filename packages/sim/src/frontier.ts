@@ -59,6 +59,7 @@ function pendingPlots(state: GameState): { open: number; surveying: number } {
   let surveying = 0;
   for (const d of Object.values(state.districts)) {
     if (d.owner !== 'neutral') continue;
+    if (d.frontier === 'open' && d.settling) continue;
     if (d.frontier === 'open') open += 1;
     else if (d.frontier === 'surveying') surveying += 1;
   }
@@ -186,7 +187,11 @@ export function chooseStartPlot(ctx: Ctx, playerId: Id, exclude?: Id): District 
   const candidates = (): District[] =>
     Object.values(state.districts).filter(
       (d) =>
-        d.frontier === 'open' && d.owner === 'neutral' && d.id !== exclude && !state.sieges[d.id],
+        d.frontier === 'open' &&
+        d.owner === 'neutral' &&
+        d.id !== exclude &&
+        !d.settling &&
+        !state.sieges[d.id],
     );
   let list = candidates();
   if (list.length === 0) {

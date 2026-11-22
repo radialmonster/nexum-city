@@ -226,14 +226,14 @@ describe('capture rate', () => {
     expect(rate(lead)).toBe(110);
   });
 
-  it('uses the strength of a neutral guard of 10', () => {
+  it('uses the strength of the neutral guard', () => {
     const s = duel();
     const first = step(s, [attack(s, 'd2_0')], 5 * MS_PER_HOUR);
     const siege = first.state.sieges['d2_0'];
     expect(siege?.rate.mode).toBe('up');
-    // The neutral guard is the 10 militia alone.
+    // The neutral guard is its own balance value.
     if (siege && siege.rate.mode === 'up') {
-      expect(siege.rate.d).toBe(10 * 100 * 100);
+      expect(siege.rate.d).toBe(balance.siege.neutralGuard * 100 * 100);
     }
     expect(balance.siege.militia).toBe(10);
   });

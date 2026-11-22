@@ -13,7 +13,7 @@ export type {
   SiegeView,
 } from './fog.js';
 export { hashState, canonicalJson } from './hash.js';
-export { inFinale, settleScore, standings } from './score.js';
+export { addTradeScore, inFinale, settleScore, standings } from './score.js';
 export type { Standing } from './score.js';
 export { isProtected, progressAt, siegeFraction } from './siege.js';
 export { applyOrder, validateOrder } from './orders.js';

@@ -80,11 +80,21 @@ export interface District {
   warehouse: Goods;
   protectedUntilMs?: number;
   frontier: FrontierState;
+  /** Set while a settler holds this open plot and the settle timer runs (task 54). */
+  settling?: Settling;
   construction: Construction | null;
   /** True while output is being lost to a full warehouse. */
   overflowing: boolean;
   /** Atoms lost since the overflow began. */
   wasted: number;
+}
+
+/** A settler's claim on an open plot: when `completesAtMs` passes unbroken, the plot becomes theirs. */
+export interface Settling {
+  owner: Id;
+  crewIds: Id[];
+  startedMs: number;
+  completesAtMs: number;
 }
 
 export interface Player {
@@ -95,6 +105,12 @@ export interface Player {
   stash: Record<Id, Goods>;
   /** Season score in district-milliseconds: 1 point = `MS_PER_HOUR` of one owned district. */
   score: number;
+  /** Part of `score` that came from trade, in district-milliseconds. */
+  tradeMs: number;
+  /** Season day (0-based) the daily trade counter below belongs to. */
+  tradeDay: number;
+  /** Trade score earned on `tradeDay`, in district-milliseconds (capped per day). */
+  tradeDayMs: number;
 }
 
 export type UnitLocation = { at: Id } | { movement: Id };
@@ -115,7 +131,7 @@ export interface Carrier {
   loc: UnitLocation;
 }
 
-export type MovementKind = 'move' | 'haul' | 'scout' | 'siege' | 'reinforce';
+export type MovementKind = 'move' | 'haul' | 'scout' | 'siege' | 'reinforce' | 'settle';
 
 /** A group of units travelling together along a route. */
 export interface Movement {
@@ -147,6 +163,7 @@ export type QueuedEvent = { at: number; seq: number } & (
   | { kind: 'score.tick' }
   | { kind: 'market.tick' }
   | { kind: 'frontier.survey'; districtId: Id }
+  | { kind: 'settle.done'; districtId: Id }
 );
 export type QueuedKind = QueuedEvent['kind'];
 
@@ -279,6 +296,7 @@ export type Order =
   | { type: 'build'; districtId: Id; building: BuildingType }
   | { type: 'siege'; carrierId: Id | null; crewIds: Id[]; target: Id }
   | { type: 'reinforce'; carrierId: Id | null; crewIds: Id[]; to: Id }
+  | { type: 'settle'; carrierId: Id | null; crewIds: Id[]; target: Id }
   | { type: 'scout'; crewId: Id; carrierId: Id | null; target: Id }
   | { type: 'stance'; districtId: Id; stance: Stance }
   | { type: 'recall'; movementId: Id }
@@ -330,6 +348,8 @@ export const ORDER_ERRORS = [
   'bad_price',
   'unknown_order',
   'too_many_orders',
+  'not_open_plot',
+  'already_settling',
 ] as const;
 export type OrderError = (typeof ORDER_ERRORS)[number];
 
@@ -349,6 +369,9 @@ export type SimEventKind =
   | 'trade.filled'
   | 'player.joined'
   | 'frontier.opened'
+  | 'settle.started'
+  | 'settle.done'
+  | 'settle.failed'
   | 'protection.ended'
   | 'score.tick'
   | 'order.rejected';

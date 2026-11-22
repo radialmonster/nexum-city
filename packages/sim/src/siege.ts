@@ -15,6 +15,7 @@ import {
   type Siege,
   type SiegeRate,
 } from './types.js';
+import { failSettle } from './settle.js';
 import { relocatePlayer } from './world.js';
 
 const BASE_MS = balance.siege.baseHoursToFill * MS_PER_HOUR;
@@ -92,7 +93,8 @@ function garrisonCrews(ctx: Ctx, d: District): Crew[] {
 
 /** Defence in 1/10000ths of a strength point: (garrison + militia) x walls x stance. */
 function defenceScaled(ctx: Ctx, d: District): number {
-  const units = strengthOf(garrisonCrews(ctx, d)) + balance.siege.militia;
+  const base = d.owner === 'neutral' ? balance.siege.neutralGuard : balance.siege.militia;
+  const units = strengthOf(garrisonCrews(ctx, d)) + base;
   const walls = 100 + balance.siege.wallsPercentPerLevel * buildingLevel(d, 'walls');
   const stance = d.stance === 'pullback' ? balance.siege.pullbackPercent : 100;
   return units * walls * stance;
@@ -237,7 +239,7 @@ export function nearestOwned(ctx: Ctx, owner: Id, from: Id, exclude: Id): Distri
   return best;
 }
 
-function walkHome(ctx: Ctx, crew: Crew, from: Id, to: Id): void {
+export function walkHome(ctx: Ctx, crew: Crew, from: Id, to: Id): void {
   const route = shortestRoute(ctx.state.graph, from, to);
   if (!route) return;
   startMovement(ctx, {
@@ -310,6 +312,8 @@ function runRound(ctx: Ctx, s: Siege): void {
  * goods stay put.
  */
 function loot(ctx: Ctx, d: District, attacker: Id): Goods {
+  const percent =
+    d.owner === 'neutral' ? balance.siege.neutralLootPercent : balance.siege.lootPercent;
   const taken = emptyGoods();
   const home = nearestOwned(ctx, attacker, d.id, d.id);
   if (!home) return taken;
@@ -319,7 +323,7 @@ function loot(ctx: Ctx, d: District, attacker: Id): Goods {
     .filter((c) => c.owner === attacker && 'at' in c.loc && c.loc.at === d.id)
     .sort((x, y) => (x.id < y.id ? -1 : 1));
   const want = emptyGoods();
-  for (const g of GOODS) want[g] = Math.floor((d.warehouse[g] * balance.siege.lootPercent) / 100);
+  for (const g of GOODS) want[g] = Math.floor((d.warehouse[g] * percent) / 100);
   for (const carrier of carriers) {
     let room = balance.carriers[carrier.kind].cargo * ATOMS_PER_UNIT;
     const cargo = emptyGoods();
@@ -347,7 +351,10 @@ function loot(ctx: Ctx, d: District, attacker: Id): Goods {
 function capture(ctx: Ctx, s: Siege): void {
   const { state } = ctx;
   const d = state.districts[s.districtId] as District;
-  const defender = d.owner;
+  // A settler holding the plot is its defender; losing it fails the settlement.
+  const settler = d.settling;
+  const defender = settler ? settler.owner : d.owner;
+  if (settler) failSettle(ctx, d, 'captured');
   const attackers = presentCrews(ctx, s);
   if (d.construction) {
     unschedule(state, (e) => e.kind === 'build.done' && e.districtId === d.id);

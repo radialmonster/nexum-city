@@ -7,7 +7,16 @@ import { isOwn } from './derive';
 export const TIMELINE_SPAN_MS = 4 * 3_600_000;
 
 export type TimelineKind =
-  'move' | 'haul' | 'scout' | 'siege' | 'reinforce' | 'build' | 'recruit' | 'reveal' | 'defence';
+  | 'move'
+  | 'haul'
+  | 'scout'
+  | 'siege'
+  | 'reinforce'
+  | 'settle'
+  | 'build'
+  | 'recruit'
+  | 'reveal'
+  | 'defence';
 
 export interface TimelineEntry {
   readonly id: string;
@@ -41,6 +50,7 @@ const GLYPH: Record<TimelineKind, string> = {
   scout: '?',
   siege: 'x',
   reinforce: '+',
+  settle: '+',
   build: '+',
   recruit: '+',
   reveal: 'o',
@@ -82,6 +92,7 @@ export function timelineEntries(
       scout: 'SCOUT',
       siege: 'ATTACK',
       reinforce: 'REINFORCE',
+      settle: 'SETTLE',
     };
     out.push({
       id: m.id,

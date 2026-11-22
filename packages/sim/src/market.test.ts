@@ -294,3 +294,42 @@ describe('determinism', () => {
     expect(trades(jump.events).length).toBeGreaterThan(0);
   });
 });
+
+describe('trade score', () => {
+  const ms = (p: string, s: GameState) => who(s, p).tradeMs;
+
+  it('pays 1 point per 100 credits to both sides of a player trade', () => {
+    // 5 parts at 18.00 = 90 credits = 0.9 point = 3,240,000 ms for each side.
+    const { state } = run(base(), [place('p1', 'sell', 1800, 5), place('p2', 'buy', 1800, 5)]);
+    expect(ms('p1', state)).toBe(3_240_000);
+    expect(ms('p2', state)).toBe(3_240_000);
+    // Trade points are part of the total score.
+    expect(who(state, 'p1').score).toBeGreaterThanOrEqual(3_240_000);
+  });
+  it('pays on civic fills too, but only to the player', () => {
+    const { state } = run(base(), [place('p1', 'sell', 1000, 10)]);
+    // 10 parts at the civic bid 16.56 = 165.6 credits.
+    expect(ms('p1', state)).toBe(16_560 * 360);
+    expect(ms('p2', state)).toBe(0);
+  });
+  it('does not pay for trading with yourself', () => {
+    const { state } = run(base(), [place('p1', 'sell', 1800, 5), place('p1', 'buy', 1800, 5)]);
+    expect(ms('p1', state)).toBe(0);
+  });
+  it('stops at the daily cap and starts again the next season day', () => {
+    const s = base();
+    const p = who(s, 'p1');
+    const day = Math.floor((s.nowMs - s.season.startMs) / (24 * MS_PER_HOUR));
+    p.tradeDay = day;
+    p.tradeDayMs = balance.tradeScore.dailyCapPoints * MS_PER_HOUR - 1000;
+    const first = run(s, [place('p1', 'sell', 1000, 10)]);
+    // Only the last 1000 ms of the cap are paid out.
+    expect(ms('p1', first.state)).toBe(1000);
+    const again = run(first.state, [place('p1', 'sell', 1000, 10)], first.state.nowMs + 1);
+    expect(ms('p1', again.state)).toBe(1000);
+    const at = again.state.nowMs + 24 * MS_PER_HOUR;
+    const next = run(again.state, [place('p1', 'sell', 1000, 10, 'parts', at)], at);
+    expect(ms('p1', next.state)).toBeGreaterThan(1000);
+    expect(checkInvariants(next.state)).toEqual([]);
+  });
+});

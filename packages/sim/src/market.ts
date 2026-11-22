@@ -1,6 +1,7 @@
 import { ATOMS_PER_UNIT, MS_PER_HOUR, balance, toAtoms } from './balance.js';
 import { emit, schedule, type Ctx } from './ctx.js';
 import { emptyGoods } from './production.js';
+import { addTradeScore } from './score.js';
 import type { System } from './systems.js';
 import {
   GOODS,
@@ -153,6 +154,11 @@ function fill(
     good,
     book.refCents + Math.trunc((price - book.refCents) / M.refDriftDivisor),
   );
+  // Trade earns score, but a player trading with themselves does not.
+  if (!buy || !sell || buy.owner !== sell.owner) {
+    if (buy) addTradeScore(ctx, buy.owner, price * qty);
+    if (sell) addTradeScore(ctx, sell.owner, price * qty);
+  }
   const actors = [buy?.owner, sell?.owner].filter((a): a is Id => a !== undefined);
   emit(ctx, 'trade.filled', actors, [hub], {
     hub,

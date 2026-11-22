@@ -24,6 +24,13 @@ export interface SeasonResult {
   hash: string;
   events: number;
   captures: number;
+  /** Captures where the defender was another player (not a neutral plot). */
+  pvpCaptures: number;
+  settled: number;
+  settleFailed: number;
+  /** Orders the bots proposed, and how many validateOrder refused (should stay under 10 percent). */
+  botOrders: number;
+  botRejected: number;
   fills: number;
   filledUnits: number;
   rejected: number;
@@ -60,6 +67,11 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
   let state = start;
   const inputs: Input[] = [];
   let captures = 0;
+  let pvpCaptures = 0;
+  let settled = 0;
+  let settleFailed = 0;
+  let botOrders = 0;
+  let botRejected = 0;
   let fills = 0;
   let filledUnits = 0;
   let rejected = 0;
@@ -69,7 +81,12 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
   const count = (list: SimEvent[]): void => {
     events += list.length;
     for (const e of list) {
-      if (e.kind === 'siege.captured') captures += 1;
+      if (e.kind === 'siege.captured') {
+        captures += 1;
+        const defender = e.data['defender'];
+        if (typeof defender === 'string' && defender !== 'neutral') pvpCaptures += 1;
+      } else if (e.kind === 'settle.done') settled += 1;
+      else if (e.kind === 'settle.failed') settleFailed += 1;
       else if (e.kind === 'trade.filled') {
         fills += 1;
         const qty = e.data['qty'];
@@ -84,7 +101,9 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
     for (const p of players) {
       for (const order of BOTS[p.bot](state, p.id)) {
         const input: Input = { actorId: p.id, order, atMs: at };
+        botOrders += 1;
         if (validateOrder(state, input).ok) batch.push(input);
+        else botRejected += 1;
       }
     }
     inputs.push(...batch);
@@ -100,6 +119,11 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
     hash: hashState(state),
     events,
     captures,
+    pvpCaptures,
+    settled,
+    settleFailed,
+    botOrders,
+    botRejected,
     fills,
     filledUnits,
     rejected,

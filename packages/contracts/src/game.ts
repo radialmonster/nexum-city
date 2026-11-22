@@ -75,7 +75,7 @@ export const carrierSchema = z.object({
 export const movementSchema = z.object({
   id: idSchema,
   owner: idSchema,
-  kind: z.enum(['move', 'haul', 'scout', 'siege', 'reinforce']),
+  kind: z.enum(['move', 'haul', 'scout', 'siege', 'reinforce', 'settle']),
   carrierId: idSchema.nullable(),
   carrierKind: carrierKindSchema,
   crewIds: z.array(idSchema),
@@ -102,6 +102,9 @@ export const SIM_EVENT_KINDS = [
   'trade.filled',
   'player.joined',
   'frontier.opened',
+  'settle.started',
+  'settle.done',
+  'settle.failed',
   'protection.ended',
   'score.tick',
   'order.rejected',
@@ -243,6 +246,8 @@ export const standingSchema = z.object({
   score: z.number(),
   scoreMs: z.number(),
   districts: z.number().int(),
+  tradeScore: z.number(),
+  tradeMs: z.number(),
 });
 
 export type GoodName = z.infer<typeof goodSchema>;

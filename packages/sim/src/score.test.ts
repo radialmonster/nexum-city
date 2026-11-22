@@ -65,8 +65,24 @@ describe('district-hours', () => {
   it('ranks players with the standings helper', () => {
     const s = step(scenario(), [], 3 * MS_PER_HOUR).state;
     expect(standings(s)).toEqual([
-      { rank: 1, playerId: 'p1', score: 6, scoreMs: 6 * MS_PER_HOUR, districts: 2 },
-      { rank: 2, playerId: 'p2', score: 3, scoreMs: 3 * MS_PER_HOUR, districts: 1 },
+      {
+        rank: 1,
+        playerId: 'p1',
+        score: 6,
+        scoreMs: 6 * MS_PER_HOUR,
+        districts: 2,
+        tradeScore: 0,
+        tradeMs: 0,
+      },
+      {
+        rank: 2,
+        playerId: 'p2',
+        score: 3,
+        scoreMs: 3 * MS_PER_HOUR,
+        districts: 1,
+        tradeScore: 0,
+        tradeMs: 0,
+      },
     ]);
   });
 

@@ -43,6 +43,8 @@ const MESSAGES: Record<ApiErrorCode, string> = {
   bad_price: 'That price does not work.',
   unknown_order: 'That market order is already gone.',
   too_many_orders: 'You have too many open market orders.',
+  not_open_plot: 'That plot is not open for settling.',
+  already_settling: 'Someone is already settling that plot.',
 };
 
 /** Words for any rejection code; unknown ones fall back to a generic line. */

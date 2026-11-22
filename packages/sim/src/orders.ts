@@ -97,11 +97,17 @@ function resolveTravel(state: GameState, req: TravelRequest): Resolved {
     if (target.kind === 'hub') return fail('invalid_target');
   } else if (req.kind === 'siege') {
     if (target.kind === 'hub' || target.owner === req.actorId) return fail('invalid_target');
+    if (target.settling?.owner === req.actorId) return fail('invalid_target');
     if (isProtected(target, state.nowMs)) return fail('protected');
     const siege = state.sieges[target.id];
     if (siege && siege.attacker !== req.actorId && siege.crewIds.length > 0) {
       return fail('invalid_target');
     }
+  } else if (req.kind === 'settle') {
+    if (target.kind === 'hub' || target.owner !== 'neutral' || target.frontier !== 'open') {
+      return fail('not_open_plot');
+    }
+    if (target.settling) return fail('already_settling');
   } else if (req.kind === 'reinforce') {
     if (target.kind === 'hub' || target.owner !== req.actorId) return fail('invalid_target');
   } else if (target.kind !== 'hub' && target.owner !== req.actorId) {
@@ -109,6 +115,14 @@ function resolveTravel(state: GameState, req: TravelRequest): Resolved {
   }
 
   const cargo: Goods = { parts: 0, power: 0, data: 0, supplies: 0 };
+  if (req.kind === 'settle') {
+    const origin = state.districts[from];
+    if (!origin || origin.kind === 'hub' || origin.owner !== req.actorId) {
+      return fail('invalid_target');
+    }
+    cargo.supplies = toAtoms(balance.settle.supplies);
+    if (origin.warehouse.supplies < cargo.supplies) return fail('insufficient_goods');
+  }
   if (req.kind === 'haul') {
     let total = 0;
     for (const [good, qty] of Object.entries(req.cargo ?? {})) {
@@ -171,6 +185,14 @@ function resolve(state: GameState, input: Input): Resolved {
         crewIds: order.crewIds,
         to: order.to,
         cargo: order.cargo,
+      });
+    case 'settle':
+      return resolveTravel(state, {
+        kind: 'settle',
+        actorId,
+        carrierId: order.carrierId,
+        crewIds: order.crewIds,
+        to: order.target,
       });
     case 'scout':
       return resolveTravel(state, {
@@ -269,7 +291,9 @@ export function applyOrder(ctx: Ctx, input: Input): Validation {
   switch (plan.type) {
     case 'travel': {
       const source =
-        plan.kind === 'haul' ? storeAt(ctx, plan.owner, plan.route.route[0] as Id) : null;
+        plan.kind === 'haul' || plan.kind === 'settle'
+          ? storeAt(ctx, plan.owner, plan.route.route[0] as Id)
+          : null;
       if (source) for (const g of GOODS) source[g] -= plan.cargo[g];
       startMovement(ctx, plan);
       const from = state.districts[plan.route.route[0] as Id];

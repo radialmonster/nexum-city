@@ -27,13 +27,17 @@ console.log(
 );
 console.log(`bots: ${r.players.map((p) => `${p.id}=${p.bot}`).join(' ')}`);
 console.log(`orders=${r.inputs.length} rejected=${r.rejected} events=${r.events}`);
-console.log(`captures=${r.captures} fills=${r.fills} filledUnits=${r.filledUnits}`);
+console.log(
+  `captures=${r.captures} pvp=${r.pvpCaptures} settled=${r.settled} settleFailed=${r.settleFailed}`,
+);
+console.log(`bot orders=${r.botOrders} refused=${r.botRejected}`);
+console.log(`fills=${r.fills} filledUnits=${r.filledUnits}`);
 console.log(`invariant problems=${r.problems.length}`);
 console.log('standings:');
 for (const s of r.standings) {
   const bot = r.players.find((p) => p.id === s.playerId)?.bot ?? '?';
   console.log(
-    `  #${s.rank} ${s.playerId} (${bot}) score=${s.score.toFixed(1)} districts=${s.districts}`,
+    `  #${s.rank} ${s.playerId} (${bot}) score=${s.score.toFixed(1)} districts=${s.districts} trade=${s.tradeScore ?? 0}`,
   );
 }
 console.log(

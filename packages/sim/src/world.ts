@@ -176,6 +176,9 @@ export function addPlayerWithEvents(
     credits: toAtoms(opts.credits ?? balance.player.startCredits),
     stash: {},
     score: 0,
+    tradeMs: 0,
+    tradeDay: 0,
+    tradeDayMs: 0,
   };
   d.owner = opts.id;
   d.frontier = 'built';

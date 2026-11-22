@@ -40,3 +40,39 @@ describe('season fast-forward', () => {
     runSeason({ seed: 3 });
   }, 5_000);
 });
+
+// Task 54 targets, over seeds 1 to 5.
+describe('balance pass', () => {
+  const seeds = [1, 2, 3, 4, 5].map((seed) => runSeason({ seed }));
+
+  it('keeps bot orders valid: under 10 percent are refused', () => {
+    for (const r of seeds) expect(r.botRejected / Math.max(1, r.botOrders)).toBeLessThan(0.1);
+  });
+
+  it('has no invariant problems and at least one player-vs-player capture', () => {
+    for (const r of seeds) expect(r.problems).toEqual([]);
+    expect(seeds.reduce((n, r) => n + r.pvpCaptures, 0)).toBeGreaterThanOrEqual(1);
+  });
+
+  it('settles frontier plots', () => {
+    expect(seeds.reduce((n, r) => n + r.settled, 0)).toBeGreaterThanOrEqual(1);
+  });
+
+  it('gives every bot type at least 3 districts on average, raiders ahead by less than 2x', () => {
+    const agg: Record<string, { n: number; d: number; score: number }> = {};
+    for (const r of seeds) {
+      for (const s of r.standings) {
+        const bot = r.players.find((p) => p.id === s.playerId)?.bot ?? '?';
+        const a = (agg[bot] ??= { n: 0, d: 0, score: 0 });
+        a.n++;
+        a.d += s.districts;
+        a.score += s.score;
+      }
+    }
+    for (const a of Object.values(agg)) expect(a.d / a.n).toBeGreaterThanOrEqual(3);
+    const avg = (k: string) => (agg[k] ? agg[k].score / agg[k].n : 0);
+    const best = Math.max(avg('turtle'), avg('merchant'));
+    expect(avg('raider')).toBeGreaterThan(best);
+    expect(avg('raider')).toBeLessThan(2 * best);
+  });
+});

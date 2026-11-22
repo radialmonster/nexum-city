@@ -1,4 +1,4 @@
-import { MS_PER_HOUR } from './balance.js';
+import { MS_PER_HOUR, balance } from './balance.js';
 import { emit, schedule, type Ctx } from './ctx.js';
 import { refreshSiege } from './siege.js';
 import type { System } from './systems.js';
@@ -12,6 +12,10 @@ export interface Standing {
   /** The exact integer behind `score`, in district-milliseconds. */
   scoreMs: number;
   districts: number;
+  /** Part of `score` earned from trade, in district-hours. */
+  tradeScore: number;
+  /** The exact integer behind `tradeScore`. */
+  tradeMs: number;
 }
 
 /**
@@ -29,6 +33,29 @@ export function settleScore(ctx: Ctx, fromMs: number, toMs: number): void {
   }
 }
 
+/**
+ * Credits a player's trade score for a fill worth `cents` centi-credits. 1 point (one district
+ * hour) per `creditsPerPoint` credits, floored to whole milliseconds, capped per season day.
+ * Pure integer maths, so the total never depends on how time was sliced.
+ */
+export function addTradeScore(ctx: Ctx, playerId: Id, cents: number): void {
+  const { state } = ctx;
+  const p = state.players[playerId];
+  if (!p || state.nowMs >= state.season.endMs) return;
+  const T = balance.tradeScore;
+  const day = Math.floor((state.nowMs - state.season.startMs) / (24 * MS_PER_HOUR));
+  if (p.tradeDay !== day) {
+    p.tradeDay = day;
+    p.tradeDayMs = 0;
+  }
+  const earned = Math.floor((cents * MS_PER_HOUR) / (100 * T.creditsPerPoint));
+  const gain = Math.min(earned, T.dailyCapPoints * MS_PER_HOUR - p.tradeDayMs);
+  if (gain <= 0) return;
+  p.tradeDayMs += gain;
+  p.tradeMs += gain;
+  p.score += gain;
+}
+
 /** Players ranked by score (ties broken by id), with their district counts. */
 export function standings(state: GameState): Standing[] {
   const held = new Map<Id, number>();
@@ -36,7 +63,12 @@ export function standings(state: GameState): Standing[] {
     if (d.owner !== 'neutral') held.set(d.owner, (held.get(d.owner) ?? 0) + 1);
   }
   const rows = Object.values(state.players)
-    .map((p) => ({ playerId: p.id, scoreMs: p.score, districts: held.get(p.id) ?? 0 }))
+    .map((p) => ({
+      playerId: p.id,
+      scoreMs: p.score,
+      tradeMs: p.tradeMs,
+      districts: held.get(p.id) ?? 0,
+    }))
     .sort((a, b) => b.scoreMs - a.scoreMs || (a.playerId < b.playerId ? -1 : 1));
   return rows.map((r, i) => ({
     rank: i + 1,
@@ -44,6 +76,8 @@ export function standings(state: GameState): Standing[] {
     score: r.scoreMs / MS_PER_HOUR,
     scoreMs: r.scoreMs,
     districts: r.districts,
+    tradeScore: r.tradeMs / MS_PER_HOUR,
+    tradeMs: r.tradeMs,
   }));
 }
 

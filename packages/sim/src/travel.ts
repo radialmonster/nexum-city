@@ -2,6 +2,7 @@ import { MS_PER_HOUR, balance } from './balance.js';
 import { emit, schedule, unschedule, type Ctx } from './ctx.js';
 import { deposit } from './production.js';
 import type { Route } from './routing.js';
+import { beginSettle } from './settle.js';
 import { joinSiege, onCrewArrived, onCrewLeft } from './siege.js';
 import type { System } from './systems.js';
 import type { Carrier, Crew, Goods, Id, Movement, MovementKind } from './types.js';
@@ -90,8 +91,16 @@ export const travelSystem: System = {
       }
       const carrier = m.carrierId ? state.carriers[m.carrierId] : undefined;
       if (carrier) carrier.loc = { at: m.to };
-      deposit(ctx, m.owner, m.to, m.cargo);
       const recalled = m.recalledAtMs !== undefined;
+      // Settlers spend their supplies on arrival; a recalled trip brings them home.
+      if (m.kind !== 'settle' || recalled) deposit(ctx, m.owner, m.to, m.cargo);
+      if (m.kind === 'settle' && !recalled) {
+        beginSettle(
+          ctx,
+          m,
+          m.crewIds.flatMap((id) => state.crews[id] ?? []),
+        );
+      }
       if (m.kind === 'siege' && !recalled) {
         const crews = m.crewIds.flatMap((id) => state.crews[id] ?? []);
         joinSiege(ctx, m.to, m.owner, crews);
