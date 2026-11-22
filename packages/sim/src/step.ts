@@ -7,6 +7,25 @@ function clone(state: GameState): GameState {
   return JSON.parse(JSON.stringify(state)) as GameState;
 }
 
+/**
+ * The quiet-step copy. With nothing due, `step` only integrates rates, so the only things that
+ * change are `nowMs`, each owner's credits and score, and each owned district's stock and waste.
+ * Copy just those and share the rest with `prev` (graph, crews, books, memory and queue are the
+ * bulk of the state). Results are plain data: treat any state as read-only and pass it to `step`.
+ */
+function cloneForQuietStep(prev: GameState): GameState {
+  const districts: GameState['districts'] = {};
+  for (const id of Object.keys(prev.districts)) {
+    const d = prev.districts[id] as GameState['districts'][string];
+    districts[id] = d.owner === 'neutral' ? d : { ...d, warehouse: { ...d.warehouse } };
+  }
+  const players: GameState['players'] = {};
+  for (const id of Object.keys(prev.players)) {
+    players[id] = { ...(prev.players[id] as GameState['players'][string]) };
+  }
+  return { ...prev, districts, players };
+}
+
 function advanceTo(ctx: Ctx, toMs: number): void {
   const from = ctx.state.nowMs;
   if (toMs <= from) return;
@@ -30,7 +49,9 @@ export function step(prev: GameState, inputs: readonly Input[], toMs: number): S
   if (!Number.isInteger(toMs) || toMs < prev.nowMs) {
     throw new RangeError(`toMs must be an integer >= state.nowMs (${prev.nowMs}), got ${toMs}`);
   }
-  const ctx: Ctx = { state: clone(prev), events: [] };
+  const nothingQueued = (prev.queue[0]?.at ?? Infinity) > toMs;
+  const quiet = nothingQueued && inputs.every((i) => (i.atMs ?? prev.nowMs) > toMs);
+  const ctx: Ctx = { state: quiet ? cloneForQuietStep(prev) : clone(prev), events: [] };
   const { state } = ctx;
 
   const due = inputs

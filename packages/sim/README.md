@@ -49,3 +49,7 @@ Open plots along the city edge keep newcomers placed (`frontier.ts`: `ensureFron
 ## Season harness
 
 `runSeason({ seed, days, bots })` plays a scripted season (raider, turtle and merchant bots in `bots.ts`) and returns the recorded inputs, final state, hash, capture and fill counts and any invariant problems. `replay(start, inputs, sliceMs, toMs?)` rebuilds it in any time slicing (0 is one jump) to prove `step` is exact. `checkInvariants(state)` lists negative stock or credits and units in two places. Run `npm run sim:season` for a printed summary with timing (timing lives in the script, since the sim reads no clock). Findings are in `docs/rewrite/sim-spec.md`.
+
+## Performance
+
+`step` copies state before changing it. When nothing is due (no queued event or input at or before `toMs`) it uses a quiet-step copy: only districts' stock and waste, players' credits and score, and `nowMs` are copied, and the rest (graph, crews, books, memory, queue) is shared with the previous state. So treat every state as read-only and get the next one from `step`. A step with events or inputs still deep-copies. A no-event step on a lived-in 38-district, 6-player world fell from about 0.055 ms to about 0.004 ms; `npm run build && npm run sim:bench` measures it (timing lives in the script). Output is bit-identical (same season hash).
