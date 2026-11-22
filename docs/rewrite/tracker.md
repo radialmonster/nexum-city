@@ -80,9 +80,9 @@ Live status for [`plan.md`](plan.md). Update this file in the same commit as the
 | 42  | "While you were away" feed                       | done   | 2026-11-22 (b7c350b) |
 | 43  | District panel                                   | done   | 2026-11-22 (b7c350b) |
 | 44  | Order confirm card, with carrier picker and odds | done   | 2026-11-22 (b7c350b) |
-| 45  | Active orders timeline                           | done   | 2026-11-22 (adfd491)    |
-| 46  | Market panel                                     | done   | 2026-11-22 (adfd491)    |
-| 47  | Battle report and rival dossier                  | done   | 2026-11-22 (adfd491)    |
+| 45  | Active orders timeline                           | done   | 2026-11-22 (adfd491) |
+| 46  | Market panel                                     | done   | 2026-11-22 (adfd491) |
+| 47  | Battle report and rival dossier                  | done   | 2026-11-22 (adfd491) |
 
 ## Phase 5: Bots and a living city
 
