@@ -33,9 +33,12 @@ describe('clear ambush helpers', () => {
   });
 
   it('plans a clear with no estimate when no crew is free', () => {
-    const v = withAmbush();
-    v.crews['c1'] = { ...v.crews['c1']!, readyAtMs: 99_000_000 };
-    const plan = planClear(v, v.ambushes[0]!, 1_000_000);
+    const base = makeView();
+    const v = makeView({
+      ambushes: [seen()] as never,
+      crews: { c1: { ...base.crews.c1, id: 'c1', readyAtMs: 99_000_000 } } as never,
+    });
+    const plan = planClear(v, seen() as never, 1_000_000);
     expect(plan.pick).toBeNull();
     expect(plan.estimate).toBeNull();
   });
