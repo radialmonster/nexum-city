@@ -848,7 +848,10 @@ export class MapRenderer {
       const text =
         mins >= 60 ? `AMBUSH ${String(Math.ceil(mins / 60))} H` : `AMBUSH ${String(mins)} MIN`;
       const t = this.label(`am:${a.id}`, text, tagSize, pal.faction[a.role], true);
-      this.place(t, s.x, s.y - tagSize * 1.6, m.pitchX * cam.zoom);
+      // sit above the top edge of the two plots the street joins, clear of their name labels
+      const topWorld = Math.min(this.plotTop(a.x1, a.y1), this.plotTop(a.x2, a.y2));
+      const topY = worldToScreen(cam, vp, a.x1, topWorld).y;
+      this.place(t, s.x, Math.min(s.y - tagSize * 1.6, topY - tagSize * 1.2), m.pitchX * cam.zoom);
     }
     this.flashes.forEach((f, i) => {
       const s = worldToScreen(cam, vp, (f.x1 + f.x2) / 2, (f.y1 + f.y2) / 2);
@@ -873,6 +876,20 @@ export class MapRenderer {
     sound.position.set(w.x, w.y);
     sound.alpha = 1;
     sound.visible = true;
+  }
+
+  /** World y of the top edge of the plot whose centre is nearest to a point. */
+  private plotTop(x: number, y: number): number {
+    let best = y;
+    let bestD = Infinity;
+    for (const d of this.scene.districts) {
+      const dist = (d.cx - x) ** 2 + (d.cy - y) ** 2;
+      if (dist < bestD) {
+        bestD = dist;
+        best = d.cy - d.h / 2;
+      }
+    }
+    return best;
   }
 
   private districtLabels(level: ZoomLevel, cam: Camera, lod: Lod): void {
