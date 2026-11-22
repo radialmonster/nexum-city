@@ -146,6 +146,28 @@ describe('snapshot upgrades', () => {
     expect(RULES_VERSION).toBeGreaterThan(0);
     expect(ada.account.username).toBe('Ada');
   });
+
+  it('still boots when the stored world is too old to archive', async () => {
+    const clock = { t: T0 };
+    const a = boot({ clock });
+    await register(a, 'Ada');
+    const row = a.game.db
+      .prepare('SELECT id, state FROM snapshots ORDER BY id DESC LIMIT 1')
+      .get() as { id: number; state: string };
+    const old = JSON.parse(row.state) as Record<string, unknown>;
+    for (const k of ['season', 'markets', 'memory', 'sieges']) delete old[k];
+    a.game.db
+      .prepare('UPDATE snapshots SET state = ?, version = 0, rules_version = 0 WHERE id = ?')
+      .run(JSON.stringify(old), row.id);
+    a.game.engine.shutdown = () => undefined;
+    a.game.stop();
+
+    clock.t += 60_000;
+    const b = boot({ dir: a.dir, clock });
+    expect(b.game.seasons.number()).toBe(2);
+    expect(b.game.engine.current.season.endMs).toBeGreaterThan(clock.t);
+    expect(b.logs.some((l) => l['msg'] === 'old season could not be archived')).toBe(true);
+  });
 });
 
 describe('season lifecycle', () => {

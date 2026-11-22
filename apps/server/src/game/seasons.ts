@@ -58,7 +58,13 @@ export class SeasonManager {
       from,
       to: RULES_VERSION,
     });
-    this.archive('rules_change');
+    try {
+      this.archive('rules_change');
+    } catch (err) {
+      // A snapshot from a very early build can lack whole parts of the world. There is nothing
+      // sensible to freeze, so say so and move on to the new season rather than refuse to boot.
+      this.o.log?.({ level: 'warn', msg: 'old season could not be archived', err: String(err) });
+    }
     this.startNext();
   }
 
