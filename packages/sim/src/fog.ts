@@ -372,9 +372,12 @@ export function viewFor(state: GameState, playerId: Id): PlayerView {
         overflowing: d.overflowing,
         siege: sieges(d.id),
       };
-    } else if (sight.has(d.id)) {
+    } else if (sight.has(d.id) || (d.owner === 'neutral' && d.frontier === 'open' && !d.settling)) {
+      // Open frontier plots are public: everyone sees them as "open for claim" (name, kind, open),
+      // so a newcomer can order a settle without scouting. Beyond sight nothing else is shown.
+      const inSight = sight.has(d.id);
       const presence: Record<Id, number> = {};
-      for (const crew of Object.values(state.crews)) {
+      for (const crew of inSight ? Object.values(state.crews) : []) {
         if (crew.owner !== playerId && 'at' in crew.loc && crew.loc.at === d.id) {
           presence[crew.owner] = (presence[crew.owner] ?? 0) + 1;
         }
@@ -385,12 +388,13 @@ export function viewFor(state: GameState, playerId: Id): PlayerView {
         owner: d.owner,
         protected: d.protectedUntilMs !== undefined && d.protectedUntilMs > state.nowMs,
         presence,
-        siege: sieges(d.id),
+        siege: inSight ? sieges(d.id) : null,
         open: d.owner === 'neutral' && d.frontier === 'open',
-        settling: d.settling
-          ? { owner: d.settling.owner, completesAtMs: d.settling.completesAtMs }
-          : null,
-        watchtower: watchtowerLevel(d.buildings),
+        settling:
+          inSight && d.settling
+            ? { owner: d.settling.owner, completesAtMs: d.settling.completesAtMs }
+            : null,
+        watchtower: inSight ? watchtowerLevel(d.buildings) : 0,
       };
     } else {
       districts[d.id] = { relation: 'remembered', ...base, lastKnownOwner: memory[d.id] ?? null };
