@@ -69,6 +69,7 @@ All orders are **asset-limited**: a crew or carrier can do one thing at a time, 
 | `siege`     | timed                            | Travel to the target, then start or join its capture bar                    |
 | `reinforce` | timed                            | Move crews into your own district's garrison                                |
 | `scout`     | timed                            | A crew travels to the target and reveals it for 4 h after arriving          |
+| `settle`    | timed                            | A crew carries 60 supplies to an open frontier plot and claims it (below)   |
 | `build`     | timed                            | Spend goods from that district's warehouse; it completes after a set time   |
 | `stance`    | instant                          | `hold` or `pullback`                                                        |
 | `recall`    | instant                          | An order in transit turns around and returns along the same path            |
@@ -126,7 +127,7 @@ The rules are planned but not built in Phase 1. Leave a hook: a convoy that pass
 ## Season and scoring
 
 - **Season length:** 7 days for the milestone 1 test season; 4 weeks normally.
-- **Score:** 1 point per owned district per hour, integrated continuously. Trade volume and contracts add a smaller amount from milestone 2; this is open decision #4.
+- **Score:** 1 point per owned district per hour, integrated continuously. Trade adds 1 point per 100 credits of fills against the civic traders or other players, at most 24 points per player per season day (task 54; self-trades never count). Contracts add a smaller amount from milestone 2.
 - **Catch-up:** players below the median get 25% faster recruiting. The leader's districts get a 10% bonus to capture rate against them.
 - **Finale:** in the last 48 hours, no new players join.
 
@@ -141,6 +142,7 @@ The rules are planned but not built in Phase 1. Leave a hook: a convoy that pass
 - `combat.round`
 - `production.wasted`
 - `build.done`
+- `settle.started`, `settle.done`, `settle.failed` (reason `taken`, `captured` or `abandoned`)
 - `trade.filled`
 - `player.joined`
 - `frontier.opened`
@@ -221,9 +223,59 @@ Why the full-week check uses 60 s ticks and one jump, with 2 s ticks only for th
 
 Reference run (seed 1, 7 days, 2 raiders, 2 turtles, 2 merchants): 38 districts, 695 orders (0 rejected), 12 captures, 84 civic fills (3,270 units), 0 invariant problems, hash identical as one jump, hourly, and in 60 s ticks; the run takes about 170 ms.
 
-Balance findings, not yet acted on:
+Balance findings (all acted on in task 54, see "Balance pass (task 54)" below):
 
 - **Raiders dominate.** They finish with 8 and 6 districts, while turtles and merchants stay at 1. Most captures are of neutral frontier plots, which are unprotected once the 48 h newcomer protection has passed.
 - **Non-raiders have no way to grow without attacking.** Frontier plots cannot be claimed peacefully, so a turtle or merchant can only stay put. Consider a peaceful claim (survey and settle) or merchant income that buys expansion.
 - **Merchants earn credits but not an edge.** They sold 3,270 units on the civic bid, yet their score equals a turtle's; selling does not convert to districts or score yet.
 - **Neutral plots are the cheapest target.** Raids on neutral plots should probably cost more or give less, so that attacking players is the better prize.
+
+## Balance pass (task 54)
+
+Direction from the owner: "fun first", so mechanics could change freely. Three rules were added, from [`balance-proposals.md`](balance-proposals.md) A + B + C. All numbers live in `balance.ts`.
+
+### Rules
+
+- **Settle (A).** `settle { carrierId, crewIds, target }` sends a crew (on foot or on any carrier) with `balance.settle.supplies` (60) supplies from the nearest owned district's warehouse to an open frontier plot (`not_open_plot` if the target is a hub, owned or not open; `already_settling` if a settle timer is already running there; `insufficient_goods` if the origin lacks the supplies). The supplies ride as cargo. On arrival they are spent and a `balance.settle.hours` (10 h) timer starts (`settle.started`); the settlers sit in the plot's garrison. When the timer ends the plot becomes the settler's district (`settle.done`) and an enemy siege, if any, carries on against it. Contests:
+  - the first settler to arrive holds the plot; a second one is turned back with the supplies refunded to their nearest district (`settle.failed`, reason `taken`);
+  - an enemy siege on the plot fights the settlers plus the neutral guard; if its bar fills first the settlement fails (`captured`) and the siege wins an empty plot; if the timer wins, the new owner defends normally;
+  - if every settler walks away before the timer ends the claim lapses (`abandoned`); a recalled trip brings the supplies home.
+- **Tougher neutrals (B).** `siege.neutralGuard` is 20 (was 10, the same as an owned district's militia) and `siege.neutralLootPercent` is 10 (was the normal 30 for every capture). The proposal suggested a guard of about 25; 20 was enough with the rest and kept early expansion from stalling.
+- **Trade score (C).** Every fill against a civic trader or another player earns both sides `fill credits / 100` points (one district-hour each), floored to whole milliseconds and capped at 24 points per player per season day (the day is `floor((now - season start) / 24 h)`). A fill where a player's own orders meet (self-trade) earns nothing. `standings` gained `tradeScore` and `tradeMs` (the part of `score` that came from trade). The maths is integer-only, so the total does not depend on how time was sliced.
+
+### Bots
+
+Bots now check what they can afford before they build or recruit, so they stay under the 10 percent rejection ceiling (harness test; the run is at about 0.7 percent). Turtles and merchants settle the nearest open plot whenever a district has 60 spare supplies and an idle crew, and merchants keep a supplies reserve and buy a van-load from the civic traders when short. Merchants also trade toward the daily cap. Raiders treat a rival who scores less than they do as half as far away (`WEAK_RIVAL_DISCOUNT` 0.5), so a weak player is picked over a neutral plot unless the plot is less than half the distance.
+
+### Before and after, seeds 1 to 5
+
+Each cell is districts / score (first letter: r raider, t turtle, m merchant), 7-day season, sorted by final score.
+
+| Seed | Before (main)                                             | After (task 54)                                          |
+| ---- | --------------------------------------------------------- | -------------------------------------------------------- |
+| 1    | r8/1094 r6/867 t1/168 t1/168 m1/168 m1/168 (12 captures)  | m6/864 r5/673 r5/668 m4/487 t1/168 t1/168 (8 captures)   |
+| 2    | r7/996 r2/330 t1/168 t1/168 m1/168 m1/168 (7 captures)    | t8/921 t7/827 r6/804 m7/684 r2/327 m1/172 (6 captures)   |
+| 3    | r8/1098 r5/748 t1/168 t1/168 m1/168 m1/168 (11 captures)  | t7/837 r6/820 m5/591 r4/581 m2/329 t1/168 (8 captures)   |
+| 4    | r8/1093 r6/866 t1/168 t1/168 m1/168 m1/168 (12 captures)  | t11/1055 r5/612 r3/477 m1/172 m1/172 t1/168 (6 captures) |
+| 5    | r11/1161 r6/832 t1/168 t1/168 m1/168 m1/168 (15 captures) | t6/758 m6/714 r5/690 r3/454 m1/172 t1/168 (6 captures)   |
+
+Averages over the five seeds (each bot type, 10 bots):
+
+| Bot      | Districts before | Districts after | Score before | Score after |
+| -------- | ---------------- | --------------- | ------------ | ----------- |
+| raider   | 6.70             | 4.40            | 908          | 611         |
+| turtle   | 1.00             | 4.40            | 168          | 524         |
+| merchant | 1.00             | 3.40            | 168          | 436         |
+
+Raiders lead turtles by about 1.17x (target: under 2x), every type averages at least 3 districts, there are 5 player-vs-player captures over the five seeds, 0 invariant problems, 45 of about 6,300 bot orders were refused, and one season runs in about 0.2 s. Seed 1 prints `settled=10 settleFailed=2`, 3 pvp captures, and a final hash of `1226f5451258cf`.
+
+**The season hash changed**, as expected: the bots, the neutral guard and scoring all differ. The determinism tests (same seed gives the same hash; one jump equals 60 s ticks and 2 s ticks) still pass.
+
+### Known gaps
+
+- A turtle whose home district produces no supplies and that never trades never settles; turtles have no trading logic, so a few turtles stay at 1 district (seeds 3 to 5 show one each).
+- `fog.ts` does not expose `settling` in player views yet, so a rival's running settle timer is invisible; the client shows a plot as open until the settle is done, and an order against it is refused with `already_settling`.
+
+### What the server's bot adapter must supply
+
+The sim's bots read a `GameState`. The server's `stateFromView` (`apps/server/src/game/bots/view.ts`) already fills what they use: own districts (garrison, buildings, slots, warehouse, `construction`, `frontier`), other districts' owner and protection, crews, carriers, movements, stash, credits and market reference prices. Nothing new is required for the settle logic: the bots never read `District.settling`, and for districts that are not the bot's own the adapter's `frontier: owner === 'neutral' ? 'open' : 'built'` is enough (a plot that is still being surveyed or settled looks open, and the bot's order is refused with `not_open_plot` or `already_settling`). To make that refusal rarer, the adapter could copy `frontier` and a boolean for "settling" into the fogged view in a later contract change.
