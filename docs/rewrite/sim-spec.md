@@ -463,7 +463,7 @@ Goal: at least 15 minutes of active, asynchronous play for a new player, without
 - **Starter contract.** One civic contract is reserved for the newcomer on the nearest hub: 5 supplies at 200 percent of the reference value (premium 100), window = van ETA plus 3 h (hubs are 30 to 65 min away by van, so the 3 h is a generous grace on top; a failed or untaken one is re-offered once, see "Playtest fixes"). Other players cannot take it (`reserved_contract`).
 - **Street jobs.** A personal list of up to 3 (`balance.jobs.cap`), one new offer every 30 min, drawn deterministically from the seeded RNG. Each is done by one crew and an optional carrier (a carrier makes it 67 percent of the time).
   - courier: 4 to 8 min, carry 4 to 10 units, pays 6 to 12 credits; raidable like a haul.
-  - salvage: 3 to 6 min, pays 2 to 4 parts (task 83).
+  - salvage: 3 to 6 min, pays 2 parts (task 83).
   - patrol: 5 to 10 min, pays 4 to 8 credits and reveals ambushes on the streets walked for 60 min.
   - Jobs give little or no score. Payouts are civic sources in the invariants and the harness conservation.
 - **Order and events.** `{type:'job.take', jobId, crewId, carrierId?}`; errors `unknown_job`, `reserved_contract`. Events `job.done`, `job.failed`, `rush.ended`. The view's `self.jobs` lists the offers and `self.jobNextMs` the next refill.
@@ -709,7 +709,7 @@ From a scripted playtest as a newcomer. `RULES_VERSION` stays 3; no snapshot cha
 3. **Starter contract.** Window is van ETA plus 3 h (`rush.starter.graceMinutes` 180). A failed or untaken starter contract is re-offered once (`starterOffer = 2`, new `offerEndsMs`). `contract.failed` and `contract.expired` carry `starter`, `reoffered` and (failed) `deposit`, so the feed can say the deposit is lost or refunded.
 4. **Newcomer probe.** After protection ends the bots prefer a "fresh" target (protection ended within `PROBE_WINDOW_HOURS` = 24) and need only two crews of any total strength to ambush it, so the first hit is small and survivable. Merchant newcomer, seeds 1 to 16: 13 of 16 touched, median first touch about 6 h (12 of 16 and 20 h before); an idle newcomer was 0 of 16 touched before. Check with `node scripts/newcomer-probe.mjs 1 16 3` (`IDLE=1` for an idle newcomer).
 5. **Clear crews.** `pickClearCrewsOrWhy` returns `{error:'no_crew', reason:'busy'|'under_siege'}`; it never takes crews from a district that is under siege or being raided. `pickClearCrews` is a wrapper that returns null on an error.
-6. **Salvage job** pays 2 to 4 parts (was 1 to 2), about 15 to 25 percent of a Watchtower's cost over a few jobs.
+6. **Salvage job** pays 2 parts (was 1 to 2), 15 percent of a Watchtower's 40 parts over three jobs and 20 percent over four. Larger yields (2 to 4, 1 to 5, 3 to 4) pushed the merchant under the 2.4 districts floor on seeds 1 to 8 or the yield over 25 percent.
 7. **Full warehouses.** Capacity stays 120. A larger base capacity (160) was tried and rejected: turtle score 800, top to next 1.38, raider lead 0.71x. The relief is information: the ongoing `production.wasted` event now carries `perHour` (units lost an hour) and `capacity`, so the client can say "full, losing N an hour". No automation was added.
 
 #### Harness (seeds 1 to 16, invariants 0)
@@ -722,3 +722,5 @@ From a scripted playtest as a newcomer. `RULES_VERSION` stays 3; no snapshot cha
 | score per player, after      | 574      | 700    | 569    | 524    |
 
 Top to next 1.22 (1.17 before), raider lead 0.81x (0.85x before; floor 0.85x of the best other type is the viability test, which passes), raid success 45 percent (47), raids 20.3, hits 12.3. `node scripts/first-session.mjs`: settle accepted in 8 of 8 seeds within 15 min, no change.
+
+After rebasing onto the economy stages 1 and 2 (the table above is the pre-economy comparison), seeds 1 to 16: merchant 2.91 districts and score 539, raider 6.56 and 789, turtle 4.56 and 644, hunter 2.38 and 497; top to next 1.23, raider lead 1.23x (limit 1.4x), raid success 46 percent, invariants 0; newcomer probe 13 of 16 touched, median first touch 7 h. The economy merge made the field more fragile around the 2.4 districts floor on seeds 1 to 8, so salvage stays at a flat 2 parts.

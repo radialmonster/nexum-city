@@ -334,7 +334,7 @@ export const balance = {
     /** How long a patrol keeps the streets it walked revealed. */
     patrolRevealMinutes: 60,
     courier: { minMinutes: 4, maxMinutes: 8, minQty: 4, maxQty: 10, minCredits: 6, maxCredits: 12 },
-    salvage: { minMinutes: 3, maxMinutes: 6, minParts: 2, maxParts: 4 },
+    salvage: { minMinutes: 3, maxMinutes: 6, minParts: 2, maxParts: 2 },
     patrol: { minMinutes: 5, maxMinutes: 10, minCredits: 4, maxCredits: 8 },
   },
 
