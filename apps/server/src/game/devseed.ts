@@ -54,7 +54,7 @@ export async function seedGame(game: Game, clock: DevClock, bots: number, hours:
     }
     const created = engine.createPlayer((playerId) => {
       store.insertAccount(username, pw, playerId, game.now());
-    });
+    }, username);
     if (!created.ok) break;
     made.push({ username, playerId: created.playerId, kind });
   }

@@ -7,6 +7,7 @@ import { Hub } from './hub.js';
 import { RateLimiter } from './ratelimit.js';
 import { Sessions } from './sessions.js';
 import { Store } from './store.js';
+import { BotRunner, type BotConfig } from './bots/runner.js';
 
 export interface GameOptions {
   readonly dataDir: string;
@@ -21,6 +22,8 @@ export interface GameOptions {
   readonly authLimit?: { readonly max: number; readonly windowMs: number } | undefined;
   readonly backupHourUtc?: number | undefined;
   readonly backupKeep?: number | undefined;
+  /** Computer-run crews; off unless given. */
+  readonly bots?: BotConfig | undefined;
   readonly log?: ((entry: Record<string, unknown>) => void) | undefined;
 }
 
@@ -29,6 +32,8 @@ export interface Game {
   readonly store: Store;
   readonly engine: Engine;
   readonly hub: Hub;
+  /** The bot roster and scheduler; `null` when bots are disabled. */
+  readonly bots: BotRunner | null;
   readonly sessions: Sessions;
   readonly now: () => number;
   readonly options: GameOptions;
@@ -58,6 +63,11 @@ export function createGame(options: GameOptions): Game {
   engine.onTick((r) => {
     if (hub.size > 0) hub.publishTick(r.nowMs, r.events);
   });
+  const botCfg = options.bots;
+  const bots =
+    botCfg?.enabled && botCfg.count > 0
+      ? new BotRunner({ engine, store, now, seed: options.seed, config: botCfg, log: options.log })
+      : null;
   const sessions = new Sessions(store, now);
   const limit = options.authLimit ?? { max: 20, windowMs: 60_000 };
   const log = options.log;
@@ -80,6 +90,7 @@ export function createGame(options: GameOptions): Game {
     store,
     engine,
     hub,
+    bots,
     sessions,
     now,
     options,
@@ -91,6 +102,7 @@ export function createGame(options: GameOptions): Game {
       tickTimer = setInterval(() => {
         try {
           engine.tick();
+          bots?.run();
         } catch (err) {
           log?.({ level: 'error', msg: 'tick failed', err: String(err) });
         }

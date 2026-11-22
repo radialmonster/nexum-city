@@ -160,14 +160,17 @@ export function describeEvent(item: FeedItem, view: PlayerView): FeedEntry | nul
         text: `${side} ${formatUnits(qty)} ${good} at ${price.toFixed(2)} each in ${name(placeId)}.`,
       };
     }
-    case 'frontier.opened':
+    case 'frontier.opened': {
+      const plot = placeId ? view.districts[placeId] : undefined;
+      const kind = str(d, 'kind') ?? plot?.kind;
       return {
         ...base,
         kind: 'CITY GROWS',
         glyph: '#',
         tone: 'special',
-        text: `A new plot opened: ${name(placeId)}.`,
+        text: `A new plot opened on the frontier: ${placeId ? name(placeId) : (kind ?? 'unknown')}.`,
       };
+    }
     case 'production.wasted': {
       if (d['ongoing'] === true) {
         return {
@@ -196,14 +199,23 @@ export function describeEvent(item: FeedItem, view: PlayerView): FeedEntry | nul
         tone: 'warn',
         text: `New-owner protection ended on ${name(placeId)}.`,
       };
-    case 'player.joined':
-      return {
-        ...base,
-        kind: 'NEWCOMER',
-        glyph: '+',
-        tone: 'special',
-        text: 'A new player joined the city.',
-      };
+    case 'player.joined': {
+      const actor = event.actors[0];
+      const crew = str(d, 'crew') ?? actor ?? 'A new crew';
+      const district = str(d, 'district') ?? (placeId ? name(placeId) : 'a plot');
+      const side = str(d, 'side');
+      const where = side && side !== 'centre' ? ` on the ${side} frontier` : '';
+      const relocated = str(d, 'reason') === 'relocated';
+      const text =
+        actor === me
+          ? relocated
+            ? `You were resettled in ${district}${where}.`
+            : `You founded ${district}${where}.`
+          : relocated
+            ? `Crew ${crew} lost its last district and resettled in ${district}${where}.`
+            : `New crew ${crew} founded ${district}${where}.`;
+      return { ...base, kind: 'NEWCOMER', glyph: '+', tone: 'special', text };
+    }
     case 'order.rejected':
       return {
         ...base,

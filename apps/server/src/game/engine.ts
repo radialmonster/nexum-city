@@ -1,4 +1,4 @@
-import { addPlayer, createWorld, hashState, step, validateOrder } from '@nexum/sim';
+import { addPlayerWithEvents, createWorld, hashState, step, validateOrder } from '@nexum/sim';
 import type { GameState, Id, Order, OrderError, SimEvent } from '@nexum/sim';
 import { Store } from './store.js';
 import type { StoredEvent, StoredInput } from './store.js';
@@ -22,6 +22,24 @@ export interface TickResult {
 
 export type AcceptResult =
   { ok: true; seq: number; atMs: number } | { ok: false; error: OrderError };
+
+/** Events every player should see, not only the ones they act in. */
+const isPublic = (e: SimEvent): boolean =>
+  e.kind === 'frontier.opened' || (e.kind === 'player.joined' && e.data['reason'] === 'new');
+
+/** Which edge of the city a position is on, for the arrival message. */
+function sideOf(state: GameState, pos: { x: number; y: number }): string {
+  const nodes = Object.values(state.graph.nodes);
+  const xs = nodes.map((n) => n.pos.x);
+  const ys = nodes.map((n) => n.pos.y);
+  const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+  const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+  const dx = (pos.x - cx) / Math.max(1, (Math.max(...xs) - Math.min(...xs)) / 2);
+  const dy = (pos.y - cy) / Math.max(1, (Math.max(...ys) - Math.min(...ys)) / 2);
+  if (Math.hypot(dx, dy) < 0.25) return 'centre';
+  if (Math.abs(dx) >= Math.abs(dy)) return dx > 0 ? 'east' : 'west';
+  return dy > 0 ? 'south' : 'north';
+}
 
 export type CreatePlayerResult = { ok: true; playerId: Id } | { ok: false; error: 'world_full' };
 
@@ -106,7 +124,10 @@ export class Engine {
     const nowMs = Math.max(this.opts.now(), this.state.nowMs);
     const due = this.pending.filter((i) => i.atMs <= nowMs);
     const result = step(this.state, due.map(Store.toInput), nowMs);
-    const stored = this.opts.store.transaction(() => this.opts.store.insertEvents(result.events));
+    const everyone = Object.keys(result.state.players);
+    const stored = this.opts.store.transaction(() =>
+      this.opts.store.insertEvents(result.events, (e) => (isPublic(e) ? everyone : undefined)),
+    );
     this.state = result.state;
     if (due.length > 0) {
       this.appliedSeq = Math.max(this.appliedSeq, ...due.map((i) => i.seq));
@@ -114,7 +135,10 @@ export class Engine {
       this.pending = this.pending.filter((i) => !dueSeqs.has(i.seq));
     }
     if (nowMs - this.lastSnapshotAt >= this.opts.snapshotMs) this.snapshot();
-    const tick: TickResult = { nowMs, events: stored };
+    return this.publish({ nowMs, events: stored });
+  }
+
+  private publish(tick: TickResult): TickResult {
     for (const fn of this.listeners) {
       try {
         fn(tick);
@@ -140,25 +164,44 @@ export class Engine {
   }
 
   /**
-   * Adds a new player at the current game time and runs `link` (which inserts the account) in the
-   * same transaction as a fresh snapshot, so account and player exist together or not at all.
+   * Adds a new player at the current game time and runs `link` (which inserts the account or bot)
+   * in the same transaction as a fresh snapshot, so both exist together or not at all. `crew` is
+   * the display name put in the arrival event that every player's feed receives.
    */
-  createPlayer(link: (playerId: Id) => void): CreatePlayerResult {
+  createPlayer(link: (playerId: Id) => void, crew?: string): CreatePlayerResult {
     this.tick();
-    const playerId = `p${Object.keys(this.state.players).length + 1}`;
-    let next: GameState;
+    const playerId = `p${String(Object.keys(this.state.players).length + 1)}`;
+    let added: ReturnType<typeof addPlayerWithEvents>;
     try {
       // The sim picks a frontier plot for the newcomer.
-      next = addPlayer(this.state, { id: playerId });
+      added = addPlayerWithEvents(this.state, { id: playerId });
     } catch {
       return { ok: false, error: 'world_full' };
     }
+    const next = added.state;
+    // Name the crew and the plot in the arrival event, so other players can read it.
+    const events = added.events.map((e): SimEvent => {
+      if (e.kind !== 'player.joined') return e;
+      const d = next.districts[added.districtId];
+      return {
+        ...e,
+        data: {
+          ...e.data,
+          crew: crew ?? playerId,
+          ...(d ? { district: d.name, side: sideOf(next, d.pos) } : {}),
+        },
+      };
+    });
+    const everyone = Object.keys(next.players);
+    let stored: StoredEvent[] = [];
     this.opts.store.transaction(() => {
       link(playerId);
+      stored = this.opts.store.insertEvents(events, (e) => (isPublic(e) ? everyone : undefined));
       this.opts.store.insertSnapshot(next, hashState(next), this.appliedSeq);
     });
     this.state = next;
     this.lastSnapshotAt = this.opts.now();
+    this.publish({ nowMs: next.nowMs, events: stored });
     return { ok: true, playerId };
   }
 

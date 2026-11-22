@@ -1,5 +1,5 @@
 import type { DatabaseSync, StatementSync } from 'node:sqlite';
-import type { GameState, Input, Order, SimEvent } from '@nexum/sim';
+import type { BotKind, GameState, Input, Order, SimEvent } from '@nexum/sim';
 import { transaction } from './db.js';
 
 export interface StoredInput {
@@ -20,6 +20,21 @@ export interface StoredSnapshot {
 export interface StoredEvent {
   readonly seq: number;
   readonly event: SimEvent;
+  /** Everyone who should see it: the actors plus, for public events, every player. */
+  readonly audience?: readonly string[];
+}
+
+export interface BotRow {
+  readonly playerId: string;
+  readonly kind: BotKind;
+  readonly name: string;
+  readonly motto: string;
+  /** Faction colour role in the theme. */
+  readonly role: string;
+  readonly createdMs: number;
+  readonly retiredMs: number | null;
+  readonly nextCheckinMs: number;
+  readonly checkins: number;
 }
 
 export interface AccountRow {
@@ -126,7 +141,10 @@ export class Store {
   // ---- events
 
   /** Stores events (ignoring ones already stored, so replay is idempotent); returns each with its seq. */
-  insertEvents(events: readonly SimEvent[]): StoredEvent[] {
+  insertEvents(
+    events: readonly SimEvent[],
+    audienceOf?: (e: SimEvent) => readonly string[] | undefined,
+  ): StoredEvent[] {
     const out: StoredEvent[] = [];
     for (const e of events) {
       this.q('INSERT OR IGNORE INTO events (id, at_ms, kind, json) VALUES (?, ?, ?, ?)').run(
@@ -137,12 +155,14 @@ export class Store {
       );
       const row = this.q('SELECT seq FROM events WHERE id = ?').get(e.id) as Row;
       const seq = Number(row['seq']);
-      for (const actor of new Set(e.actors)) {
+      const audience = audienceOf?.(e);
+      const everyone = audience ? [...new Set([...e.actors, ...audience])] : undefined;
+      for (const actor of new Set(everyone ?? e.actors)) {
         this.q(
           'INSERT OR IGNORE INTO event_actors (player_id, at_ms, event_seq) VALUES (?, ?, ?)',
         ).run(actor, e.at, seq);
       }
-      out.push({ seq, event: e });
+      out.push(everyone ? { seq, event: e, audience: everyone } : { seq, event: e });
     }
     return out;
   }
@@ -161,6 +181,51 @@ export class Store {
       event: JSON.parse(String(r['json'])) as SimEvent,
     }));
     return { items, hasMore: rows.length > q.limit };
+  }
+
+  // ---- bots
+
+  private static bot(r: Row): BotRow {
+    return {
+      playerId: String(r['player_id']),
+      kind: String(r['kind']) as BotKind,
+      name: String(r['name']),
+      motto: String(r['motto']),
+      role: String(r['role']),
+      createdMs: Number(r['created_ms']),
+      retiredMs: r['retired_ms'] === null ? null : Number(r['retired_ms']),
+      nextCheckinMs: Number(r['next_checkin_ms']),
+      checkins: Number(r['checkins']),
+    };
+  }
+
+  insertBot(b: Omit<BotRow, 'retiredMs' | 'checkins'>): void {
+    this.q(
+      'INSERT INTO bots (player_id, kind, name, motto, role, created_ms, next_checkin_ms) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    ).run(b.playerId, b.kind, b.name, b.motto, b.role, b.createdMs, b.nextCheckinMs);
+  }
+
+  /** All bots, retired included, in creation order. */
+  allBots(): BotRow[] {
+    return (this.q('SELECT * FROM bots ORDER BY created_ms, player_id').all() as Row[]).map(
+      Store.bot,
+    );
+  }
+
+  setBotCheckin(playerId: string, nextCheckinMs: number, checkins: number): void {
+    this.q('UPDATE bots SET next_checkin_ms = ?, checkins = ? WHERE player_id = ?').run(
+      nextCheckinMs,
+      checkins,
+      playerId,
+    );
+  }
+
+  retireBot(playerId: string, nowMs: number): void {
+    this.q('UPDATE bots SET retired_ms = ? WHERE player_id = ?').run(nowMs, playerId);
+  }
+
+  countAccounts(): number {
+    return Number((this.q('SELECT COUNT(*) AS n FROM accounts').get() as Row)['n']);
   }
 
   // ---- accounts and sessions

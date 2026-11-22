@@ -19,6 +19,12 @@ const schema = z.object({
   BACKUP_KEEP: z.coerce.number().int().min(1).default(7),
   /** Development only: mounts `/api/dev` (seed bots, fast-forward the clock). Never enable in production. */
   DEV_SEED: z.enum(['true', 'false']).default('false'),
+  /** Fill the city with computer-run crews that play like async humans (see game/README.md). */
+  BOTS_ENABLED: z.enum(['true', 'false']).default('true'),
+  /** Bots wanted while the city has no human players. */
+  BOT_COUNT: z.coerce.number().int().min(0).max(24).default(6),
+  /** Fewest bots kept however many humans have joined. */
+  BOT_MIN: z.coerce.number().int().min(0).max(24).default(2),
   CLIENT_DIR: z.string().min(1).optional(),
 });
 
@@ -34,6 +40,9 @@ export interface Config {
   readonly backupHourUtc: number;
   readonly backupKeep: number;
   readonly devSeed: boolean;
+  readonly botsEnabled: boolean;
+  readonly botCount: number;
+  readonly botMin: number;
 }
 
 /** Parse and validate the environment; throws a readable error when it is invalid. */
@@ -55,5 +64,8 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     backupHourUtc: parsed.data.BACKUP_HOUR_UTC,
     backupKeep: parsed.data.BACKUP_KEEP,
     devSeed: parsed.data.DEV_SEED === 'true',
+    botsEnabled: parsed.data.BOTS_ENABLED === 'true',
+    botCount: parsed.data.BOT_COUNT,
+    botMin: Math.min(parsed.data.BOT_MIN, parsed.data.BOT_COUNT),
   };
 }

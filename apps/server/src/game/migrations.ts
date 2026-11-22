@@ -74,4 +74,22 @@ export const migrations: readonly Migration[] = [
       CREATE INDEX sessions_by_expiry ON sessions (expires_ms);
     `,
   },
+  {
+    id: 2,
+    name: 'bots',
+    sql: `
+      -- Bots are sim players with no login. Retired bots keep their districts but never act again.
+      CREATE TABLE bots (
+        player_id       TEXT PRIMARY KEY,
+        kind            TEXT NOT NULL,
+        name            TEXT NOT NULL,
+        motto           TEXT NOT NULL,
+        role            TEXT NOT NULL,
+        created_ms      INTEGER NOT NULL,
+        retired_ms      INTEGER,
+        next_checkin_ms INTEGER NOT NULL,
+        checkins        INTEGER NOT NULL DEFAULT 0
+      ) WITHOUT ROWID;
+    `,
+  },
 ];

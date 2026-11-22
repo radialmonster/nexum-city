@@ -1,5 +1,8 @@
 import type { FeedItem } from '@nexum/contracts';
 
+/** A feed item plus who should receive it (public events go to everyone). */
+export type HubItem = FeedItem & { readonly audience?: readonly string[] | undefined };
+
 export interface Subscriber {
   readonly playerId: string;
   /** Ends the connection (server shutdown). */
@@ -25,11 +28,14 @@ export class Hub {
     this.subs.clear();
   }
 
-  publishTick(nowMs: number, items: readonly FeedItem[]): void {
+  publishTick(nowMs: number, items: readonly HubItem[]): void {
     for (const sub of this.subs) {
       try {
         for (const item of items) {
-          if (item.event.actors.includes(sub.playerId)) sub.send('game', item, item.seq);
+          if ((item.audience ?? item.event.actors).includes(sub.playerId)) {
+            // Never send the audience list itself: it names every player.
+            sub.send('game', { seq: item.seq, event: item.event }, item.seq);
+          }
         }
         sub.send('tick', { nowMs });
       } catch {

@@ -138,7 +138,7 @@ export function gameRoutes(game: Game): Hono<Env> {
     try {
       const created = engine.createPlayer((playerId) => {
         account = store.insertAccount(body.username, pwHash, playerId, game.now());
-      });
+      }, body.username);
       if (!created.ok) return fail(c, 503, created.error);
       if (!account) throw new Error('account was not created');
       startSession(c, account.id);

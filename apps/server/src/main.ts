@@ -29,6 +29,7 @@ const game = createGame({
   trustProxy: config.trustProxy,
   backupHourUtc: config.backupHourUtc,
   backupKeep: config.backupKeep,
+  bots: { enabled: config.botsEnabled, count: config.botCount, min: config.botMin },
   log: (entry) => log({ time: new Date().toISOString(), ...entry }),
 });
 game.start();

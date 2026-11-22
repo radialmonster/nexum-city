@@ -369,11 +369,12 @@ describe('orders', () => {
     const none = feedResponseSchema.parse(
       await (await h.call('GET', `/api/feed?after=${last?.seq ?? 0}`, { token })).json(),
     );
-    expect(none.items).toEqual([]);
+    // Bob's arrival is public, so Alice's feed has it; nothing else is newer.
+    expect(none.items.map((i) => i.event.kind)).toEqual(['player.joined']);
     const late = feedResponseSchema.parse(
       await (await h.call('GET', `/api/feed?since=${(last?.event.at ?? 0) + 1}`, { token })).json(),
     );
-    expect(late.items).toEqual([]);
+    expect(late.items.map((i) => i.event.kind).filter((k) => k !== 'player.joined')).toEqual([]);
     expect((await h.call('GET', '/api/feed?limit=0', { token })).status).toBe(400);
   });
 
@@ -495,11 +496,11 @@ describe('persistence', () => {
     a.close();
     const b = openDatabase(join(dir, 'x.db'));
     const rows = b.prepare('SELECT id FROM schema_migrations').all();
-    expect(rows).toEqual([{ id: 1 }]);
+    expect(rows).toEqual([{ id: 1 }, { id: 2 }]);
     const tables = (
       b.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]
     ).map((t) => t.name);
-    for (const t of ['meta', 'snapshots', 'inputs', 'events', 'accounts', 'sessions']) {
+    for (const t of ['meta', 'snapshots', 'inputs', 'events', 'accounts', 'sessions', 'bots']) {
       expect(tables).toContain(t);
     }
     expect((b.prepare('PRAGMA journal_mode').get() as { journal_mode: string }).journal_mode).toBe(
