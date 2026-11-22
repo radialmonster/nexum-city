@@ -1,11 +1,21 @@
-import { MS_PER_HOUR, balance } from './balance.js';
+import { MS_PER_HOUR, balance, toUnits } from './balance.js';
 import { emit, schedule, unschedule, type Ctx } from './ctx.js';
 import { deposit } from './production.js';
+import { beginAmbush, scheduleStrikes } from './raid.js';
 import type { Route } from './routing.js';
 import { beginSettle } from './settle.js';
 import { joinSiege, onCrewArrived, onCrewLeft } from './siege.js';
 import type { System } from './systems.js';
-import type { Carrier, Crew, Goods, Id, Movement, MovementKind } from './types.js';
+import {
+  GOODS,
+  type Carrier,
+  type Crew,
+  type Goods,
+  type Id,
+  type Movement,
+  type MovementKind,
+  type RaidInfo,
+} from './types.js';
 
 /** Puts a crew at a node. It joins the garrison when the node is its owner's district. */
 export function placeCrew(ctx: Ctx, crew: Crew, nodeId: Id): void {
@@ -29,6 +39,8 @@ export interface MovementSpec {
   cargo: Goods;
   route: Route;
   durationMs: number;
+  /** Raids only. */
+  raid?: RaidInfo;
 }
 
 /** Moves units out of their location and into a new movement. Units are never in two places. */
@@ -53,6 +65,8 @@ export function startMovement(ctx: Ctx, spec: MovementSpec): Movement {
     departMs: state.nowMs,
     arriveMs: state.nowMs + spec.durationMs,
   };
+  if (spec.raid) movement.raid = spec.raid;
+  if (spec.kind === 'haul') movement.sent = GOODS.reduce((n, g) => n + spec.cargo[g], 0);
   for (const crew of spec.crews) {
     const node = 'at' in crew.loc ? crew.loc.at : null;
     leaveGarrison(ctx, crew);
@@ -62,6 +76,7 @@ export function startMovement(ctx: Ctx, spec: MovementSpec): Movement {
   if (spec.carrier) spec.carrier.loc = { movement: id };
   state.movements[id] = movement;
   schedule(ctx, movement.arriveMs, { kind: 'arrive', movementId: id });
+  scheduleStrikes(ctx, movement);
   return movement;
 }
 
@@ -85,6 +100,10 @@ export const travelSystem: System = {
       const { state } = ctx;
       const m = state.movements[ev.movementId];
       if (!m) return;
+      if (m.kind === 'raid' && m.recalledAtMs === undefined) {
+        beginAmbush(ctx, m);
+        return;
+      }
       for (const crewId of m.crewIds) {
         const crew = state.crews[crewId];
         if (crew) placeCrew(ctx, crew, m.to);
@@ -117,6 +136,8 @@ export const travelSystem: System = {
         carrier: m.carrierKind,
         crewIds: m.crewIds,
         recalled,
+        cargo: GOODS.reduce((n, g) => n + toUnits(m.cargo[g]), 0),
+        sent: m.sent === undefined ? 0 : toUnits(m.sent),
       });
     },
   },

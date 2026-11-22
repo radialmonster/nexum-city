@@ -32,6 +32,9 @@ console.log(
 );
 console.log(`bot orders=${r.botOrders} refused=${r.botRejected}`);
 console.log(`fills=${r.fills} filledUnits=${r.filledUnits}`);
+console.log(
+  `raids=${r.raids} hits=${r.raidHits} repelled=${r.raidsRepelled} stolen=${r.stolenUnits.toFixed(1)} destroyed=${r.destroyedUnits.toFixed(1)}`,
+);
 console.log(`invariant problems=${r.problems.length}`);
 console.log('standings:');
 for (const s of r.standings) {

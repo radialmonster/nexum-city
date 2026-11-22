@@ -8,6 +8,7 @@ export type {
   OwnDistrictView,
   PlayerView,
   RememberedDistrictView,
+  SeenAmbushView,
   SeenConvoyView,
   SeenDistrictView,
   SiegeView,
@@ -17,6 +18,7 @@ export { hashState, canonicalJson } from './hash.js';
 export { addTradeScore, inFinale, settleScore, standings } from './score.js';
 export type { Standing } from './score.js';
 export { isProtected, progressAt, siegeFraction } from './siege.js';
+export { crossingTime } from './raid.js';
 export { applyOrder, validateOrder } from './orders.js';
 export { ATOMS_PER_CENT, civicAsk, civicBid } from './market.js';
 export { BOTS, merchant, raider, turtle } from './bots.js';

@@ -1,10 +1,11 @@
+import { toUnits } from './balance.js';
 import { BOTS, type BotKind } from './bots.js';
 import { hashState } from './hash.js';
 import { checkInvariants } from './invariants.js';
 import { validateOrder } from './orders.js';
 import { standings, type Standing } from './score.js';
 import { step } from './step.js';
-import type { GameState, Id, Input, SimEvent } from './types.js';
+import { GOODS, type GameState, type Id, type Input, type SimEvent } from './types.js';
 import { addPlayer, createWorld } from './world.js';
 
 export interface SeasonOptions {
@@ -34,6 +35,12 @@ export interface SeasonResult {
   fills: number;
   filledUnits: number;
   rejected: number;
+  /** Raids (milestone 2): ambushes set, convoys hit, ambushes beaten, units stolen and destroyed. */
+  raids: number;
+  raidHits: number;
+  raidsRepelled: number;
+  stolenUnits: number;
+  destroyedUnits: number;
   districts: number;
   players: { id: Id; bot: BotKind }[];
   standings: Standing[];
@@ -76,7 +83,22 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
   let filledUnits = 0;
   let rejected = 0;
   let events = 0;
+  let raids = 0;
+  let raidHits = 0;
+  let raidsRepelled = 0;
+  let stolenUnits = 0;
+  let destroyedUnits = 0;
+  let lootReturned = 0;
+  // Per haul: units stolen and destroyed on the way, to prove nothing is created or lost silently.
+  const taken = new Map<string, number>();
   const problems: string[] = [];
+  const sumUnits = (v: unknown): number =>
+    v && typeof v === 'object'
+      ? Object.values(v as Record<string, unknown>).reduce<number>(
+          (n, x) => n + (typeof x === 'number' ? x : 0),
+          0,
+        )
+      : 0;
 
   const count = (list: SimEvent[]): void => {
     events += list.length;
@@ -92,6 +114,28 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
         const qty = e.data['qty'];
         if (typeof qty === 'number') filledUnits += qty;
       } else if (e.kind === 'order.rejected') rejected += 1;
+      else if (e.kind === 'raid.set') raids += 1;
+      else if (e.kind === 'raid.repelled') raidsRepelled += 1;
+      else if (e.kind === 'raid.ended') lootReturned += sumUnits(e.data['loot']);
+      else if (e.kind === 'raid.hit') {
+        raidHits += 1;
+        const stolen = sumUnits(e.data['stolen']);
+        const destroyed = sumUnits(e.data['destroyed']);
+        stolenUnits += stolen;
+        destroyedUnits += destroyed;
+        const haul = String(e.data['haulId']);
+        taken.set(haul, (taken.get(haul) ?? 0) + stolen + destroyed);
+      } else if (e.kind === 'arrived' && e.data['movement'] === 'haul') {
+        const sent = Number(e.data['sent']);
+        const left = Number(e.data['cargo']);
+        const lost = taken.get(String(e.data['movementId'])) ?? 0;
+        if (Math.abs(sent - left - lost) > 1e-6) {
+          problems.push(
+            `haul ${String(e.data['movementId'])}: sent ${sent} but ${left} arrived and ${lost} were taken`,
+          );
+        }
+        taken.delete(String(e.data['movementId']));
+      }
     }
   };
 
@@ -112,6 +156,18 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
     count(result.events);
     for (const problem of checkInvariants(state)) problems.push(`t=${state.nowMs}: ${problem}`);
   }
+  // Loot conservation: everything stolen is either reported home or still with a waiting ambush.
+  const waiting = Object.values(state.movements)
+    .filter((m) => m.kind === 'ambush')
+    .reduce(
+      (n, m) => n + sumUnits(Object.fromEntries(GOODS.map((g) => [g, toUnits(m.cargo[g])]))),
+      0,
+    );
+  if (Math.abs(stolenUnits - lootReturned - waiting) > 1e-6) {
+    problems.push(
+      `loot: stolen ${stolenUnits} but ${lootReturned} reported home and ${waiting} waiting`,
+    );
+  }
   return {
     inputs,
     start,
@@ -127,6 +183,11 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
     fills,
     filledUnits,
     rejected,
+    raids,
+    raidHits,
+    raidsRepelled,
+    stolenUnits,
+    destroyedUnits,
     districts: Object.keys(state.districts).length,
     players,
     standings: standings(state),

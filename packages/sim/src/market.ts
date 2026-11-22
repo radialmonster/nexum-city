@@ -6,6 +6,7 @@ import type { System } from './systems.js';
 import {
   GOODS,
   type Book,
+  type GameState,
   type Good,
   type Id,
   type MarketOrder,
@@ -50,6 +51,13 @@ function clampRef(good: Good, ref: number): number {
   const lo = Math.ceil((base * M.refMinPercent) / 100);
   const hi = Math.floor((base * M.refMaxPercent) / 100);
   return Math.min(hi, Math.max(lo, ref));
+}
+
+/** Moves a hub's reference price for a good up by a percent (raids use it: scarcity raises prices). */
+export function nudgeRef(state: GameState, hub: Id, good: Good, percent: number): void {
+  const book = state.markets[hub]?.[good];
+  if (!book) return;
+  book.refCents = clampRef(good, book.refCents + Math.ceil((book.refCents * percent) / 100));
 }
 
 /** Checks a placement without changing anything. */

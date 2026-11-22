@@ -54,6 +54,12 @@ describe('balance pass', () => {
     expect(seeds.reduce((n, r) => n + r.pvpCaptures, 0)).toBeGreaterThanOrEqual(1);
   });
 
+  it('plays raids and keeps goods conserved', () => {
+    expect(seeds.reduce((n, r) => n + r.raids, 0)).toBeGreaterThanOrEqual(1);
+    expect(seeds.reduce((n, r) => n + r.raidHits, 0)).toBeGreaterThanOrEqual(1);
+    // Conservation problems are reported in `problems`, which the test above requires to be empty.
+  });
+
   it('settles frontier plots', () => {
     expect(seeds.reduce((n, r) => n + r.settled, 0)).toBeGreaterThanOrEqual(1);
   });

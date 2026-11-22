@@ -35,6 +35,12 @@ function neighbours(edges: readonly Edge[]): Map<Id, Id[]> {
   return out;
 }
 
+/** The street nodes a movement is seen on: both ends of the street for an ambush. */
+function endsOf(state: GameState, m: Movement): Id[] {
+  if (m.kind === 'ambush' && m.raid) return [m.raid.a, m.raid.b];
+  return movementSegment(state.graph, m, state.nowMs);
+}
+
 function watchtowerLevel(buildings: readonly Building[]): number {
   return buildings.find((b) => (b.type as string) === WATCHTOWER)?.level ?? 0;
 }
@@ -73,12 +79,12 @@ export function sightOf(state: GameState, playerId: Id): Set<Id> {
     if ('at' in crew.loc) spread(crew.loc.at, 1);
     else {
       const m = state.movements[crew.loc.movement];
-      if (m) for (const id of movementSegment(state.graph, m, state.nowMs)) seen.add(id);
+      if (m) for (const id of endsOf(state, m)) seen.add(id);
     }
   }
   for (const m of Object.values(state.movements)) {
     if (m.owner !== playerId) continue;
-    for (const id of movementSegment(state.graph, m, state.nowMs)) seen.add(id);
+    for (const id of endsOf(state, m)) seen.add(id);
   }
   for (const [key, until] of Object.entries(state.reveals)) {
     const [who, where] = key.split('|');
@@ -173,6 +179,15 @@ export interface SeenConvoyView {
   segment: [Id, Id];
 }
 
+/** An ambush of another player, seen because one end of its street is in your sight. */
+export interface SeenAmbushView {
+  id: Id;
+  owner: Id;
+  /** The two ends of the ambushed street. */
+  edge: [Id, Id];
+  untilMs: number;
+}
+
 /** One price level of a public book: total open units at a price. */
 export interface BookLevel {
   price: number;
@@ -202,6 +217,8 @@ export interface PlayerView {
   movements: Record<Id, Movement>;
   /** Convoys of other players seen inside your sight. */
   convoys: SeenConvoyView[];
+  /** Ambushes of other players on streets inside your sight (yours are in `movements`). */
+  ambushes: SeenAmbushView[];
   /** Scout reveals you hold: district id to the time it ends. */
   reveals: Record<Id, number>;
   /** Public order books by hub id, then good. */
@@ -282,9 +299,17 @@ export function viewFor(state: GameState, playerId: Id): PlayerView {
   for (const c of Object.values(state.carriers)) if (c.owner === playerId) carriers[c.id] = copy(c);
   const movements: Record<Id, Movement> = {};
   const convoys: SeenConvoyView[] = [];
+  const ambushes: SeenAmbushView[] = [];
   for (const m of Object.values(state.movements)) {
     if (m.owner === playerId) {
       movements[m.id] = copy(m);
+      continue;
+    }
+    if (m.kind === 'ambush' && m.raid) {
+      const { a, b, untilMs } = m.raid;
+      // Hidden unless the street is in sight; the target only learns when hit (`raid.hit`).
+      if (sight.has(a) || sight.has(b))
+        ambushes.push({ id: m.id, owner: m.owner, edge: [a, b], untilMs });
       continue;
     }
     const segment = movementSegment(state.graph, m, state.nowMs);
@@ -358,6 +383,7 @@ export function viewFor(state: GameState, playerId: Id): PlayerView {
     carriers,
     movements,
     convoys,
+    ambushes,
     reveals,
     markets,
     orders,

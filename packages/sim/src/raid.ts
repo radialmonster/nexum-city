@@ -1,0 +1,233 @@
+import { balance, toAtoms, toUnits } from './balance.js';
+import { emit, schedule, unschedule, type Ctx } from './ctx.js';
+import { nudgeRef } from './market.js';
+import { nextFloat } from './rng.js';
+import { shortestRoute, travelMs } from './routing.js';
+import { applyLoss } from './siege.js';
+import type { System } from './systems.js';
+import { GOODS, type Crew, type Goods, type Id, type Movement } from './types.js';
+
+/*
+ * Raids and escorts (milestone 2). The rules and the reasoning are in
+ * docs/rewrite/sim-spec.md, "Raids and escorts (M2)".
+ *
+ * A raid order sends crews to one end of a street (a `raid` movement). On
+ * arrival the movement turns into a persistent `ambush`: the crews stay inside
+ * it, so they are never garrison, never besieging and never seen standing at a
+ * node. Strikes are scheduled queue events (`raid.strike`) at the moment an
+ * enemy haul crosses the middle of the street, so the result never depends on
+ * how the clock is sliced. When the window ends (or the ambush is full,
+ * beaten or recalled) the movement becomes a `return` walking home with the
+ * loot, and the normal arrival deposits it.
+ */
+
+const sumGoods = (g: Goods): number => GOODS.reduce((n, good) => n + g[good], 0);
+
+const goodsUnits = (g: Goods): Record<string, number> => {
+  const out: Record<string, number> = {};
+  for (const good of GOODS) if (g[good] > 0) out[good] = toUnits(g[good]);
+  return out;
+};
+
+function crewsOf(ctx: Ctx, m: Movement): Crew[] {
+  return m.crewIds.flatMap((id) => ctx.state.crews[id] ?? []);
+}
+
+function edgeLength(ctx: Ctx, x: Id, y: Id): number | null {
+  const e = ctx.state.graph.edges.find((k) => (k.a === x && k.b === y) || (k.a === y && k.b === x));
+  return e ? e.lengthM : null;
+}
+
+/** When a haul crosses the middle of the street a-b, or null if its route never uses it. */
+export function crossingTime(ctx: Ctx, haul: Movement, a: Id, b: Id): number | null {
+  if (haul.lengthM <= 0) return null;
+  let walked = 0;
+  for (let i = 0; i + 1 < haul.route.length; i++) {
+    const x = haul.route[i] as Id;
+    const y = haul.route[i + 1] as Id;
+    const len = edgeLength(ctx, x, y) ?? 0;
+    if ((x === a && y === b) || (x === b && y === a)) {
+      const fraction = (walked + len / 2) / haul.lengthM;
+      return haul.departMs + Math.round(fraction * (haul.arriveMs - haul.departMs));
+    }
+    walked += len;
+  }
+  return null;
+}
+
+function maybeStrike(ctx: Ctx, ambush: Movement, haul: Movement): void {
+  const r = ambush.raid;
+  if (!r || ambush.kind !== 'ambush' || haul.kind !== 'haul') return;
+  if (haul.owner === ambush.owner || haul.recalledAtMs !== undefined) return;
+  if (sumGoods(haul.cargo) <= 0 || r.struck.includes(haul.id)) return;
+  const at = crossingTime(ctx, haul, r.a, r.b);
+  if (at === null || at < ctx.state.nowMs || at >= r.untilMs) return;
+  schedule(ctx, at, { kind: 'raid.strike', movementId: ambush.id, targetId: haul.id });
+}
+
+/** A haul has just set out: every enemy ambush on its route gets a strike at the crossing. */
+export function scheduleStrikes(ctx: Ctx, haul: Movement): void {
+  if (haul.kind !== 'haul') return;
+  for (const id of Object.keys(ctx.state.movements).sort()) {
+    const m = ctx.state.movements[id] as Movement;
+    if (m.kind === 'ambush') maybeStrike(ctx, m, haul);
+  }
+}
+
+/** The raiders have reached the street: they dig in and start waiting. */
+export function beginAmbush(ctx: Ctx, m: Movement): void {
+  const { state } = ctx;
+  const r = m.raid;
+  if (!r) return;
+  r.untilMs = state.nowMs + r.windowMs;
+  m.kind = 'ambush';
+  m.route = [r.near];
+  m.lengthM = 0;
+  m.from = r.near;
+  m.to = r.near;
+  m.departMs = state.nowMs;
+  m.arriveMs = r.untilMs;
+  schedule(ctx, r.untilMs, { kind: 'raid.end', movementId: m.id });
+  emit(ctx, 'raid.set', [m.owner], [r.a, r.b], {
+    movementId: m.id,
+    edge: [r.a, r.b],
+    untilMs: r.untilMs,
+    crewIds: m.crewIds,
+  });
+  for (const id of Object.keys(state.movements).sort()) {
+    const other = state.movements[id] as Movement;
+    if (other.kind === 'haul') maybeStrike(ctx, m, other);
+  }
+}
+
+export type AmbushEnd = 'expired' | 'recalled' | 'repelled' | 'full';
+
+/** Stops an ambush: the crews walk home with whatever they took. */
+export function endAmbush(ctx: Ctx, m: Movement, reason: AmbushEnd): void {
+  const { state } = ctx;
+  const r = m.raid;
+  if (!r || m.kind !== 'ambush') return;
+  unschedule(
+    state,
+    (e) => (e.kind === 'raid.end' || e.kind === 'raid.strike') && e.movementId === m.id,
+  );
+  const home = shortestRoute(state.graph, r.near, r.home) ?? { route: [r.near], lengthM: 0 };
+  m.kind = 'return';
+  m.route = home.route;
+  m.lengthM = home.lengthM;
+  m.from = r.near;
+  m.to = r.home;
+  m.departMs = state.nowMs;
+  m.arriveMs = state.nowMs + travelMs(home.lengthM, m.carrierKind);
+  Reflect.deleteProperty(m, 'recalledAtMs');
+  Reflect.deleteProperty(m, 'recallFraction');
+  schedule(ctx, m.arriveMs, { kind: 'arrive', movementId: m.id });
+  emit(ctx, 'raid.ended', [m.owner], [r.a, r.b], {
+    movementId: m.id,
+    reason,
+    loot: goodsUnits(m.cargo),
+    struck: r.struck.length,
+  });
+}
+
+function roll(ctx: Ctx): number {
+  const k = balance.raid.noisePercent / 100;
+  return 1 + (nextFloat(ctx.state.rng) * 2 - 1) * k;
+}
+
+function strike(ctx: Ctx, ambush: Movement, haul: Movement): void {
+  const { state } = ctx;
+  const r = ambush.raid;
+  if (!r) return;
+  const cfg = balance.raid;
+  r.struck.push(haul.id);
+
+  const raiders = crewsOf(ctx, ambush);
+  const escort = crewsOf(ctx, haul);
+  const raiderStrength = raiders.reduce((n, c) => n + c.strength, 0);
+  let guard = balance.carriers[haul.carrierKind].toughness;
+  escort.forEach((c, i) => {
+    guard += i === 0 ? (c.strength * cfg.driverPercent) / 100 : c.strength;
+  });
+  // Two draws every time, so the number of RNG calls never depends on the outcome.
+  const raiderRoll = roll(ctx);
+  const guardRoll = roll(ctx);
+  const raidersWin = raiderStrength * raiderRoll > guard * guardRoll;
+  const victim = haul.owner;
+  const actors = [ambush.owner, victim];
+
+  if (!raidersWin) {
+    const lost = applyLoss(
+      raiders,
+      Math.max(1, Math.floor((raiderStrength * cfg.raiderLossPercent) / 100)),
+    );
+    emit(ctx, 'raid.repelled', actors, [r.a, r.b], {
+      movementId: ambush.id,
+      haulId: haul.id,
+      raiderStrength,
+      guard,
+      raiderLost: lost,
+    });
+    endAmbush(ctx, ambush, 'repelled');
+    return;
+  }
+
+  const carrierSpace =
+    haul.carrierKind === 'foot'
+      ? balance.carriers.foot.cargo * Math.max(1, haul.crewIds.length)
+      : balance.carriers[haul.carrierKind].cargo;
+  const room = Math.max(0, toAtoms(carrierSpace) - sumGoods(ambush.cargo));
+  const want: Goods = { parts: 0, power: 0, data: 0, supplies: 0 };
+  for (const g of GOODS) want[g] = Math.floor((haul.cargo[g] * cfg.stealPercent) / 100);
+  const wantTotal = sumGoods(want);
+  const stolen: Goods = { parts: 0, power: 0, data: 0, supplies: 0 };
+  const destroyed: Goods = { parts: 0, power: 0, data: 0, supplies: 0 };
+  for (const g of GOODS) {
+    stolen[g] = wantTotal <= room ? want[g] : Math.floor((want[g] * room) / wantTotal);
+    const left = haul.cargo[g] - stolen[g];
+    destroyed[g] = Math.floor((left * cfg.destroyPercent) / 100);
+    haul.cargo[g] = left - destroyed[g];
+    ambush.cargo[g] += stolen[g];
+  }
+  const escortLost = applyLoss(
+    escort,
+    Math.max(
+      1,
+      Math.floor((escort.reduce((n, c) => n + c.strength, 0) * cfg.escortLossPercent) / 100),
+    ),
+  );
+  emit(ctx, 'raid.hit', actors, [r.a, r.b], {
+    movementId: ambush.id,
+    haulId: haul.id,
+    stolen: goodsUnits(stolen),
+    destroyed: goodsUnits(destroyed),
+    remaining: goodsUnits(haul.cargo),
+    raiderStrength,
+    guard,
+    escortLost,
+  });
+  const dest = state.districts[haul.to];
+  if (dest && dest.kind === 'hub') {
+    for (const g of GOODS) if (stolen[g] > 0) nudgeRef(state, dest.id, g, cfg.priceNudgePercent);
+  }
+  if (room - sumGoods(stolen) <= toAtoms(cfg.fullUnits)) endAmbush(ctx, ambush, 'full');
+}
+
+export const raidSystem: System = {
+  name: 'raid',
+  handlers: {
+    'raid.end': (ctx, ev) => {
+      const m = ctx.state.movements[ev.movementId];
+      if (m && m.kind === 'ambush') endAmbush(ctx, m, 'expired');
+    },
+    'raid.strike': (ctx, ev) => {
+      const ambush = ctx.state.movements[ev.movementId];
+      const haul = ctx.state.movements[ev.targetId];
+      if (!ambush || ambush.kind !== 'ambush' || !ambush.raid) return;
+      if (!haul || haul.kind !== 'haul' || haul.recalledAtMs !== undefined) return;
+      if (haul.owner === ambush.owner || ambush.raid.struck.includes(haul.id)) return;
+      if (sumGoods(haul.cargo) <= 0) return;
+      strike(ctx, ambush, haul);
+    },
+  },
+};

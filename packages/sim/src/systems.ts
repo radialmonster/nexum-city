@@ -4,6 +4,7 @@ import { observe } from './fog.js';
 import { frontierSystem } from './frontier.js';
 import { marketSystem } from './market.js';
 import { productionSystem } from './production.js';
+import { raidSystem } from './raid.js';
 import { scoreSystem } from './score.js';
 import { settleSystem } from './settle.js';
 import { siegeSystem } from './siege.js';
@@ -34,6 +35,7 @@ const fogSystem: System = { name: 'fog', after: observe };
 /** Order matters only for `settle` (all current systems are independent). */
 export const systems: readonly System[] = [
   travelSystem,
+  raidSystem,
   productionSystem,
   constructionSystem,
   siegeSystem,

@@ -1,9 +1,10 @@
-import { MS_PER_MINUTE, balance, toAtoms } from './balance.js';
+import { MS_PER_HOUR, MS_PER_MINUTE, balance, toAtoms } from './balance.js';
 import { buildCost, startConstruction } from './construction.js';
 import { emit, type Ctx } from './ctx.js';
 import { cancelOrder, findOrder, placeOrder, validatePlace } from './market.js';
 import { afterWarehouseChange, buildingLevel, storeAt } from './production.js';
 import { shortestRoute, travelMs, type Route } from './routing.js';
+import { endAmbush } from './raid.js';
 import { isProtected, refreshSiege } from './siege.js';
 import { placeCrew, recallMovement, startMovement } from './travel.js';
 import {
@@ -20,6 +21,7 @@ import {
   type MovementKind,
   type Order,
   type OrderError,
+  type RaidInfo,
   type Validation,
 } from './types.js';
 
@@ -34,6 +36,7 @@ type Plan =
       cargo: Goods;
       route: Route;
       durationMs: number;
+      raid?: RaidInfo;
     }
   | { type: 'build'; district: District; building: BuildingType }
   | { type: 'stance'; district: District; stance: 'hold' | 'pullback' }
@@ -57,6 +60,8 @@ interface TravelRequest {
   crewIds: readonly Id[];
   to: Id;
   cargo?: Partial<Record<string, number>>;
+  /** Raids only: the street to lie in wait on, and for how many hours. */
+  edge?: { a: Id; b: Id; hours: number };
 }
 
 function resolveTravel(state: GameState, req: TravelRequest): Resolved {
@@ -90,10 +95,42 @@ function resolveTravel(state: GameState, req: TravelRequest): Resolved {
   if (crews.some((c) => nodeOf(c) !== from)) return fail('not_colocated');
   if (carrier && nodeOf(carrier) !== from) return fail('not_colocated');
 
-  const target = state.districts[req.to];
+  let to = req.to;
+  let raid: RaidInfo | undefined;
+  if (req.kind === 'raid' && req.edge) {
+    const { a, b, hours } = req.edge;
+    if (!state.graph.edges.some((e) => (e.a === a && e.b === b) || (e.a === b && e.b === a))) {
+      return fail('bad_edge');
+    }
+    if (!Number.isInteger(hours) || hours < 1 || hours > balance.raid.maxHours) {
+      return fail('bad_window');
+    }
+    const active = Object.values(state.movements).filter(
+      (m) => m.owner === req.actorId && (m.kind === 'raid' || m.kind === 'ambush'),
+    ).length;
+    if (active >= balance.raid.maxActive) return fail('too_many_raids');
+    // Wait at the end of the street that is the shorter walk (ties: the smaller id).
+    const [lo, hi] = a < b ? [a, b] : [b, a];
+    const toLo = shortestRoute(state.graph, from, lo);
+    const toHi = shortestRoute(state.graph, from, hi);
+    if (!toLo && !toHi) return fail('no_route');
+    to = toLo && (!toHi || toLo.lengthM <= toHi.lengthM) ? lo : hi;
+    raid = {
+      a: lo,
+      b: hi,
+      near: to,
+      home: from,
+      windowMs: hours * MS_PER_HOUR,
+      untilMs: 0,
+      struck: [],
+    };
+  }
+  const target = state.districts[to];
   if (!target) return fail('unknown_district');
-  if (req.to === from) return fail('invalid_target');
-  if (req.kind === 'scout') {
+  if (req.kind !== 'raid' && to === from) return fail('invalid_target');
+  if (req.kind === 'raid') {
+    // Any street will do; the checks above are all a raid needs.
+  } else if (req.kind === 'scout') {
     if (target.kind === 'hub') return fail('invalid_target');
   } else if (req.kind === 'siege') {
     if (target.kind === 'hub' || target.owner === req.actorId) return fail('invalid_target');
@@ -139,7 +176,7 @@ function resolveTravel(state: GameState, req: TravelRequest): Resolved {
     for (const g of GOODS) if (source[g] < cargo[g]) return fail('insufficient_goods');
   }
 
-  const route = shortestRoute(state.graph, from, req.to);
+  const route = shortestRoute(state.graph, from, to);
   if (!route) return fail('no_route');
   return {
     plan: {
@@ -151,6 +188,7 @@ function resolveTravel(state: GameState, req: TravelRequest): Resolved {
       cargo,
       route,
       durationMs: travelMs(route.lengthM, kind),
+      ...(raid ? { raid } : {}),
     },
   };
 }
@@ -218,6 +256,15 @@ function resolve(state: GameState, input: Input): Resolved {
         crewIds: order.crewIds,
         to: order.to,
       });
+    case 'raid':
+      return resolveTravel(state, {
+        kind: 'raid',
+        actorId,
+        carrierId: order.carrierId,
+        crewIds: order.crewIds,
+        to: order.a,
+        edge: { a: order.a, b: order.b, hours: order.hours },
+      });
     case 'build': {
       const district = state.districts[order.districtId];
       if (!district) return fail('unknown_district');
@@ -241,7 +288,9 @@ function resolve(state: GameState, input: Input): Resolved {
       const movement = state.movements[order.movementId];
       if (!movement) return fail('unknown_movement');
       if (movement.owner !== actorId) return fail('not_owner');
-      if (movement.recalledAtMs !== undefined) return fail('already_recalled');
+      if (movement.recalledAtMs !== undefined || movement.kind === 'return') {
+        return fail('already_recalled');
+      }
       return { plan: { type: 'recall', movement } };
     }
     case 'market.place': {
@@ -308,7 +357,8 @@ export function applyOrder(ctx: Ctx, input: Input): Validation {
       refreshSiege(ctx, plan.district.id);
       break;
     case 'recall':
-      recallMovement(ctx, plan.movement);
+      if (plan.movement.kind === 'ambush') endAmbush(ctx, plan.movement, 'recalled');
+      else recallMovement(ctx, plan.movement);
       break;
     case 'place': {
       placeOrder(ctx, input.actorId, plan.order);

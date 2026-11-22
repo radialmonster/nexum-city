@@ -256,7 +256,7 @@ export function walkHome(ctx: Ctx, crew: Crew, from: Id, to: Id): void {
 // ------------------------------------------------------------ combat
 
 /** Takes `loss` strength points from the crews, one at a time from the strongest, never below 1. */
-function applyLoss(crews: Crew[], loss: number): number {
+export function applyLoss(crews: Crew[], loss: number): number {
   let taken = 0;
   for (let i = 0; i < loss; i++) {
     let pick: Crew | null = null;

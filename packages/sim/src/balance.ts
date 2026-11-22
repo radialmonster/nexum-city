@@ -141,6 +141,30 @@ export const balance = {
     hours: 10,
   },
 
+  /** Raids and escorts (milestone 2, docs/rewrite/sim-spec.md). */
+  raid: {
+    /** The longest an ambush may last, in hours. */
+    maxHours: 8,
+    /** Ambushes (waiting or on their way) one player may run at once. */
+    maxActive: 2,
+    /** Percent of a convoy's cargo, per good, that winning raiders try to take. */
+    stealPercent: 40,
+    /** Percent of what is left after the theft that is destroyed in the fight. */
+    destroyPercent: 15,
+    /** Percent of the raiders' strength lost when they are beaten. */
+    raiderLossPercent: 30,
+    /** Percent of the escort's strength lost when the raiders win. */
+    escortLossPercent: 10,
+    /** Each side's strength is rolled between 100 minus and 100 plus this percent. */
+    noisePercent: 20,
+    /** The convoy's first crew drives, and counts for this percent as a guard. */
+    driverPercent: 50,
+    /** A winning ambush with this many units of room left or fewer stands down, full. */
+    fullUnits: 1,
+    /** A successful raid nudges the hub's reference price for the stolen good up by this percent. */
+    priceNudgePercent: 4,
+  },
+
   /** Trade earns score (task 54): only fills against the civic traders or other players count. */
   tradeScore: {
     /** Credits of trade per score point (1 point = 1 district-hour). */

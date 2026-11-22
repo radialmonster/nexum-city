@@ -131,7 +131,36 @@ export interface Carrier {
   loc: UnitLocation;
 }
 
-export type MovementKind = 'move' | 'haul' | 'scout' | 'siege' | 'reinforce' | 'settle';
+export type MovementKind =
+  | 'move'
+  | 'haul'
+  | 'scout'
+  | 'siege'
+  | 'reinforce'
+  | 'settle'
+  /** Crews walking to a street edge to lie in wait (raids, M2). */
+  | 'raid'
+  /** Crews lying in wait on a street edge. Persistent; the crews are inside it. */
+  | 'ambush'
+  /** Raiders walking home with the loot. */
+  | 'return';
+
+/** The bookkeeping of a raid, carried by its `raid`, `ambush` and `return` movements. */
+export interface RaidInfo {
+  /** The two ends of the ambushed street (sorted by id). */
+  a: Id;
+  b: Id;
+  /** The end the raiders walk to and wait beside. */
+  near: Id;
+  /** Where the crews came from and walk back to. */
+  home: Id;
+  /** How long the ambush lasts once the crews arrive. */
+  windowMs: number;
+  /** When the ambush ends (0 until the crews have arrived). */
+  untilMs: number;
+  /** Convoys already hit by this ambush; each is hit at most once. */
+  struck: Id[];
+}
 
 /** A group of units travelling together along a route. */
 export interface Movement {
@@ -153,6 +182,10 @@ export interface Movement {
   recalledAtMs?: number;
   /** Fraction of the route covered when it was recalled. */
   recallFraction?: number;
+  /** Raids only: the ambush this movement belongs to. */
+  raid?: RaidInfo;
+  /** Hauls only: the cargo it set out with, in atoms (for conservation checks and reports). */
+  sent?: number;
 }
 
 export type QueuedEvent = { at: number; seq: number } & (
@@ -164,6 +197,8 @@ export type QueuedEvent = { at: number; seq: number } & (
   | { kind: 'market.tick' }
   | { kind: 'frontier.survey'; districtId: Id }
   | { kind: 'settle.done'; districtId: Id }
+  | { kind: 'raid.end'; movementId: Id }
+  | { kind: 'raid.strike'; movementId: Id; targetId: Id }
 );
 export type QueuedKind = QueuedEvent['kind'];
 
@@ -297,6 +332,7 @@ export type Order =
   | { type: 'siege'; carrierId: Id | null; crewIds: Id[]; target: Id }
   | { type: 'reinforce'; carrierId: Id | null; crewIds: Id[]; to: Id }
   | { type: 'settle'; carrierId: Id | null; crewIds: Id[]; target: Id }
+  | { type: 'raid'; carrierId: Id | null; crewIds: Id[]; a: Id; b: Id; hours: number }
   | { type: 'scout'; crewId: Id; carrierId: Id | null; target: Id }
   | { type: 'stance'; districtId: Id; stance: Stance }
   | { type: 'recall'; movementId: Id }
@@ -350,6 +386,9 @@ export const ORDER_ERRORS = [
   'too_many_orders',
   'not_open_plot',
   'already_settling',
+  'bad_edge',
+  'bad_window',
+  'too_many_raids',
 ] as const;
 export type OrderError = (typeof ORDER_ERRORS)[number];
 
@@ -372,6 +411,10 @@ export type SimEventKind =
   | 'settle.started'
   | 'settle.done'
   | 'settle.failed'
+  | 'raid.set'
+  | 'raid.hit'
+  | 'raid.repelled'
+  | 'raid.ended'
   | 'protection.ended'
   | 'score.tick'
   | 'order.rejected';

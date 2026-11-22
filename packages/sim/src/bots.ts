@@ -1,4 +1,4 @@
-import { balance, toAtoms, toUnits } from './balance.js';
+import { MS_PER_HOUR, balance, toAtoms, toUnits } from './balance.js';
 import { buildCost } from './construction.js';
 import { civicAsk, civicBid } from './market.js';
 import { shortestRoute } from './routing.js';
@@ -148,8 +148,60 @@ const BUY_MARGIN = 10;
 /** What a van carries (balance.carriers.van.cargo), so a haul is never over capacity. */
 const VAN_CARGO = balance.carriers.van.cargo;
 
+/** A merchant escorts hauls of at least this many units. */
+const ESCORT_FROM_UNITS = 30;
+
 /** A weaker rival's district is picked over a neutral plot unless it is this much farther. */
 const WEAK_RIVAL_DISCOUNT = 0.5;
+
+/** The raider sets an ambush on every this-many-th hour of the season, so it is not constant. */
+const AMBUSH_EVERY_HOURS = 1;
+const AMBUSH_HOURS = 6;
+
+/**
+ * A street edge on a rival's way to its nearest hub (the last street into the hub, where hauls
+ * from that district are most likely to pass). Bots guess; they do not watch convoys.
+ */
+function ambushOrders(s: GameState, me: Id): Order[] {
+  if (Math.floor(s.nowMs / MS_PER_HOUR) % AMBUSH_EVERY_HOURS !== 0) return [];
+  if (
+    Object.values(s.movements).some(
+      (m) => m.owner === me && ['raid', 'ambush', 'return'].includes(m.kind),
+    )
+  ) {
+    return [];
+  }
+  for (const base of mine(s, me)) {
+    const crews = idleCrews(s, base.id, me);
+    const van = vanAt(s, base.id, me);
+    if (crews.length < 2 || !van) continue;
+    const edges: { a: Id; b: Id; len: number }[] = [];
+    for (const d of Object.values(s.districts)) {
+      if (d.kind === 'hub' || d.owner === me || d.owner === 'neutral') continue;
+      const hub = nearestHubTo(s, d.id);
+      const route = hub && shortestRoute(s.graph, d.id, hub.id);
+      if (!route || route.route.length < 2) continue;
+      const a = route.route[route.route.length - 2] as Id;
+      const b = route.route[route.route.length - 1] as Id;
+      edges.push({ a, b, len: Math.min(length(s, base.id, a), length(s, base.id, b)) });
+    }
+    const edge = edges
+      .filter((e) => Number.isFinite(e.len))
+      .sort((x, y) => x.len - y.len || (x.a < y.a ? -1 : 1))[0];
+    if (!edge) continue;
+    return [
+      {
+        type: 'raid',
+        carrierId: van,
+        crewIds: crews.slice(0, 2).map((c) => c.id),
+        a: edge.a,
+        b: edge.b,
+        hours: AMBUSH_HOURS,
+      },
+    ];
+  }
+  return [];
+}
 
 /** Sends its crews at the nearest district it does not own (neutral plots first on ties). */
 export const raider: Bot = (s, me) => {
@@ -159,7 +211,7 @@ export const raider: Bot = (s, me) => {
   const campaigning =
     Object.values(s.sieges).some((g) => g.attacker === me) ||
     Object.values(s.movements).some((m) => m.owner === me && m.kind === 'siege');
-  if (campaigning) return orders;
+  if (campaigning) return [...orders, ...ambushOrders(s, me)];
   for (const base of mine(s, me)) {
     const crews = idleCrews(s, base.id, me);
     if (crews.length === 0) continue;
@@ -289,10 +341,11 @@ function sellStash(s: GameState, me: Id): Order[] {
 }
 
 /** Hauls the biggest spare pile from a home warehouse to the nearest hub. */
-function haulToHub(s: GameState, me: Id): Order[] {
+function haulToHub(s: GameState, me: Id, escort = false): Order[] {
   const orders: Order[] = [];
   for (const base of mine(s, me)) {
-    const crew = idleCrews(s, base.id, me)[0];
+    const idle = idleCrews(s, base.id, me);
+    const crew = idle[0];
     const van = vanAt(s, base.id, me);
     if (!crew || !van) continue;
     let best: { good: (typeof GOODS)[number]; qty: number } | null = null;
@@ -309,12 +362,16 @@ function haulToHub(s: GameState, me: Id): Order[] {
       .sort((a, b) => length(s, base.id, a.id) - length(s, base.id, b.id));
     const hub = hubs[0];
     if (!hub) continue;
+    const qty = Math.min(best.qty, 40);
+    // A valuable load gets a second crew riding along as escort (the van has two seats).
+    const guards =
+      escort && qty >= ESCORT_FROM_UNITS && idle[1] ? [crew.id, idle[1].id] : [crew.id];
     orders.push({
       type: 'haul',
       carrierId: van,
-      crewIds: [crew.id],
+      crewIds: guards,
       to: hub.id,
-      cargo: { [best.good]: Math.min(best.qty, 40) },
+      cargo: { [best.good]: qty },
     });
     break;
   }
@@ -371,7 +428,7 @@ export const merchant: Bot = (s, me) => {
     ...economy(s, me, budget, 3, ['workshop']),
     ...settleOrders(s, me, budget, SETTLE_RESERVE, 1),
   ];
-  orders.push(...sellStash(s, me), ...haulToHub(s, me), ...resupply(s, me, budget));
+  orders.push(...sellStash(s, me), ...haulToHub(s, me, true), ...resupply(s, me, budget));
   return orders;
 };
 
