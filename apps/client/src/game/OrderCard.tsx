@@ -1,5 +1,12 @@
 import type { OrderBody, PlayerView } from '@nexum/contracts';
-import { balance, buildCost, buildDurationMs, eta, toUnits, type CarrierKind } from '@nexum/sim';
+import {
+  balance,
+  buildCost,
+  buildDurationMs,
+  toUnits,
+  type BuildingType,
+  type CarrierKind,
+} from '@nexum/sim';
 import { useEffect, useMemo, useState } from 'react';
 import { Bar, Button, Panel } from '../ui';
 import {
@@ -22,6 +29,8 @@ import { messageFor } from './messages';
 import { siegeOdds } from './odds';
 import { JOB_NAMES, jobDuration, jobMinutes, jobPay, jobRisk, jobSentence } from './streetJobs';
 import { compareCarriers, suggestRunner } from './runner';
+import { AMBUSH_ROUTE_WARNING, ambushesOnRoute } from './towers';
+import { maxLevelFor, slowText, wearInfo, wornRoute } from './wear';
 import type { OrderDraft } from './store';
 import styles from './OrderCard.module.css';
 
@@ -56,7 +65,7 @@ export interface Pick {
   /** A carrier id, or null to go on foot. */
   readonly carrierId: string | null;
   readonly cargo: Readonly<Record<string, number>>;
-  readonly building: 'workshop' | 'depot' | 'walls';
+  readonly building: BuildingType;
   /** Raid: the street's two ends and how long the crews wait. */
   readonly street?: readonly [string, string] | null;
   readonly hours?: number;
@@ -212,6 +221,7 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
   const crewIds = picked ?? crews.slice(0, 1).map((c) => c.id);
   const chosenCrews = crews.filter((c) => crewIds.includes(c.id));
   const kind = carrierKindOf(view, carrierId);
+  const carrierWear = wearInfo({ wear: carrierId ? view.carriers[carrierId]?.wear : 0 });
   const seats = seatsFor(kind);
   const maxCrews = draft.kind === 'scout' || draft.kind === 'job' ? 1 : seats;
   const tooMany = chosenCrews.length > maxCrews;
@@ -243,9 +253,9 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
       // The crews walk to the nearer end of the street (ties: the smaller id), as the sim does.
       if (streetA === null || streetB === null) return null;
       const ends = [streetA, streetB].sort();
-      let best: ReturnType<typeof eta> = null;
+      let best: ReturnType<typeof wornRoute> = null;
       for (const end of ends) {
-        const leg = eta(view.graph, source, end, kind);
+        const leg = wornRoute(view, source, end, kind, carrierWear.wear);
         if (leg && (!best || leg.durationMs < best.durationMs)) best = leg;
       }
       if (!best) return null;
@@ -253,8 +263,13 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
       const far = ends.find((e) => e !== near);
       return { ...best, route: far ? [...best.route, far] : best.route };
     }
-    return eta(view.graph, source, draft.districtId, kind === 'foot' ? 'foot' : kind);
-  }, [view.graph, source, draft, kind, streetA, streetB]);
+    return wornRoute(view, source, draft.districtId, kind, carrierWear.wear);
+  }, [view, source, draft, kind, streetA, streetB, carrierWear.wear]);
+  const knownAmbush = useMemo(
+    () =>
+      draft.kind === 'haul' && route ? ambushesOnRoute(view, route.route, nowMs).length > 0 : false,
+    [view, draft.kind, route, nowMs],
+  );
 
   useEffect(() => {
     onRoute(route ? route.route : null);
@@ -290,7 +305,7 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
     const level = (own?.buildings.find((b) => b.type === building)?.level ?? 0) + 1;
     const cost = buildCost(building, level);
     if (!own) blocker = 'You can only build in your own districts.';
-    else if (level > balance.buildings.maxLevel) blocker = 'That building is at its top level.';
+    else if (level > maxLevelFor(building)) blocker = 'That building is at its top level.';
     else if (own.construction) blocker = 'Something is already being built here.';
     else if (own.buildings.length >= own.slots && !own.buildings.some((b) => b.type === building))
       blocker = 'No free slot. Upgrade a building you have.';
@@ -373,7 +388,7 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
           <>
             <fieldset className={styles['field']}>
               <legend>BUILDING</legend>
-              {(['workshop', 'depot', 'walls'] as const).map((b) => (
+              {BUILD_CHOICES.map((b) => (
                 <label key={b} className={styles['opt']}>
                   <input
                     type="radio"
@@ -570,9 +585,14 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
                 : route
                   ? draft.kind === 'raid' && route.lengthM < 1
                     ? 'Crews are in place at once.'
-                    : `ETA ${formatEta(route.durationMs)} over ${String(Math.round(route.lengthM))} m`
+                    : `ETA ${formatEta(route.durationMs)} over ${String(Math.round(route.lengthM))} m${slowText(carrierWear.slowPercent) ? ` (${slowText(carrierWear.slowPercent) ?? ''}, worn)` : ''}`
                   : 'No route'}
             </p>
+            {knownAmbush && (
+              <p className={styles['warn']} role="alert" data-testid="ambush-warning">
+                {AMBUSH_ROUTE_WARNING}
+              </p>
+            )}
             {draft.kind === 'settle' && (
               <p className={styles['line']} data-testid="settle-cost">
                 Costs {balance.settle.supplies} supplies from this warehouse. The plot is yours{' '}
@@ -628,8 +648,19 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
   );
 }
 
-const BUILDING_HELP: Record<Pick['building'], string> = {
+/** What a player can build, in the order the card lists it. */
+const BUILD_CHOICES = [
+  'workshop',
+  'depot',
+  'walls',
+  'watchtower',
+  'garage',
+] as const satisfies readonly BuildingType[];
+
+const BUILDING_HELP: Record<(typeof BUILD_CHOICES)[number], string> = {
   workshop: `+${String(balance.production.workshopBonusPercent)}% output per level`,
   depot: `+${String(balance.warehouse.depotBonusPerLevel)} storage per level`,
   walls: `+${String(balance.siege.wallsPercentPerLevel)}% defence per level`,
+  watchtower: 'See 2 streets further and get warned when someone sets an ambush nearby.',
+  garage: 'Repairs your carriers 4× faster; Runners bought here are cheaper.',
 };

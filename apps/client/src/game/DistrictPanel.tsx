@@ -3,6 +3,7 @@ import { balance, toUnits } from '@nexum/sim';
 import { Bar, Button, Chip, Gauge, Panel, StanceSwitch, Tag, type Tone } from '../ui';
 import { cx } from '../ui/util';
 import {
+  carrierLabel,
   carriersAt,
   crewLabel,
   crewsAt,
@@ -25,6 +26,8 @@ import { JobsPanel } from './JobsPanel';
 import { MyContracts } from './MyContracts';
 import type { JobOffer } from './streetJobs';
 import { buyRunnerBlocker, RUNNER_PITCH } from './runner';
+import { maxLevelFor, runnerCreditsAt } from './wear';
+import { WearMeter } from './WearMeter';
 import styles from './DistrictPanel.module.css';
 
 export const GOOD_TONE: Readonly<Record<(typeof GOOD_KEYS)[number], Tone>> = {
@@ -156,13 +159,12 @@ function Own({
 }) {
   const crews = crewsAt(view, d.id);
   const carriers = carriersAt(view, d.id);
-  const runnerBlocker = onBuyRunner ? buyRunnerBlocker(view) : 'Not available here.';
+  const runnerBlocker = onBuyRunner ? buyRunnerBlocker(view, d.id) : 'Not available here.';
   const cap = warehouseCapacity(d);
   const rate = productionPerHour(d);
   const good = KIND_GOOD[d.kind];
   const maxed =
-    d.buildings.length >= d.slots &&
-    d.buildings.every((b) => b.level >= balance.buildings.maxLevel);
+    d.buildings.length >= d.slots && d.buildings.every((b) => b.level >= maxLevelFor(b.type));
   const empty = Math.max(0, d.slots - d.buildings.length);
   return (
     <div className={styles['stack']}>
@@ -243,6 +245,18 @@ function Own({
           carrier{carriers.length === 1 ? '' : 's'}
           {carriers.length > 0 && `: ${carriers.map((c) => c.kind).join(', ')}`}
         </span>
+        {carriers.some((c) => (c.wear ?? 0) > 0) && (
+          <ul className={styles['wear-list']} data-testid="carrier-wear">
+            {carriers
+              .filter((c) => (c.wear ?? 0) > 0)
+              .map((c) => (
+                <li key={c.id} className={styles['wear-row']}>
+                  <span>{carrierLabel(view, c.id)}</span>
+                  <WearMeter wear={c.wear} label={carrierLabel(view, c.id)} />
+                </li>
+              ))}
+          </ul>
+        )}
         {crews
           .filter((c) => c.strength < balance.recruit.startStrength)
           .map((c) => (
@@ -257,7 +271,7 @@ function Own({
             onBuyRunner?.(d.id);
           }}
         >
-          BUY RUNNER - {balance.runner.credits} CR
+          BUY RUNNER - {runnerCreditsAt(d)} CR
         </Button>
         <small className={styles['hint']} data-testid="runner-pitch">
           {RUNNER_PITCH}
@@ -441,6 +455,9 @@ function Empire({
 }: Pick<DistrictPanelProps, 'view' | 'nowMs' | 'onFly' | 'onDeliver' | 'onBoard' | 'onTakeJob'>) {
   const e = empireSummary(view);
   const own = ownDistricts(view);
+  const worn = Object.values(view.carriers).filter(
+    (c) => c.owner === view.playerId && (c.wear ?? 0) > 0,
+  );
   return (
     <Panel title="Your empire" tag="NONE SELECTED" className={styles['panel']}>
       <div className={styles['stack']}>
@@ -449,6 +466,19 @@ function Empire({
           <Chip label="CREWS" value={String(e.crews)} />
           <Chip label="CARRIERS" value={String(e.carriers)} />
         </div>
+        {worn.length > 0 && (
+          <div className={styles['block']}>
+            <span className={styles['cap']}>WORN CARRIERS</span>
+            <ul className={styles['wear-list']} data-testid="empire-wear">
+              {worn.map((c) => (
+                <li key={c.id} className={styles['wear-row']}>
+                  <span>{carrierLabel(view, c.id)}</span>
+                  <WearMeter wear={c.wear} label={carrierLabel(view, c.id)} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className={styles['block']}>
           <span className={styles['cap']}>INCOME PER HOUR</span>
           {e.totalPerHour > 0 ? (

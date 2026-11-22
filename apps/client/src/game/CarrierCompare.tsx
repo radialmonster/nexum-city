@@ -1,6 +1,7 @@
 import type { CarrierKind } from '@nexum/sim';
 import { formatEta } from './derive';
 import type { CarrierOption } from './runner';
+import { WearMeter } from './WearMeter';
 import styles from './CarrierCompare.module.css';
 
 export interface CarrierCompareProps {
@@ -28,6 +29,7 @@ export function CarrierCompare({ options, chosen, suggestion }: CarrierComparePr
               {o.cargo}
               {o.tooSmall ? ' (too small for this load)' : ''}
             </span>
+            <WearMeter wear={o.wear} label={o.label} />
           </li>
         ))}
       </ul>

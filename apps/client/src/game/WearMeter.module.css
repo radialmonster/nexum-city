@@ -1,0 +1,19 @@
+.meter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-dim);
+}
+
+.bar {
+  width: var(--size-row);
+}
+
+.text {
+  font-family: var(--font-mono);
+}
+
+.meter[data-slow='true'] .text {
+  color: var(--color-warn);
+}

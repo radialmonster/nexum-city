@@ -257,3 +257,26 @@ describe('raid events', () => {
     expect(bought('rival')).toBeNull();
   });
 });
+
+describe('watchtower and wear events', () => {
+  it('describes a spotted ambush with the street and the end time', () => {
+    const e = describeEvent(
+      feedItem(1, 'raid.spotted', {
+        districts: ['a', 'b'],
+        data: { movementId: 'm1', untilMs: 14 * 3_600_000 + 20 * 60_000, owner: 'rival' },
+      }),
+      view,
+    );
+    expect(e).toMatchObject({ kind: 'WATCHTOWER', tone: 'warn' });
+    expect(e?.text).toContain('until 14:20');
+  });
+
+  it('folds worn and repaired carriers away quietly', () => {
+    expect(
+      describeEvent(feedItem(1, 'carrier.worn', { data: { carrierId: 'v1' } }), view),
+    ).toBeNull();
+    expect(
+      describeEvent(feedItem(2, 'carrier.repaired', { data: { carrierId: 'v1' } }), view),
+    ).toBeNull();
+  });
+});

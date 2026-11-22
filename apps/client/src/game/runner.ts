@@ -1,7 +1,8 @@
 import type { PlayerView } from '@nexum/contracts';
 import { balance, eta, toAtoms, type CarrierKind } from '@nexum/sim';
+import { runnerCreditsAt, wearInfo, wearOfBest, wornRoute } from './wear';
 import { carriersAt, carrierLabel, formatEta, seatsFor } from './derive';
-import { remainingUnits, msLeft } from './contracts';
+import { unitsToSend, msLeft } from './contracts';
 
 const R = balance.runner;
 
@@ -16,12 +17,14 @@ export const ownedRunners = (view: PlayerView): number =>
     .length;
 
 /** Why a Runner cannot be bought now, or null when it can. */
-export function buyRunnerBlocker(view: PlayerView): string | null {
+export function buyRunnerBlocker(view: PlayerView, districtId?: string): string | null {
+  const here = districtId ? view.districts[districtId] : undefined;
+  const price = runnerCreditsAt(here?.relation === 'own' ? here : undefined);
   if (ownedRunners(view) >= R.maxOwned) {
     return `You already own ${String(R.maxOwned)} Runners, the most allowed.`;
   }
-  if (view.self.credits < toAtoms(R.credits)) {
-    return `Needs ${String(R.credits)} credits.`;
+  if (view.self.credits < toAtoms(price)) {
+    return `Needs ${String(price)} credits.`;
   }
   return null;
 }
@@ -33,6 +36,10 @@ export interface CarrierOption {
   readonly speedX: number;
   readonly etaMs: number | null;
   readonly cargo: number;
+  /** Wear (0 to 100) of the carrier of this kind the card would send. */
+  readonly wear: number;
+  /** How much slower that wear makes it, in percent (0 when none). */
+  readonly slowPercent: number;
   readonly seats: number;
   /** Plain-language trade-off. */
   readonly note: string;
@@ -61,7 +68,8 @@ export function compareCarriers(
   kinds.sort((a, b) => balance.carriers[a].speed - balance.carriers[b].speed);
   return kinds.map((kind) => {
     const spec = balance.carriers[kind];
-    const route = eta(view.graph, from, to, kind);
+    const { wear, slowPercent } = wearInfo({ wear: wearOfBest(view, from, kind) });
+    const route = wornRoute(view, from, to, kind, wear);
     const name = kind.charAt(0).toUpperCase() + kind.slice(1);
     return {
       kind,
@@ -69,6 +77,8 @@ export function compareCarriers(
       speedX: Math.round((spec.speed / speedVan) * 10) / 10,
       etaMs: route ? route.durationMs : null,
       cargo: spec.cargo,
+      wear,
+      slowPercent,
       seats: seatsFor(kind),
       note: NOTES[kind],
       tooSmall: units > spec.cargo,
@@ -94,7 +104,7 @@ export function suggestRunner(
 ): RunnerSuggestion | null {
   const c = contractId ? view.contracts[contractId] : undefined;
   if (!c || c.taker !== view.playerId || c.status !== 'taken') return null;
-  const units = remainingUnits(c);
+  const units = unitsToSend(view, c);
   if (units <= 0 || units > balance.carriers.runner.cargo) return null;
   const left = msLeft(c, nowMs);
   for (const node of readyFrom) {

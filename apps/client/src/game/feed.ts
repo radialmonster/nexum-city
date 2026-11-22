@@ -2,6 +2,7 @@ import type { FeedItem, PlayerView } from '@nexum/contracts';
 import type { Tone } from '../ui';
 import { contractIdOf, describeContract } from './contractFeed';
 import { streetEnds, whoIs, type CrewNames } from './derive';
+import { spottingTower } from './towers';
 
 /** One line of the "While you were away" column. */
 export interface FeedEntry {
@@ -137,6 +138,24 @@ export function describeEvent(
               : `A siege of ${name(placeId)} ended.`,
       };
     }
+    case 'raid.spotted': {
+      // an enemy ambush inside one of your towers' reach (the sim tells only the tower owner)
+      const a = event.districts[0];
+      const b = event.districts[1];
+      const until = num(d, 'untilMs');
+      const tower = a && b ? spottingTower(view, a, b) : null;
+      return {
+        ...base,
+        kind: 'WATCHTOWER',
+        glyph: '!',
+        tone: 'warn',
+        text: `Your watchtower${tower ? ` at ${name(tower.districtId)}` : ''} spotted an ambush ${streetName(a, b)}${until === undefined ? '' : `, until ${clockOf(until)}`}.`,
+      };
+    }
+    // worn and repaired carriers are shown on the carrier itself, not as feed cards
+    case 'carrier.worn':
+    case 'carrier.repaired':
+      return null;
     case 'raid.set': {
       const street = streetName(placeId, event.districts[1]);
       return {
@@ -439,6 +458,9 @@ export function describeEvent(
       return event.kind.startsWith('contract.') ? describeContract(item, view, names) : null;
   }
 }
+
+/** `HH:MM` of a game time, the same clock the battle report shows. */
+export const clockOf = (ms: number): string => new Date(ms).toISOString().slice(11, 16);
 
 /** "now", "5m ago", "3h ago", "2d ago". */
 export function ago(nowMs: number, atMs: number): string {

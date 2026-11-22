@@ -98,3 +98,11 @@
   font-family: var(--font-mono);
   color: var(--color-text-bright);
 }
+
+.warn {
+  margin: 0;
+  padding: var(--space-xs) var(--space-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-danger);
+  border: var(--border-thin) solid var(--color-danger);
+}
