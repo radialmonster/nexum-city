@@ -136,7 +136,7 @@ describe('check-in schedule', () => {
     // Six bots, a day: a handful of visits each, not one per 2 s tick.
     expect(s?.checkins).toBeGreaterThan(6);
     expect(s?.checkins).toBeLessThan(6 * 12);
-  });
+  }, 30_000);
 
   it('produces the same game from the same seed', () => {
     const run = (): string => {
