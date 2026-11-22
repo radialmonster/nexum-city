@@ -36,19 +36,19 @@ Live status for [`plan.md`](plan.md). Update this file in the same commit as the
 
 ## Phase 1: Simulation core
 
-| ID  | Task                                                                                  | Status | Notes                 |
-| --- | ------------------------------------------------------------------------------------- | ------ | --------------------- |
-| 11  | World model: district grid, street graph, hubs, frontier, ownership                   | done   | 2026-11-22, `59b7800` |
-| 12  | Seeded RNG and a deterministic step function, `(state, inputs, dt) -> state + events` | done   | 2026-11-22, `59b7800` |
-| 13  | Orders: move, haul, build, scout, stance; asset-limited                               | done   | 2026-11-22, `59b7800` |
-| 14  | Travel: carriers (on foot, van, hauler), routing, ETAs                                | done   | 2026-11-22, `59b7800` |
-| 15  | Production and warehouses                                                             | done   | 2026-11-22, `59b7800` |
-| 16  | Siege: a single capture bar with modifiers; garrison, walls and stance                | todo   |                       |
-| 17  | Markets: a hub order book with civic baseline traders                                 | todo   |                       |
-| 18  | Fog and sight                                                                         | todo   |                       |
-| 19  | Season clock and district-hour scoring                                                | todo   |                       |
-| 1A  | New-player placement on the frontier, with protection; city growth                    | todo   | ADR 0028              |
-| 1B  | Fast-forward harness: simulate N days, determinism test                               | todo   |                       |
+| ID  | Task                                                                                  | Status | Notes                  |
+| --- | ------------------------------------------------------------------------------------- | ------ | ---------------------- |
+| 11  | World model: district grid, street graph, hubs, frontier, ownership                   | done   | 2026-11-22, `59b7800`  |
+| 12  | Seeded RNG and a deterministic step function, `(state, inputs, dt) -> state + events` | done   | 2026-11-22, `59b7800`  |
+| 13  | Orders: move, haul, build, scout, stance; asset-limited                               | done   | 2026-11-22, `59b7800`  |
+| 14  | Travel: carriers (on foot, van, hauler), routing, ETAs                                | done   | 2026-11-22, `59b7800`  |
+| 15  | Production and warehouses                                                             | done   | 2026-11-22, `59b7800`  |
+| 16  | Siege: a single capture bar with modifiers; garrison, walls and stance                | done   | 2026-11-22 (`45c2bed`) |
+| 17  | Markets: a hub order book with civic baseline traders                                 | todo   |                        |
+| 18  | Fog and sight                                                                         | done   | 2026-11-22 (`45c2bed`) |
+| 19  | Season clock and district-hour scoring                                                | done   | 2026-11-22 (`45c2bed`) |
+| 1A  | New-player placement on the frontier, with protection; city growth                    | todo   | ADR 0028               |
+| 1B  | Fast-forward harness: simulate N days, determinism test                               | todo   |                        |
 
 ## Phase 2: Server and persistence
 
@@ -110,5 +110,7 @@ Live status for [`plan.md`](plan.md). Update this file in the same commit as the
 - 2026-11-22: Phase 0 tasks 04–05 done (2637f15). `apps/client` is a Vite and React 19 app that injects the theme into a `<style>` element at boot, switches between `neon` and `highContrast` live, and has a user scale setting driving `--s-user`. The 13 UI kit components live in `apps/client/src/ui/` (CSS Modules, tokens only) and the `/kit` gallery shows every variant. `packages/theme` gained a `size` group (fixed component dimensions) and the `dangerSurface`, `track` and `trackLine` colours. Vitest now runs a `node` project and the jsdom `apps/client` project.
 - 2026-11-22: Phase 0 tasks 06–07 done (743baf2). `apps/server` (`@nexum/server`) is a Hono server on `@hono/node-server`: zod-validated `PORT`/`DATA_DIR` config, `GET /api/health`, JSON 404 for unknown `/api` routes, the built client with an SPA fallback, one JSON log line per request and graceful SIGTERM/SIGINT shutdown. `src/game/` is the placeholder for the tick loop and SQLite. `npm run dev` runs the server and the Vite dev server (with an `/api` proxy) together. The multi-stage `Dockerfile` (node:22-alpine, production deps only, non-root `node` user, healthcheck) and `docker-compose.yml` (256 MB limit, `nexum-data` volume at `/app/data`) work locally: image 254 MB, about 20 MiB RAM idle, container healthy. `package-lock.json` was regenerated because the Alpine image's npm 10 rejected the old one.
 - 2026-11-22: Phase 1 tasks 11–15 done (`59b7800`). `packages/sim` has the world model, a seeded RNG, an exact integer `step` (2 s ticks and one jump hash the same), the seven orders with typed validation, Dijkstra travel with ETAs, and production with warehouses. Siege, markets, fog, scoring and the frontier are left as extension points. Decisions are in `sim-spec.md`.
-- 2026-11-22: Phase 2 tasks 21–27 done (`7d50fa8`). `apps/server/src/game/` persists the authoritative in-memory sim to SQLite (`node:sqlite`, WAL): numbered migrations, JSON snapshots every 5 minutes and on shutdown, an append-only `inputs` log replayed on boot, then a catch-up `step` to the wall clock. Accounts use scrypt with per-user salts and hashed httpOnly session cookies; auth routes are rate limited. New `packages/contracts` holds the zod schemas for every request, response and order. API: register/login/logout, `/me`, `/orders`, `/eta`, `/feed`, `/stream` (SSE with heartbeat and `Last-Event-ID` replay). Nightly `VACUUM INTO` backups keep 7. Restart recovery hashes identically to an uninterrupted run (tested). Docker: state and in-flight movements survive a container restart, about 25 MiB RAM idle. `/me` uses a `viewForPlayer` adapter until the sim gains `viewFor`.
+- 2026-11-22: Phase 2 tasks 21–27 done (`7d50fa8`). `apps/server/src/game/` persists the authoritative in-memory sim to SQLite (`node:sqlite`, WAL): numbered migrations, JSON snapshots every 5 minutes and on shutdown, an append-only `inputs` log replayed on boot, then a catch-up `step` to the wall clock. Accounts use scrypt with per-user salts and hashed httpOnly session cookies; auth routes are rate limited. New `packages/contracts` holds the zod schemas for every request, response and order. API: register/login/logout, `/me`, `/orders`, `/eta`, `/feed`, `/stream` (SSE with heartbeat and `Last-Event-ID` replay). Nightly `VACUUM INTO` backups keep 7. Restart recovery hashes identically to an uninterrupted run (tested). Docker: state and in-flight movements survive a container restart, about 25 MiB RAM idle.
 - 2026-11-22: Phase A task A5 done. Cloudflare teardown complete: the cron worker, the Pages project and both D1 databases are deleted, and nothing named `nexum` remains on the account.
+- 2026-11-22: Phase 1 tasks 16, 18, 19 done (`45c2bed`). Siege (one capture bar per district, walls, stance, attrition rounds, loot, building damage, retreat, `reinforce`, battle report), fog (`viewFor`, `sightOf`, last-known owners) and season scoring (exact district-hours, hourly `score.tick`, catch-up modifiers, `standings`). An even fight captures in about 10 h. 134 tests pass.
+- 2026-11-22: sim-core merged into main (siege, fog and scoring). `packages/contracts` now mirrors the sim exactly (siege and reinforce orders, the `protected` error code, the new movement kinds, the fogged `PlayerView` and `Standing`; the compat test checks orders, events, movements, views and standings at compile time). The server uses the sim's `viewFor` for `/api/me` (the `viewForPlayer` adapter is gone, and a test proves a rival's warehouse and credits never appear), and `GET /api/standings` returns `standings(state)`. A new world now starts its season and first score tick at the wall-clock start time.

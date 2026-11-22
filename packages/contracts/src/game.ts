@@ -74,7 +74,7 @@ export const carrierSchema = z.object({
 export const movementSchema = z.object({
   id: idSchema,
   owner: idSchema,
-  kind: z.enum(['move', 'haul', 'scout']),
+  kind: z.enum(['move', 'haul', 'scout', 'siege', 'reinforce']),
   carrierId: idSchema.nullable(),
   carrierKind: carrierKindSchema,
   crewIds: z.array(idSchema),
@@ -118,17 +118,96 @@ export const simEventSchema = z.object({
 /** An event with its position in the server's append-only event log. */
 export const feedItemSchema = z.object({ seq: z.number().int(), event: simEventSchema });
 
+const scoreSchema = z.object({ rank: z.number().int(), playerId: idSchema, score: z.number() });
+
+/** A district's capture bar as a player may see it (progress 0 to 1). */
+export const siegeViewSchema = z.object({ attacker: idSchema, progress: z.number() });
+
+const districtBase = {
+  id: idSchema,
+  name: z.string(),
+  kind: z.string(),
+  pos: posSchema,
+};
+
+/** One district as seen through fog: full detail if own, coarse if in sight, a memory otherwise. */
+export const districtViewSchema = z.discriminatedUnion('relation', [
+  z.object({
+    relation: z.literal('own'),
+    ...districtBase,
+    owner: idSchema,
+    garrison: z.array(idSchema),
+    stance: stanceSchema,
+    buildings: z.array(z.object({ type: buildingTypeSchema, level: z.number() })),
+    slots: z.number(),
+    warehouse: goodsSchema,
+    protectedUntilMs: z.number().optional(),
+    frontier: z.enum(['open', 'surveying', 'built']),
+    construction: z
+      .object({ building: buildingTypeSchema, level: z.number(), completesAtMs: z.number() })
+      .nullable(),
+    overflowing: z.boolean(),
+    siege: siegeViewSchema.nullable(),
+  }),
+  z.object({
+    relation: z.enum(['visible', 'hub']),
+    ...districtBase,
+    owner: z.string(),
+    protected: z.boolean(),
+    /** Crews present by owner, as counts. */
+    presence: z.record(idSchema, z.number()),
+    siege: siegeViewSchema.nullable(),
+  }),
+  z.object({
+    relation: z.literal('remembered'),
+    ...districtBase,
+    lastKnownOwner: z.string().nullable(),
+  }),
+]);
+
+export const seenConvoySchema = z.object({
+  id: idSchema,
+  owner: idSchema,
+  carrier: z.string(),
+  position: posSchema,
+  segment: z.tuple([idSchema, idSchema]),
+});
+
+/** Mirrors `PlayerView` from `viewFor` in `@nexum/sim`: fogged, never holds rivals' private data. */
 export const playerViewSchema = z.object({
+  playerId: idSchema,
   nowMs: z.number(),
-  world: z.object({ cols: z.number(), rows: z.number(), soundY: z.number() }),
-  player: playerSchema,
-  /** Own districts plus hubs. */
-  districts: z.record(idSchema, districtSchema),
+  season: z.object({
+    startMs: z.number(),
+    endMs: z.number(),
+    finaleStartMs: z.number(),
+    finale: z.boolean(),
+  }),
+  self: z.object({
+    credits: z.number(),
+    stash: z.record(z.string(), goodsSchema),
+    score: z.number(),
+  }),
+  standings: z.array(scoreSchema),
+  districts: z.record(idSchema, districtViewSchema),
   crews: z.record(idSchema, crewSchema),
   carriers: z.record(idSchema, carrierSchema),
   movements: z.record(idSchema, movementSchema),
+  convoys: z.array(seenConvoySchema),
+  reveals: z.record(idSchema, z.number()),
+});
+
+/** Mirrors `Standing` from `standings` in `@nexum/sim`. */
+export const standingSchema = z.object({
+  rank: z.number().int(),
+  playerId: idSchema,
+  score: z.number(),
+  scoreMs: z.number(),
+  districts: z.number().int(),
 });
 
 export type GoodName = z.infer<typeof goodSchema>;
 export type PlayerView = z.infer<typeof playerViewSchema>;
+export type DistrictView = z.infer<typeof districtViewSchema>;
+export type Standing = z.infer<typeof standingSchema>;
 export type FeedItem = z.infer<typeof feedItemSchema>;

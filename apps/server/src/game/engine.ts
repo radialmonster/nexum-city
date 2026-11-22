@@ -34,6 +34,26 @@ export type CreatePlayerResult = { ok: true; playerId: Id } | { ok: false; error
  * and catches the clock up to now. `step` is exact over any split of time, so the replay hashes
  * the same as an uninterrupted run.
  */
+/**
+ * A new world whose game time is the wall clock. The sim starts at game time 0, with the season
+ * and the first hourly score tick measured from there, so all of them shift to the start time;
+ * otherwise the season would already be over and the first catch-up would run months of ticks.
+ */
+function genesis(seed: number, startMs: number): GameState {
+  const world = createWorld(seed);
+  return {
+    ...world,
+    nowMs: startMs,
+    season: {
+      ...world.season,
+      startMs: world.season.startMs + startMs,
+      endMs: world.season.endMs + startMs,
+      finaleStartMs: world.season.finaleStartMs + startMs,
+    },
+    queue: world.queue.map((e) => ({ ...e, at: e.at + startMs })),
+  };
+}
+
 export class Engine {
   private state: GameState;
   /** Inputs persisted but not yet applied to `state`. */
@@ -77,8 +97,7 @@ export class Engine {
       const seed = Number(store.getMeta('seed') ?? opts.seed);
       store.setMeta('seed', String(seed));
       store.setMeta('created_ms', String(opts.now()));
-      // The sim starts at game time 0; here game time is the wall clock.
-      const world: GameState = { ...createWorld(seed), nowMs: opts.now() };
+      const world = genesis(seed, opts.now());
       store.insertSnapshot(world, hashState(world), 0);
       engine = new Engine(opts, world, 0, []);
     }

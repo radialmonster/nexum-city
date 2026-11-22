@@ -31,3 +31,9 @@ const { state, events } = step(prev, inputs, toMs);
 ## Travel
 
 `eta(graph, from, to, carrier)` returns `{ route, lengthM, durationMs }` using Dijkstra with id tie-breaks. Carriers are in `balance.carriers` (Runner is locked). A unit is either `{ at }` a node or `{ movement }`, never both; `checkInvariants(state)` verifies that and no-negative-stock.
+
+## Siege, fog and season
+
+- `siege` and `reinforce` orders; one capture bar per district (`state.sieges`), exact and lazy. `progressAt`, `siegeFraction` and `isProtected` read it. Events: `siege.started`, `siege.progress` (every 10%), `siege.captured` (with a battle `report`), `siege.broken`, `combat.round`. Tuning lives in `balance.siege`.
+- `viewFor(state, playerId)` gives a JSON-safe, player-specific `PlayerView` (own districts in full, districts in sight, remembered owners elsewhere, convoys in sight). `sightOf` is the underlying set.
+- `state.season` holds the clock (`startMs`, `endMs`, `finaleStartMs`, `finale`). Score is exact district-milliseconds; `standings(state)` ranks players; `score.tick` fires hourly. Below-median players recruit faster and captures against the leader are faster.

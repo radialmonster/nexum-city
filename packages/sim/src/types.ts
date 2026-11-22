@@ -93,6 +93,8 @@ export interface Player {
   credits: number;
   /** Goods the player holds at each hub, by hub id. */
   stash: Record<Id, Goods>;
+  /** Season score in district-milliseconds: 1 point = `MS_PER_HOUR` of one owned district. */
+  score: number;
 }
 
 export type UnitLocation = { at: Id } | { movement: Id };
@@ -113,7 +115,7 @@ export interface Carrier {
   loc: UnitLocation;
 }
 
-export type MovementKind = 'move' | 'haul' | 'scout';
+export type MovementKind = 'move' | 'haul' | 'scout' | 'siege' | 'reinforce';
 
 /** A group of units travelling together along a route. */
 export interface Movement {
@@ -141,8 +143,54 @@ export type QueuedEvent = { at: number; seq: number } & (
   | { kind: 'arrive'; movementId: Id }
   | { kind: 'build.done'; districtId: Id }
   | { kind: 'production.full'; districtId: Id }
+  | { kind: 'siege.check'; districtId: Id }
+  | { kind: 'score.tick' }
 );
 export type QueuedKind = QueuedEvent['kind'];
+
+/** How a siege bar moves between events. Inputs are small integers; see `siege.ts`. */
+export type SiegeRate =
+  | {
+      mode: 'up';
+      /** Attacking strength, scaled by 10000 so it compares directly with `d`. */
+      a: number;
+      /** Defence: (garrison + militia) x walls percent x stance percent. */
+      d: number;
+      /** Capture-rate percent (100, or 110 against the leader). */
+      bonus: number;
+    }
+  | { mode: 'down' };
+
+/** The single capture bar of a district. Progress is lazy: it is exact at `sinceMs` and the rate holds after. */
+export interface Siege {
+  districtId: Id;
+  attacker: Id;
+  /** Attacking crews present at the district. */
+  crewIds: Id[];
+  /** Bar progress in `PROGRESS_SCALE` units, valid at `sinceMs`. */
+  progress: number;
+  sinceMs: number;
+  rate: SiegeRate;
+  /** Highest 10% step already reported (0 to 9). */
+  milestone: number;
+  /** Next attrition round, or `null` while no attackers are present. */
+  roundAtMs: number | null;
+  startedMs: number;
+  stats: { attackerStart: number; attackerLost: number; defenderLost: number; rounds: number };
+}
+
+export interface Season {
+  startMs: number;
+  endMs: number;
+  /** The last 48 hours begin here. */
+  finaleStartMs: number;
+  /** True once the finale has begun (updated hourly). New players cannot join. */
+  finale: boolean;
+  /** Strict score leader as of the last hourly tick, else `null`. */
+  leaderId: Id | null;
+  /** Players below the median score as of the last hourly tick. */
+  belowMedian: Id[];
+}
 
 export interface WorldMeta {
   cols: number;
@@ -175,6 +223,11 @@ export interface GameState {
   movements: Record<Id, Movement>;
   /** `${playerId}|${districtId}` to the time the scout reveal ends. */
   reveals: Record<string, number>;
+  /** Capture bars by district id. */
+  sieges: Record<Id, Siege>;
+  season: Season;
+  /** What each player last saw of each district's owner (fog memory). */
+  memory: Record<Id, Record<Id, Owner>>;
   /** Pending scheduled events, sorted by (at, seq). */
   queue: QueuedEvent[];
 }
@@ -187,6 +240,8 @@ export type Order =
   | { type: 'move'; carrierId: Id | null; crewIds: Id[]; to: Id }
   | { type: 'haul'; carrierId: Id | null; crewIds: Id[]; to: Id; cargo: CargoRequest }
   | { type: 'build'; districtId: Id; building: BuildingType }
+  | { type: 'siege'; carrierId: Id | null; crewIds: Id[]; target: Id }
+  | { type: 'reinforce'; carrierId: Id | null; crewIds: Id[]; to: Id }
   | { type: 'scout'; crewId: Id; carrierId: Id | null; target: Id }
   | { type: 'stance'; districtId: Id; stance: Stance }
   | { type: 'recall'; movementId: Id }
@@ -231,6 +286,7 @@ export const ORDER_ERRORS = [
   'max_level',
   'already_building',
   'already_recalled',
+  'protected',
 ] as const;
 export type OrderError = (typeof ORDER_ERRORS)[number];
 

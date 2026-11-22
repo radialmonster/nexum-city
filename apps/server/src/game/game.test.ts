@@ -9,6 +9,7 @@ import {
   feedResponseSchema,
   meResponseSchema,
   placeOrderResponseSchema,
+  standingsResponseSchema,
 } from '@nexum/contracts';
 import { balance, eta, hashState, validateOrder } from '@nexum/sim';
 import type { GameState, Order } from '@nexum/sim';
@@ -134,13 +135,10 @@ describe('accounts', () => {
     const me = meResponseSchema.parse(await (await h.call('GET', '/api/me', { token })).json());
     expect(me.account.username).toBe('Ada');
     expect(me.playerId).toBe(reg.playerId);
-    expect(me.view.player.id).toBe(reg.playerId);
-    const owned = Object.values(me.view.districts).filter((d) => d.owner === reg.playerId);
+    expect(me.view.playerId).toBe(reg.playerId);
+    const owned = Object.values(me.view.districts).filter((d) => d.relation === 'own');
     expect(owned).toHaveLength(1);
-    // the view holds only own districts plus hubs
-    for (const d of Object.values(me.view.districts)) {
-      expect(d.owner === reg.playerId || d.kind === 'hub').toBe(true);
-    }
+    expect(owned[0]?.owner).toBe(reg.playerId);
     expect(Object.values(me.view.crews).length).toBeGreaterThan(0);
 
     const out = await h.call('POST', '/api/auth/logout', { token });
@@ -266,12 +264,55 @@ describe('accounts', () => {
   });
 });
 
+describe('fog and standings', () => {
+  it('/me never leaks another players warehouse, credits or crews', async () => {
+    const h = boot();
+    const ada = await register(h, 'Ada');
+    const bob = await register(h, 'Bob');
+    // give Bob recognisable private numbers
+    const state = h.game.engine.current;
+    const bobPlayer = state.players[bob.playerId];
+    if (!bobPlayer) throw new Error('no bob');
+    bobPlayer.credits = 123_456_789;
+    const bobHome = Object.values(state.districts).find((d) => d.owner === bob.playerId);
+    if (!bobHome) throw new Error('no bob home');
+    bobHome.warehouse.parts = 987_654_321;
+
+    const res = await h.call('GET', '/api/me', { token: ada.token });
+    const text = await res.text();
+    expect(text).not.toContain('123456789');
+    expect(text).not.toContain('987654321');
+    const me = meResponseSchema.parse(JSON.parse(text));
+    expect(me.view.self.credits).not.toBe(123_456_789);
+    for (const d of Object.values(me.view.districts)) {
+      if (d.relation === 'own' || d.relation === 'remembered') continue;
+      expect(d).not.toHaveProperty('warehouse');
+    }
+    expect(Object.values(me.view.crews).every((c) => c.owner === ada.playerId)).toBe(true);
+    expect(Object.values(me.view.movements).every((m) => m.owner === ada.playerId)).toBe(true);
+    // far districts are only remembered, not seen
+    expect(Object.values(me.view.districts).some((d) => d.relation === 'remembered')).toBe(true);
+  });
+
+  it('serves public standings', async () => {
+    const h = boot();
+    const ada = await register(h, 'Ada');
+    await register(h, 'Bob');
+    expect((await h.call('GET', '/api/standings')).status).toBe(401);
+    const res = standingsResponseSchema.parse(
+      await (await h.call('GET', '/api/standings', { token: ada.token })).json(),
+    );
+    expect(res.standings.map((s) => s.rank)).toEqual([1, 2]);
+    expect(res.standings.every((s) => s.districts === 1)).toBe(true);
+  });
+});
+
 describe('orders', () => {
   it('accepts an order, rejects an invalid one with its code, and resolves it as time passes', async () => {
     const h = boot();
     const { token, playerId } = await register(h, 'Ada');
     const me = meResponseSchema.parse(await (await h.call('GET', '/api/me', { token })).json());
-    const home = Object.values(me.view.districts).find((d) => d.owner === playerId);
+    const home = Object.values(me.view.districts).find((d) => d.relation === 'own');
     if (!home) throw new Error('no home district');
 
     // invalid: not a district at all

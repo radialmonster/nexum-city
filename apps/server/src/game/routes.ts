@@ -5,7 +5,7 @@ import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { streamSSE } from 'hono/streaming';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { getConnInfo } from '@hono/node-server/conninfo';
-import { eta } from '@nexum/sim';
+import { eta, standings, viewFor } from '@nexum/sim';
 import type { Order } from '@nexum/sim';
 import {
   FEED_DEFAULT_LIMIT,
@@ -22,13 +22,13 @@ import type {
   FeedResponse,
   MeResponse,
   PlaceOrderResponse,
+  StandingsResponse,
 } from '@nexum/contracts';
 import type { ZodType } from 'zod';
 import type { Game } from './index.js';
 import { dummyHash, hashPassword, verifyPassword } from './passwords.js';
 import { SESSION_COOKIE, SESSION_TTL_MS } from './sessions.js';
 import type { AccountRow } from './store.js';
-import { viewForPlayer } from './view.js';
 
 interface Env {
   Variables: { account: AccountRow; token: string };
@@ -193,14 +193,21 @@ export function gameRoutes(game: Game): Hono<Env> {
 
   api.get('/me', requireAuth, (c) => {
     const account = c.get('account');
-    const view = viewForPlayer(engine.current, account.playerId);
-    if (!view) return fail(c, 404, 'not_found');
+    const state = engine.current;
+    if (!state.players[account.playerId]) return fail(c, 404, 'not_found');
+    const view = viewFor(state, account.playerId);
     const res: MeResponse = {
       ok: true,
       account: { id: account.id, username: account.username },
       playerId: account.playerId,
       view,
     };
+    return c.json(res);
+  });
+
+  api.get('/standings', requireAuth, (c) => {
+    const state = engine.current;
+    const res: StandingsResponse = { ok: true, nowMs: state.nowMs, standings: standings(state) };
     return c.json(res);
   });
 

@@ -27,7 +27,7 @@ Nightly `VACUUM INTO` backups go to `DATA_DIR/backups/`, keeping the last 7 (`BA
 
 ## API (`/api`, JSON, request and response shapes in `@nexum/contracts`)
 
-`POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /me`, `POST /orders`,
+`POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /me` (the sim's fogged `viewFor`), `GET /standings`, `POST /orders`,
 `GET /eta?from=&to=&carrier=`, `GET /feed?since=&after=&limit=`, `GET /stream` (SSE: `hello`, `tick`,
 `game`, `heartbeat` every 25 s; `Last-Event-ID` replays missed events; poll `/feed` as the fallback).
 Errors are `{ok:false, error, ...}` with a typed code (the sim's order codes plus the API codes).
@@ -39,6 +39,5 @@ Errors are `{ok:false, error, ...}` with a typed code (the sim's order codes plu
 
 ## Known gaps
 
-`view.ts` is an adapter (own districts, hubs, own units); swap in `viewFor` from the sim once it
-exists (fog, task 25 follow-up). SSE has no per-process connection cap. Start-district choice is
+SSE has no per-process connection cap. Start-district choice is
 simply the neutral district farthest from owned ones.

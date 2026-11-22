@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { feedItemSchema, playerViewSchema } from './game.js';
+import { feedItemSchema, playerViewSchema, standingSchema } from './game.js';
 import { ORDER_ERROR_CODES, carrierKindSchema, idSchema, orderSchema } from './orders.js';
 
 /** Request and response shapes for every `/api` route. */
@@ -58,6 +58,12 @@ export const meResponseSchema = z.object({
   view: playerViewSchema,
 });
 
+export const standingsResponseSchema = z.object({
+  ok: z.literal(true),
+  nowMs: z.number(),
+  standings: z.array(standingSchema),
+});
+
 export const placeOrderRequestSchema = z.strictObject({ order: orderSchema });
 export const placeOrderResponseSchema = z.object({
   ok: z.literal(true),
@@ -108,6 +114,7 @@ export const STREAM_EVENTS = ['hello', 'tick', 'game', 'heartbeat'] as const;
 export type ErrorResponse = z.infer<typeof errorResponseSchema>;
 export type AuthResponse = z.infer<typeof authResponseSchema>;
 export type MeResponse = z.infer<typeof meResponseSchema>;
+export type StandingsResponse = z.infer<typeof standingsResponseSchema>;
 export type PlaceOrderResponse = z.infer<typeof placeOrderResponseSchema>;
 export type EtaResponse = z.infer<typeof etaResponseSchema>;
 export type FeedResponse = z.infer<typeof feedResponseSchema>;

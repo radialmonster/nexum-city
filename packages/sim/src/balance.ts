@@ -9,6 +9,9 @@ import type { BuildingType, CarrierKind, Good, Goods } from './types.js';
 export const MS_PER_MINUTE = 60_000;
 export const MS_PER_HOUR = 3_600_000;
 
+/** A siege bar runs from 0 to this value (1.0 = captured). */
+export const PROGRESS_SCALE = 1_000_000;
+
 /**
  * Stock and credits are stored as integers of 1 / ATOMS_PER_UNIT of a unit.
  * 1 unit/hour is exactly 100 atoms/ms, so a rate integrated over any split of
@@ -74,6 +77,32 @@ export const balance = {
 
   scout: {
     revealHours: 4,
+  },
+
+  siege: {
+    /** Hours for an unopposed-ratio-1 bar (A much greater than D) to fill: base rate is 1/6 per hour. */
+    baseHoursToFill: 4,
+    /** Defence added to every district, owned or neutral. */
+    militia: 10,
+    wallsPercentPerLevel: 30,
+    pullbackPercent: 50,
+    /** The bar falls by 1/12 per hour with no attackers present. */
+    decayHours: 12,
+    roundMinutes: 30,
+    /** Expected loss per round, as a percent of the other side's strength. */
+    lossPercentPerRound: 1.5,
+    noisePercent: 20,
+    lootPercent: 30,
+    /** Capture rate bonus against the score leader, in percent. */
+    leaderBonusPercent: 10,
+  },
+
+  season: {
+    /** Milestone 1 test season; a normal season is 28 days. */
+    lengthHours: 168,
+    finaleHours: 48,
+    /** Percent of the usual recruit time for players below the median score. */
+    belowMedianRecruitPercent: 75,
   },
 
   world: {

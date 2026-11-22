@@ -1,6 +1,7 @@
 import { MS_PER_HOUR, balance, toAtoms } from './balance.js';
 import { emit, schedule, type Ctx } from './ctx.js';
 import { afterWarehouseChange, buildingLevel } from './production.js';
+import { refreshSiege } from './siege.js';
 import type { System } from './systems.js';
 import { GOODS, type BuildingType, type District, type Goods } from './types.js';
 
@@ -47,6 +48,8 @@ export const constructionSystem: System = {
       });
       // The new level changes the output rate and warehouse capacity.
       afterWarehouseChange(ctx, d);
+      // New walls change the capture rate against this district.
+      refreshSiege(ctx, d.id);
     },
   },
 };

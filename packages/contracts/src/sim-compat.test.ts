@@ -1,16 +1,41 @@
-import { ORDER_ERRORS } from '@nexum/sim';
-import type { GameState, Order, SimEvent } from '@nexum/sim';
+import { ORDER_ERRORS, addPlayer, createWorld, standings, viewFor } from '@nexum/sim';
+import type {
+  GameState,
+  Movement,
+  Order,
+  PlayerView as SimPlayerView,
+  SimEvent,
+  SimEventKind,
+  Standing as SimStanding,
+} from '@nexum/sim';
 import { describe, expect, it } from 'vitest';
-import { orderSchema, simEventSchema } from './index.js';
+import {
+  SIM_EVENT_KINDS,
+  movementSchema,
+  orderSchema,
+  playerViewSchema,
+  simEventSchema,
+  standingSchema,
+} from './index.js';
 import type { OrderBody } from './index.js';
 
-// Compile-time: the sim's orders and events are valid contract shapes. The reverse direction
-// (a parsed body being a sim `Order`) cannot be assignment-checked because zod types optional
-// keys as `?: T | undefined`, so the server casts after parsing; the runtime tests below cover it.
+// Compile-time: everything the sim produces or accepts is a valid contract shape. The reverse
+// direction for orders (a parsed body being a sim `Order`) cannot be assignment-checked because
+// zod types optional keys as `?: T | undefined`, so the server casts after parsing; the runtime
+// tests below cover it.
 const toBody = (o: Order): OrderBody => o;
 const toEvent = (e: SimEvent): ReturnType<typeof simEventSchema.parse> => e;
-void toBody;
-void toEvent;
+const toMovement = (m: Movement): ReturnType<typeof movementSchema.parse> => m;
+const toView = (v: SimPlayerView): ReturnType<typeof playerViewSchema.parse> => v;
+const toStanding = (s: SimStanding): ReturnType<typeof standingSchema.parse> => s;
+void [toBody, toEvent, toMovement, toView, toStanding];
+
+// Compile-time: the event-kind lists agree in both directions (a kind missing on either side
+// makes one of these fail to compile).
+type ContractKind = (typeof SIM_EVENT_KINDS)[number];
+const simKindsCovered: SimEventKind extends ContractKind ? true : never = true;
+const contractKindsExist: ContractKind extends SimEventKind ? true : never = true;
+void [simKindsCovered, contractKindsExist];
 
 describe('contracts mirror the sim', () => {
   it('lists exactly the sim order errors', async () => {
@@ -23,6 +48,8 @@ describe('contracts mirror the sim', () => {
       { type: 'move', carrierId: null, crewIds: ['c1'], to: 'd1_1' },
       { type: 'haul', carrierId: 'v1', crewIds: ['c1'], to: 'hubW', cargo: { parts: 5 } },
       { type: 'build', districtId: 'd0_0', building: 'workshop' },
+      { type: 'siege', carrierId: null, crewIds: ['c1', 'c2'], target: 'd1_0' },
+      { type: 'reinforce', carrierId: 'v1', crewIds: ['c1'], to: 'd0_0' },
       { type: 'scout', crewId: 'c1', carrierId: null, target: 'd2_2' },
       { type: 'stance', districtId: 'd0_0', stance: 'pullback' },
       { type: 'recall', movementId: 'm1' },
@@ -33,24 +60,21 @@ describe('contracts mirror the sim', () => {
     expect(orderSchema.safeParse({ type: 'recruit', districtId: 'x', extra: 1 }).success).toBe(
       false,
     );
+    expect(orderSchema.safeParse({ type: 'siege', carrierId: null, crewIds: [] }).success).toBe(
+      false,
+    );
     expect(
       orderSchema.safeParse({ type: 'move', carrierId: null, crewIds: [], to: '' }).success,
     ).toBe(false);
   });
 
-  it('parses a real world', async () => {
-    const { createWorld, addPlayer } = await import('@nexum/sim');
-    const state: GameState = addPlayer(createWorld(1), { id: 'p1', districtId: 'd0_0' });
-    const { playerViewSchema } = await import('./index.js');
-    const view = {
-      nowMs: state.nowMs,
-      world: state.world,
-      player: state.players['p1'],
-      districts: state.districts,
-      crews: state.crews,
-      carriers: state.carriers,
-      movements: state.movements,
-    };
-    expect(playerViewSchema.safeParse(view).success).toBe(true);
+  it('parses a real fogged view and the standings', () => {
+    let state: GameState = addPlayer(createWorld(1), { id: 'p1', districtId: 'd0_0' });
+    state = addPlayer(state, { id: 'p2', districtId: 'd5_3' });
+    const view = viewFor(state, 'p1');
+    expect(playerViewSchema.parse(view)).toEqual(view);
+    expect(Object.values(view.districts).some((d) => d.relation === 'remembered')).toBe(true);
+    const board = standings(state);
+    expect(board.map((s) => standingSchema.parse(s))).toEqual(board);
   });
 });

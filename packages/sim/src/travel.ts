@@ -2,6 +2,7 @@ import { MS_PER_HOUR, balance } from './balance.js';
 import { emit, schedule, unschedule, type Ctx } from './ctx.js';
 import { deposit } from './production.js';
 import type { Route } from './routing.js';
+import { joinSiege, onCrewArrived, onCrewLeft } from './siege.js';
 import type { System } from './systems.js';
 import type { Carrier, Crew, Goods, Id, Movement, MovementKind } from './types.js';
 
@@ -10,6 +11,7 @@ export function placeCrew(ctx: Ctx, crew: Crew, nodeId: Id): void {
   crew.loc = { at: nodeId };
   const d = ctx.state.districts[nodeId];
   if (d && d.owner === crew.owner && !d.garrison.includes(crew.id)) d.garrison.push(crew.id);
+  onCrewArrived(ctx, nodeId);
 }
 
 function leaveGarrison(ctx: Ctx, crew: Crew): void {
@@ -51,8 +53,10 @@ export function startMovement(ctx: Ctx, spec: MovementSpec): Movement {
     arriveMs: state.nowMs + spec.durationMs,
   };
   for (const crew of spec.crews) {
+    const node = 'at' in crew.loc ? crew.loc.at : null;
     leaveGarrison(ctx, crew);
     crew.loc = { movement: id };
+    if (node !== null) onCrewLeft(ctx, node, crew.id);
   }
   if (spec.carrier) spec.carrier.loc = { movement: id };
   state.movements[id] = movement;
@@ -88,6 +92,10 @@ export const travelSystem: System = {
       if (carrier) carrier.loc = { at: m.to };
       deposit(ctx, m.owner, m.to, m.cargo);
       const recalled = m.recalledAtMs !== undefined;
+      if (m.kind === 'siege' && !recalled) {
+        const crews = m.crewIds.flatMap((id) => state.crews[id] ?? []);
+        joinSiege(ctx, m.to, m.owner, crews);
+      }
       if (m.kind === 'scout' && !recalled) {
         const key = `${m.owner}|${m.to}`;
         const until = state.nowMs + balance.scout.revealHours * MS_PER_HOUR;

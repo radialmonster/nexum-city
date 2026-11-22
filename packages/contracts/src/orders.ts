@@ -49,6 +49,18 @@ export const orderSchema = z.discriminatedUnion('type', [
     building: buildingTypeSchema,
   }),
   z.strictObject({
+    type: z.literal('siege'),
+    carrierId: idSchema.nullable(),
+    crewIds,
+    target: idSchema,
+  }),
+  z.strictObject({
+    type: z.literal('reinforce'),
+    carrierId: idSchema.nullable(),
+    crewIds,
+    to: idSchema,
+  }),
+  z.strictObject({
     type: z.literal('scout'),
     crewId: idSchema,
     carrierId: idSchema.nullable(),
@@ -92,6 +104,7 @@ export const ORDER_ERROR_CODES = [
   'max_level',
   'already_building',
   'already_recalled',
+  'protected',
 ] as const;
 export const orderErrorCodeSchema = z.enum(ORDER_ERROR_CODES);
 export type OrderErrorCode = z.infer<typeof orderErrorCodeSchema>;
