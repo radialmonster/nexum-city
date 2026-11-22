@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MS_PER_HOUR, balance, toAtoms, toUnits } from './balance.js';
+import { ambushOrders } from './bots.js';
 import { clone, crewsOf, scenario, vanOf } from './fixtures.js';
 import { viewFor } from './fog.js';
 import { checkInvariants } from './invariants.js';
@@ -369,10 +370,29 @@ describe('newbie protection', () => {
     expect(kinds(run(state, w.haul).events)).toContain('raid.hit');
   });
 
-  it('is a shield on the target only: a protected player may still set an ambush', () => {
+  it('does not let a protected player set an ambush', () => {
     const w = haulWorld();
     protect(w.s, 'p1', 48);
-    expect(err(w.s, raidOrder(w.s, w.a, w.b))).toBeNull();
+    expect(err(w.s, raidOrder(w.s, w.a, w.b))).toBe('protected_no_raid');
+  });
+
+  it('lets a player raid once protection has ended', () => {
+    const w = haulWorld();
+    protect(w.s, 'p1', 48);
+    const later = step(w.s, [], w.s.nowMs + 49 * MS_PER_HOUR).state;
+    expect(err(later, raidOrder(later, w.a, w.b))).toBeNull();
+  });
+
+  it('keeps raider bots from ambushing while they are protected', () => {
+    const w = haulWorld();
+    // Open the other players up as targets, then compare protected and unprotected raiders.
+    for (const d of Object.values(w.s.districts)) if (d.owner === 'p2') d.protectedUntilMs = 0;
+    const hasRaid = (s: GameState): boolean => ambushOrders(s, 'p1').some((o) => o.type === 'raid');
+    const open = clone(w.s);
+    for (const d of Object.values(open.districts)) if (d.owner === 'p1') d.protectedUntilMs = 0;
+    expect(hasRaid(open)).toBe(true);
+    protect(w.s, 'p1', 48);
+    expect(hasRaid(w.s)).toBe(false);
   });
 });
 
@@ -435,6 +455,25 @@ describe('settle carriers and recalled hauls', () => {
       toUnits(before) - balance.settle.supplies,
     );
     expect(checkInvariants(r.state)).toEqual([]);
+  });
+
+  it('counts every crew on a settle carrier at full strength, unlike a haul driver', () => {
+    const w = settleWorld();
+    const st = ambushed({ s: w.s, a: w.a, b: w.b, haul: w.order });
+    for (const id of crewsOf(st, 'p1')) {
+      const c = st.crews[id];
+      if (c) c.strength = 500;
+    }
+    const settler = crewsOf(st, 'p2')[0] as Id;
+    const strength = st.crews[settler]?.strength ?? 0;
+    const r = step(
+      st,
+      [{ actorId: 'p2', order: w.order, atMs: st.nowMs + 1 }],
+      st.nowMs + 48 * MS_PER_HOUR,
+    );
+    const hit = r.events.find((e) => e.kind === 'raid.hit')?.data as { guard: number };
+    // On foot there is no carrier toughness, so the guard is the settler crew's full strength.
+    expect(hit.guard).toBeCloseTo(strength, 6);
   });
 
   it('strikes a settle carrier that is protected from nothing: protection shields it too', () => {
