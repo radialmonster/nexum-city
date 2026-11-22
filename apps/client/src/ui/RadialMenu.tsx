@@ -18,11 +18,16 @@ export interface RadialMenuProps {
 }
 
 // geometry, in viewBox units (the SVG is drawn at about 1 unit per CSS px at --s: 1)
-const VIEW = 300;
+const VIEW = 380;
 const CENTRE = VIEW / 2;
-const RING = 100;
+const RING = 138;
 const BUTTON = 30;
 const HUB = 44;
+// label backdrop: about this many viewBox units per letter, plus padding
+const LABEL_GAP = 18;
+const LABEL_CHAR = 10;
+const LABEL_PAD = 16;
+const LABEL_H = 22;
 
 /** Circular action menu around a point, such as around a district on the map. */
 export function RadialMenu({ items, selected, onSelect, title, className }: RadialMenuProps) {
@@ -69,7 +74,14 @@ export function RadialMenu({ items, selected, onSelect, title, className }: Radi
             <text className={styles['glyph']} x={x} y={y} dy="0.35em">
               {item.glyph}
             </text>
-            <text className={styles['label']} x={x} y={y + BUTTON + 14}>
+            <rect
+              className={styles['label-bg']}
+              x={x - (item.label.length * LABEL_CHAR + LABEL_PAD) / 2}
+              y={y + BUTTON + LABEL_GAP - LABEL_H / 2}
+              width={item.label.length * LABEL_CHAR + LABEL_PAD}
+              height={LABEL_H}
+            />
+            <text className={styles['label']} x={x} y={y + BUTTON + LABEL_GAP} dy="0.35em">
               {item.label}
             </text>
           </g>

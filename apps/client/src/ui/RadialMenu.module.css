@@ -56,6 +56,13 @@
   stroke-linejoin: round;
 }
 
+.label-bg {
+  fill: var(--color-panel-solid);
+  fill-opacity: 0.92;
+  stroke: var(--color-line-soft);
+  stroke-width: var(--border-thin);
+}
+
 .on .button {
   fill: var(--color-accent);
   filter: drop-shadow(0 0 var(--space-md) var(--color-accent));

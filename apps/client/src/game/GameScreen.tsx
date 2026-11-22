@@ -52,8 +52,15 @@ export function GameScreen() {
     };
   }, [session]);
 
+  // Any way of landing on your own plot (click, jump list, fly, auto-select) completes step one.
+  const selectedIsOwn = !!view && state.selected !== null && isOwn(view.districts[state.selected]);
+  const homeDone = steps.selectedHome || selectedIsOwn;
+  useEffect(() => {
+    if (selectedIsOwn && !steps.selectedHome) saveFirstSteps({ ...steps, selectedHome: true });
+  }, [selectedIsOwn, steps]);
+
   const updateSteps = (patch: Partial<FirstStepsState>) => {
-    const next = { ...steps, ...patch };
+    const next = { ...steps, selectedHome: homeDone, ...patch };
     setSteps(next);
     saveFirstSteps(next);
   };
@@ -63,9 +70,6 @@ export function GameScreen() {
   const alerts = Object.values(view.districts).filter((d) => isOwn(d) && d.siege !== null).length;
   const select = (id: string | null) => {
     store.dispatch({ type: 'select', id });
-    if (id !== null && isOwn(view.districts[id]) && !steps.selectedHome) {
-      updateSteps({ selectedHome: true });
-    }
     if (id !== null && compact) setDrawer('district');
   };
   const fly = (id: string) => {
@@ -162,7 +166,7 @@ export function GameScreen() {
                     id: 'home',
                     label: 'Select your district',
                     hint: 'Click your glowing plot on the map to see its crews and goods.',
-                    done: steps.selectedHome,
+                    done: homeDone,
                   },
                   {
                     id: 'settle',
