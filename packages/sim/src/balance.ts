@@ -168,6 +168,11 @@ export const balance = {
     playersPerPlot: 3,
     /** A new plot is surveyed for this long before it opens. */
     surveyHours: 4,
+    /**
+     * While any player is in their newcomer rush, a new plot is surveyed this fast instead, so the
+     * plot a joiner just left behind is open again before their rush hour is over.
+     */
+    rushSurveyMinutes: 5,
   },
 
   /** Settling an open frontier plot without a fight (task 54). */
@@ -285,8 +290,8 @@ export const balance = {
     factor: 10,
     /** The starter civic contract reserved for a newcomer. */
     starter: { good: 'supplies', qty: 5, premiumPercent: 100, graceMinutes: 20 },
-    /** Goods a new home district starts with, exactly one level-1 Workshop (so the first build is not a 30 minute haul away). */
-    kit: { parts: 30, power: 10, supplies: 20 },
+    /** Goods a new home district starts with, exactly one level-1 Workshop (so the first build is not a 30 minute haul away) and 30 supplies, which with the 30 bought at the hub make the 60 a first settle needs. */
+    kit: { parts: 30, power: 10, supplies: 30 },
   },
 
   /** Street jobs: a personal list of quick errands, one new offer every `refillMinutes`. */

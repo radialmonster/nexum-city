@@ -1,7 +1,8 @@
-import { MS_PER_HOUR, balance } from './balance.js';
+import { MS_PER_HOUR, MS_PER_MINUTE, balance } from './balance.js';
 import { emit, schedule, type Ctx } from './ctx.js';
 import { emptyGoods } from './production.js';
 import { nextInt, nextRange } from './rng.js';
+import { inRush } from './rush.js';
 import type { System } from './systems.js';
 import type { District, DistrictKind, GameState, Id } from './types.js';
 
@@ -155,10 +156,18 @@ function openPlot(ctx: Ctx, plot: District): void {
   emit(ctx, 'frontier.opened', [], [plot.id], { district: plot.id, kind: plot.kind });
 }
 
+/** How long a plot laid out now is surveyed: minutes while anyone is in their rush, else hours. */
+function surveyMs(state: GameState): number {
+  const rushing = Object.keys(state.players).some((id) => inRush(state, id));
+  return rushing
+    ? balance.frontier.rushSurveyMinutes * MS_PER_MINUTE
+    : balance.frontier.surveyHours * MS_PER_HOUR;
+}
+
 /**
  * Keeps the frontier stocked: while fewer than `max(4, players / 3)` plots are open
  * or being surveyed, lay out a new plot on the compact edge of the city. A plot is
- * surveyed for a few hours (a `frontier.survey` event) and then opens, with its
+ * surveyed for a few hours, or minutes while any player is in their newcomer rush (a `frontier.survey` event) and then opens, with its
  * streets. `instant` opens plots at once (world creation, or when a player needs a
  * plot now and none is open).
  */
@@ -183,7 +192,7 @@ export function ensureFrontier(ctx: Ctx, instant = false): void {
       openPlot(ctx, plot);
     } else {
       plot.frontier = 'surveying';
-      schedule(ctx, state.nowMs + balance.frontier.surveyHours * MS_PER_HOUR, {
+      schedule(ctx, state.nowMs + surveyMs(state), {
         kind: 'frontier.survey',
         districtId: plot.id,
       });

@@ -192,4 +192,14 @@ describe('first session', () => {
       expect(now.actions15).toBeGreaterThan(before.actions15);
     }
   });
+
+  it('lets a newcomer settle a plot inside the first 30 minutes', () => {
+    // Four players join at once and each claims a plot; the surveyed replacements open within
+    // minutes, so there is still a plot to settle (it used to be hours of nothing).
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const r = firstSession(seed, true);
+      expect(r.settleMin).not.toBeNull();
+      expect(r.settleMin ?? 99).toBeLessThan(30);
+    }
+  });
 });

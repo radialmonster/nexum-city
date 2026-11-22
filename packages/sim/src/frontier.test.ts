@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { MS_PER_HOUR, balance } from './balance.js';
+import { MS_PER_HOUR, MS_PER_MINUTE, balance } from './balance.js';
 import { hashState } from './hash.js';
 import { shortestRoute } from './routing.js';
 import { step } from './step.js';
 import type { District, GameState } from './types.js';
 import { viewFor } from './fog.js';
 import { addPlayerWithEvents, createWorld } from './world.js';
-import { sectorName, wantedOpenPlots } from './frontier.js';
+import { ensureFrontier, sectorName, wantedOpenPlots } from './frontier.js';
+import { stripNewcomerPerks } from './rush.js';
 
 function join(state: GameState, n: number): GameState {
   let s = state;
@@ -43,6 +44,29 @@ describe('frontier', () => {
     expect(Object.keys(s.districts).length).toBeGreaterThan(Object.keys(before.districts).length);
     const settled = step(s, [], s.nowMs + 6 * MS_PER_HOUR).state;
     expect(open(settled).length).toBeGreaterThanOrEqual(wantedOpenPlots(settled));
+  });
+
+  it('re-opens the plot a joiner took within minutes while a rush lasts, and in hours otherwise', () => {
+    // The newcomer rush speeds up surveying: the plot a joiner leaves behind is open again quickly.
+    const joined = addPlayerWithEvents(createWorld(11), { id: 'a' }).state;
+    expect(open(joined)).toHaveLength(wantedOpenPlots(joined) - 1);
+    const soon = step(
+      joined,
+      [],
+      joined.nowMs + (balance.frontier.rushSurveyMinutes + 1) * MS_PER_MINUTE,
+    ).state;
+    expect(open(soon)).toHaveLength(wantedOpenPlots(soon));
+    // Without any rush the survey takes the full survey time.
+    const plain = JSON.parse(JSON.stringify(joined)) as GameState;
+    stripNewcomerPerks(plain);
+    const taken = open(plain)[0] as District;
+    taken.owner = 'a';
+    taken.frontier = 'built';
+    ensureFrontier({ state: plain, events: [] });
+    const due = plain.queue
+      .filter((e) => e.kind === 'frontier.survey')
+      .map((e) => e.at - plain.nowMs);
+    expect(due).toContain(balance.frontier.surveyHours * MS_PER_HOUR);
   });
 
   it('reports player.joined and frontier.opened', () => {
