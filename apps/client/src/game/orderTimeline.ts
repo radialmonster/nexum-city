@@ -19,6 +19,7 @@ export type TimelineKind =
   | 'build'
   | 'recruit'
   | 'reveal'
+  | 'job'
   | 'defence';
 
 export interface TimelineEntry {
@@ -60,6 +61,7 @@ const GLYPH: Record<TimelineKind, string> = {
   build: '+',
   recruit: '+',
   reveal: 'o',
+  job: '*',
   defence: '!',
 };
 
@@ -101,6 +103,7 @@ export function timelineEntries(
       settle: 'SETTLE',
       raid: 'RAID',
       ambush: 'AMBUSH',
+      job: 'JOB',
       return: 'RETURN',
     };
     out.push({

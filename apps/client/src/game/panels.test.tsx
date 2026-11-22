@@ -23,6 +23,9 @@ const marketView = () =>
       credits: 1000 * ATOMS_PER_CENT,
       stash: { h: { parts: 10 * ATOMS_PER_UNIT, power: 0, data: 0, supplies: 0 } },
       score: 0,
+      rushUntilMs: 0,
+      jobs: [],
+      jobNextMs: 0,
     },
     markets: { h: { parts: book, power: book, data: book, supplies: book } },
   });

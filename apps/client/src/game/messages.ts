@@ -61,6 +61,8 @@ const MESSAGES: Record<ApiErrorCode, string> = {
   bad_reward: 'The reward must be between half and three times what the goods are worth.',
   wrong_cargo: 'A contract haul must carry only the good the contract asks for.',
   too_many_carriers: 'You already own as many Runners as you are allowed.',
+  unknown_job: 'That street job is gone. Another one will turn up soon.',
+  reserved_contract: 'That contract is reserved for a newcomer.',
 };
 
 /** Words for any rejection code; unknown ones fall back to a generic line. */
