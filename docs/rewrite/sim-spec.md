@@ -623,6 +623,17 @@ The default mix is now 1 raider, 2 turtles, 2 merchants, 1 hunter (six players, 
 
 Before is the old mix (2 raiders, 2 turtles, 2 merchants) on the same code. Raider lead 0.85x (0.93x before), limit 1.4x. Raid success 47 percent (242 of 514), per seed min 23, max 83, sd 16 (48 percent before). Success against hunters 37 percent (84 of 228), merchants 53 percent, turtles 66 percent, so a hunter is struck about a fifth less often than the field: its towers hold raiders off some streets and its two-crew escorts win more fights. The hunter is viable (score 531 against 563 for the merchant). Raid success stays in the 40 to 70 percent band.
 
-### Clear ambush (not built)
+### Break it up (clear ambush, task 78)
 
-A crew strike on a revealed ambush street (strength compared, winner keeps the street) was designed but left out: it needs a new order, movement kind, event and validation, and the hunter already lowers raid success with towers and escorts alone. Pros: gives defenders an active answer. Cons: a new order and shapes in the contracts, and a second fight to balance. Open question for the owner.
+A defender's active answer to a street ambush. Order `ambush.clear {ambushId, crewIds?, carrierId?}`.
+
+- **Spotted only.** The ambush must belong to someone else and be visible to you right now: an end of its street inside your tower sight, or revealed by a patrol. A blind or unknown id is refused with `unknown_movement` (no information leak); no free crew gives `no_crew`. Raiders keep their blind spots.
+- **Crews.** With no `crewIds`, the strongest free crews at the owned district with the shortest walk to either end go: one crew on foot, or two in an idle van or hauler. They travel with normal movement and ETA (movement kind `clear`).
+- **On arrival.** If the ambush is gone, the crew walks home (`ambush.gone`). Otherwise the existing fight maths run, with no new combat rules: your strength against the ambushers' strength, each with the usual plus or minus 20 percent roll. A win removes the ambush (`ambush.cleared`), and the ambushing crews take the normal loser loss (30 percent, at least 1) and mend as usual. A loss (`ambush.held`) costs your crew the same loss. Either way the crew then walks home as a `return`.
+- **Events.** `ambush.cleared`, `ambush.held`, `ambush.gone`. Both sides get feed events and the raider learns their ambush was broken up.
+- **Estimate for the UI.** `SeenAmbushView.strength` is a fogged range (75 to 125 percent of the true strength). The pure helper `estimateClear(yours, {strength: [low, high]})` returns `{label, text}`, for example "your strength 9 vs about 12, risky". The label is `likely` when yours is at least the top of the range, `risky` when below the middle, otherwise `even`. It uses only what the view shows.
+- **Bots.** The Hunter clears spotted ambushes it does not rate as risky; Turtles do the same only on ambushes touching their own districts; Merchants and Raiders never clear.
+
+#### Results (seeds 1 to 16, invariants 0)
+
+Before (no clear) and after are within noise: merchant 3.06 districts, score 563; turtle 5.41, 700; raider 4.31, 596; hunter 2.88, 531 (529 after). Raider lead 0.85x, limit 1.4x and floor 0.85x. Raid success 47 percent (241 of 511), per seed min 16, max 83. Success against hunters 37 percent, merchants 53 percent, turtles 66 percent. Only 4 clears were attempted in 16 seasons (hunter: 2 won, 1 held, 1 gone) because bots rarely have a spare crew and a visible ambush at the same moment. No raider hold reward was added: the raider did not drop, so the balance floor is not threatened. If players start clearing often, add a small credit or score reward for an ambush that lasts its full duration (see the balance notes above), and watch the raider lead. `RULES_VERSION` stays 3; `SNAPSHOT_VERSION` is unchanged (the view is not persisted).
