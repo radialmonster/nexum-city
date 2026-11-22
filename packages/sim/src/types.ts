@@ -392,6 +392,8 @@ export type Order =
   | { type: 'stance'; districtId: Id; stance: Stance }
   | { type: 'recall'; movementId: Id }
   | { type: 'recruit'; districtId: Id }
+  /** Buy a Runner for a district you own, paid from its warehouse and your credits. */
+  | { type: 'carrier.buy'; districtId: Id; kind: 'runner' }
   | { type: 'market.place'; hub: Id; side: Side; good: Good; price: number; qty: number }
   | { type: 'market.cancel'; orderId: Id }
   /** Post a delivery job at a hub, escrowing `reward` whole credits. */
@@ -459,6 +461,7 @@ export const ORDER_ERRORS = [
   'too_many_contracts',
   'bad_reward',
   'wrong_cargo',
+  'too_many_carriers',
 ] as const;
 export type OrderError = (typeof ORDER_ERRORS)[number];
 
@@ -484,6 +487,8 @@ export type SimEventKind =
   | 'raid.set'
   | 'raid.hit'
   | 'raid.repelled'
+  | 'raid.evaded'
+  | 'carrier.bought'
   | 'raid.ended'
   | 'contract.posted'
   | 'contract.taken'

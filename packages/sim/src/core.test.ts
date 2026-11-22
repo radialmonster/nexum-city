@@ -99,7 +99,11 @@ describe('balance', () => {
     expect(toAtoms(1)).toBe(360_000_000);
     expect(MS_PER_HOUR).toBe(3_600_000);
   });
-  it('locks the runner', () => {
-    expect(balance.carriers.runner.locked).toBe(true);
+  it('unlocks the runner: faster and smaller than a van', () => {
+    const { runner, van } = balance.carriers;
+    expect(runner.locked).toBe(false);
+    expect(runner.speed).toBeGreaterThan(van.speed);
+    expect(runner.cargo).toBeLessThan(van.cargo);
+    expect(runner.toughness).toBeLessThan(van.toughness);
   });
 });

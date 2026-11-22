@@ -62,12 +62,13 @@ describe('validateOrder', () => {
     expect(err(haul({ parts: 41 }))).toBe('over_capacity');
     expect(err(haul({ data: 5 }))).toBe('insufficient_goods');
   });
-  it('rejects the locked Runner', () => {
+  it('lets a Runner carry up to 16 units and no more', () => {
     const s = clone(s0);
     s.carriers['r1'] = { id: 'r1', owner: 'p1', kind: 'runner', loc: { at: 'd2_1' } };
-    expect(err(o({ type: 'move', carrierId: 'r1', crewIds: [c1], to: 'd3_1' }), s)).toBe(
-      'carrier_locked',
-    );
+    const haul = (parts: number): Input =>
+      o({ type: 'haul', carrierId: 'r1', crewIds: [c1], to: 'd3_1', cargo: { parts } });
+    expect(err(haul(16), s)).toBeNull();
+    expect(err(haul(17), s)).toBe('over_capacity');
   });
   it('checks build and recruit costs', () => {
     expect(err(o({ type: 'build', districtId: 'd0_0', building: 'depot' }))).toBe('not_owner');

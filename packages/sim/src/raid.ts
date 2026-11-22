@@ -171,6 +171,18 @@ function strike(ctx: Ctx, ambush: Movement, haul: Movement): void {
   const cfg = balance.raid;
   r.struck.push(haul.id);
 
+  // A Runner may slip away: one draw, taken only for Runners (a fixed rule, so the number of draws
+  // never depends on how a fight turns out). The ambush stays in place and may catch the next one.
+  if (haul.carrierKind === 'runner') {
+    if (nextFloat(state.rng) < balance.runner.evadePercent / 100) {
+      emit(ctx, 'raid.evaded', [ambush.owner, haul.owner], [r.a, r.b], {
+        movementId: ambush.id,
+        haulId: haul.id,
+        chancePercent: balance.runner.evadePercent,
+      });
+      return;
+    }
+  }
   const raiders = crewsOf(ctx, ambush);
   const escort = crewsOf(ctx, haul);
   const raiderStrength = raiders.reduce((n, c) => n + c.strength, 0);

@@ -35,12 +35,14 @@ const idleCrews = (s: GameState, at: Id, me: Id): Crew[] =>
     .map((id) => s.crews[id])
     .filter((c): c is Crew => !!c && c.owner === me && c.readyAtMs <= s.nowMs);
 
-function vanAt(s: GameState, at: Id, me: Id): Id | null {
-  const van = Object.values(s.carriers)
-    .filter((c) => c.owner === me && c.kind === 'van' && 'at' in c.loc && c.loc.at === at)
+function carrierAt(s: GameState, at: Id, me: Id, kind: 'van' | 'runner'): Id | null {
+  const found = Object.values(s.carriers)
+    .filter((c) => c.owner === me && c.kind === kind && 'at' in c.loc && c.loc.at === at)
     .sort((a, b) => (a.id < b.id ? -1 : 1))[0];
-  return van?.id ?? null;
+  return found?.id ?? null;
 }
+
+const vanAt = (s: GameState, at: Id, me: Id): Id | null => carrierAt(s, at, me, 'van');
 
 /**
  * What a bot may still spend this check-in. Orders in one batch are each checked against the
@@ -151,8 +153,30 @@ const BUY_MARGIN = 10;
 /** What a van carries (balance.carriers.van.cargo), so a haul is never over capacity. */
 const VAN_CARGO = balance.carriers.van.cargo;
 
+/** What a Runner carries: a job this small goes by Runner when one is idle (fast, but one seat). */
+const RUNNER_CARGO = balance.carriers.runner.cargo;
+
+/**
+ * A bot with credits to spare and no Runner buys one at its first district.
+ * Runners are for small urgent jobs, so this is only done by bots that take contracts.
+ */
+function runnerOrders(s: GameState, me: Id, budget: Budget, spareCredits: number): Order[] {
+  const owned = Object.values(s.carriers).filter((c) => c.owner === me && c.kind === 'runner');
+  if (owned.length > 0) return [];
+  const cost = toAtoms(balance.runner.credits);
+  if (budget.credits < cost + toAtoms(spareCredits)) return [];
+  const base = mine(s, me)[0];
+  if (!base) return [];
+  budget.credits -= cost;
+  return [{ type: 'carrier.buy', districtId: base.id, kind: 'runner' }];
+}
+
 /** A merchant escorts hauls of at least this many units. */
 const ESCORT_FROM_UNITS = 30;
+
+/** Credits a bot keeps in hand after buying a Runner. */
+const MERCHANT_RUNNER_SPARE = 500;
+const TURTLE_RUNNER_SPARE = 700;
 
 /** A weaker rival's district is picked over a neutral plot unless it is this much farther. */
 const WEAK_RIVAL_DISCOUNT = 0.5;
@@ -444,18 +468,25 @@ export function contractOrders(s: GameState, me: Id, budget: Budget, plan: Contr
     const missing = Math.ceil(c.qty - toUnits(c.delivered));
     for (const base of mine(s, me)) {
       const idle = idleCrews(s, base.id, me);
+      const runner = carrierAt(s, base.id, me, 'runner');
       const van = vanAt(s, base.id, me);
-      const qty = Math.min(missing, VAN_CARGO, spareUnits(base, c.good));
-      if (!idle[0] || !van || qty < 1) continue;
+      const small = Math.min(missing, spareUnits(base, c.good)) <= RUNNER_CARGO;
+      const ride = runner && small ? runner : van;
+      const qty = Math.min(
+        missing,
+        ride === runner ? RUNNER_CARGO : VAN_CARGO,
+        spareUnits(base, c.good),
+      );
+      if (!idle[0] || !ride || qty < 1) continue;
       if (!Number.isFinite(length(s, base.id, c.hub))) continue;
       const guards =
-        plan.escort && qty >= ESCORT_FROM_UNITS && idle[1]
+        ride !== runner && plan.escort && qty >= ESCORT_FROM_UNITS && idle[1]
           ? [idle[0].id, idle[1].id]
           : [idle[0].id];
       return [
         {
           type: 'haul',
-          carrierId: van,
+          carrierId: ride,
           crewIds: guards,
           to: c.hub,
           cargo: { [c.good]: qty },
@@ -470,11 +501,13 @@ export function contractOrders(s: GameState, me: Id, budget: Budget, plan: Contr
     if (c.status !== 'open' || c.poster === me || c.qty > plan.maxQty) continue;
     if (budget.credits < depositFor(c.reward)) continue;
     for (const base of mine(s, me)) {
-      if (idleCrews(s, base.id, me).length === 0 || !vanAt(s, base.id, me)) continue;
+      const runner = carrierAt(s, base.id, me, 'runner');
+      const byRunner = !!runner && c.qty <= RUNNER_CARGO;
+      if (idleCrews(s, base.id, me).length === 0 || !(byRunner || vanAt(s, base.id, me))) continue;
       if (spareUnits(base, c.good) < c.qty) continue;
       const len = length(s, base.id, c.hub);
       if (!Number.isFinite(len)) continue;
-      const tripMs = travelMs(len, 'van');
+      const tripMs = travelMs(len, byRunner ? 'runner' : 'van');
       if (tripMs * 100 > c.hours * MS_PER_HOUR * plan.tripPercent) continue;
       const score = plan.prefer === 'near' ? -len : c.reward / c.qty;
       if (!best || score > best.score) best = { id: c.id, score };
@@ -532,6 +565,7 @@ export const turtle: Bot = (s, me) => {
     ...(saving ? [] : economy(s, me, budget, 6, ['walls', 'workshop', 'depot'])),
     ...settleOrders(s, me, budget, SETTLE_RESERVE, 1),
     ...jobs,
+    ...runnerOrders(s, me, budget, TURTLE_RUNNER_SPARE),
     ...(jobs.length > 0 ? [] : fetchOrders(s, me)),
     ...sellStash(s, me),
     // Out of supplies and credits: sell a pile of what the district makes, as a player would.
@@ -560,6 +594,7 @@ export const merchant: Bot = (s, me) => {
   orders.push(
     ...sellStash(s, me),
     ...jobs,
+    ...runnerOrders(s, me, budget, MERCHANT_RUNNER_SPARE),
     ...(jobs.length > 0 ? [] : haulToHub(s, me, true)),
     ...postSupplyContract(s, me, budget),
     ...resupply(s, me, budget),

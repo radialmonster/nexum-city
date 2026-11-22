@@ -135,6 +135,8 @@ export const SIM_EVENT_KINDS = [
   'raid.set',
   'raid.hit',
   'raid.repelled',
+  'raid.evaded',
+  'carrier.bought',
   'raid.ended',
   'contract.posted',
   'contract.taken',
