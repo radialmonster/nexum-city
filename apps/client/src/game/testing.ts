@@ -47,6 +47,7 @@ export function makeView(over: Partial<PlayerView> = {}): PlayerView {
     crews: { c1: { id: 'c1', owner: 'me', strength: 100, loc: { at: 'a' }, readyAtMs: 0 } },
     carriers: {},
     movements: {},
+    contracts: {},
     convoys: [],
     ambushes: [],
     reveals: {},

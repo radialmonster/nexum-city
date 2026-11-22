@@ -58,6 +58,8 @@ const seasons: SeasonsResponse = {
           score: 1000,
           scoreMs: 0,
           districts: 4,
+          contractScore: 0,
+          contractMs: 0,
           tradeScore: 3,
           tradeMs: 1,
         },

@@ -51,6 +51,15 @@ const MESSAGES: Record<ApiErrorCode, string> = {
   too_many_raids: 'You already have the most ambushes allowed out.',
   protected_no_raid:
     'New-player protection shields you from raids, so you cannot set ambushes until it ends.',
+  unknown_contract: 'That contract is gone from the board.',
+  contract_taken: 'Someone has already taken that contract.',
+  contract_closed: 'That contract is already finished.',
+  not_taker: 'Only the player who took a contract can haul for it.',
+  own_contract: 'You cannot take a contract you posted yourself.',
+  board_full: 'That hub board is full. Try again when a job clears.',
+  too_many_contracts: 'You already hold or have posted the most contracts allowed.',
+  bad_reward: 'The reward must be between half and three times what the goods are worth.',
+  wrong_cargo: 'A contract haul must carry only the good the contract asks for.',
 };
 
 /** Words for any rejection code; unknown ones fall back to a generic line. */
