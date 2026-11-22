@@ -1,4 +1,4 @@
-import { ORDER_ERRORS, addPlayer, createWorld, standings, viewFor } from '@nexum/sim';
+import { ORDER_ERRORS, addPlayer, createWorld, standings, step, viewFor } from '@nexum/sim';
 import type {
   GameState,
   Movement,
@@ -67,6 +67,8 @@ describe('contracts mirror the sim', () => {
       { type: 'contract.post', hub: 'hubW', good: 'parts', qty: 20, reward: 400, hours: 12 },
       { type: 'contract.take', contractId: 'k1' },
       { type: 'contract.cancel', contractId: 'k1' },
+      { type: 'job.take', jobId: 'j1', crewId: 'c1' },
+      { type: 'job.take', jobId: 'j2', crewId: 'c1', carrierId: 'v1' },
     ];
     for (const o of orders) expect(orderSchema.parse(o)).toEqual(o);
     expect(orderSchema.safeParse({ type: 'nuke', districtId: 'x' }).success).toBe(false);
@@ -89,6 +91,26 @@ describe('contracts mirror the sim', () => {
     expect(Object.values(view.districts).some((d) => d.relation === 'remembered')).toBe(true);
     const board = standings(state);
     expect(board.map((s) => standingSchema.parse(s))).toEqual(board);
+  });
+
+  it('parses a newcomer view: rush, street jobs, the reserved starter contract and a job under way', () => {
+    let state: GameState = addPlayer(createWorld(1), { id: 'p1', districtId: 'd0_0' });
+    const before = viewFor(state, 'p1');
+    expect(before.self.jobs).toHaveLength(3);
+    expect(before.self.rushUntilMs).toBeGreaterThan(0);
+    expect(Object.values(before.contracts).some((c) => c.reservedFor === 'p1')).toBe(true);
+    expect(playerViewSchema.parse(before)).toEqual(before);
+    const job = before.self.jobs.find((j) => j.kind === 'salvage');
+    const crew = Object.values(before.crews)[0];
+    if (!job || !crew) throw new Error('no salvage job or crew');
+    state = step(
+      state,
+      [{ actorId: 'p1', order: { type: 'job.take', jobId: job.id, crewId: crew.id } }],
+      state.nowMs + 1,
+    ).state;
+    const during = viewFor(state, 'p1');
+    expect(Object.values(during.movements).some((m) => m.kind === 'job')).toBe(true);
+    expect(playerViewSchema.parse(during)).toEqual(during);
   });
 
   it('parses contracts on the board, hiding rivals progress', () => {

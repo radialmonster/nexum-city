@@ -121,6 +121,12 @@ export const orderSchema = z.discriminatedUnion('type', [
   }),
   z.strictObject({ type: z.literal('contract.take'), contractId: idSchema }),
   z.strictObject({ type: z.literal('contract.cancel'), contractId: idSchema }),
+  z.strictObject({
+    type: z.literal('job.take'),
+    jobId: idSchema,
+    crewId: idSchema,
+    carrierId: idSchema.nullable().optional(),
+  }),
 ]);
 
 export type OrderBody = z.infer<typeof orderSchema>;
@@ -173,6 +179,8 @@ export const ORDER_ERROR_CODES = [
   'bad_reward',
   'wrong_cargo',
   'too_many_carriers',
+  'unknown_job',
+  'reserved_contract',
 ] as const;
 export const orderErrorCodeSchema = z.enum(ORDER_ERROR_CODES);
 export type OrderErrorCode = z.infer<typeof orderErrorCodeSchema>;

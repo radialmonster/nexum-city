@@ -72,6 +72,18 @@ export const carrierSchema = z.object({
   loc: unitLocationSchema,
 });
 
+/** One street job on offer (task 77). Credits and parts are atoms; `good` and `qty` are courier jobs only. */
+export const jobOfferSchema = z.object({
+  id: idSchema,
+  kind: z.enum(['courier', 'salvage', 'patrol']),
+  minutes: z.number(),
+  good: goodSchema.optional(),
+  qty: z.number().optional(),
+  creditsAtoms: z.number(),
+  partsAtoms: z.number().optional(),
+  pick: z.number(),
+});
+
 export const movementSchema = z.object({
   id: idSchema,
   owner: idSchema,
@@ -85,6 +97,7 @@ export const movementSchema = z.object({
     'raid',
     'ambush',
     'return',
+    'job',
   ]),
   carrierId: idSchema.nullable(),
   carrierKind: carrierKindSchema,
@@ -101,6 +114,8 @@ export const movementSchema = z.object({
   sent: z.number().optional(),
   /** A haul that delivers to this contract. */
   contractId: idSchema.optional(),
+  /** A street job in progress (couriers are `haul` movements that carry one). */
+  job: jobOfferSchema.optional(),
   raid: z
     .object({
       a: idSchema,
@@ -144,6 +159,9 @@ export const SIM_EVENT_KINDS = [
   'contract.done',
   'contract.failed',
   'contract.expired',
+  'job.done',
+  'job.failed',
+  'rush.ended',
 ] as const;
 
 export const simEventSchema = z.object({
@@ -181,6 +199,10 @@ export const contractViewSchema = z.object({
   deposit: z.number(),
   delivered: z.number().nullable(),
   paid: z.number().nullable(),
+  /** A newcomer's starter contract: only this player may take it. */
+  reservedFor: idSchema.optional(),
+  /** A custom delivery window in ms, replacing `hours`. */
+  windowMs: z.number().optional(),
 });
 
 /** A district's capture bar as a player may see it (progress 0 to 1). */
@@ -289,6 +311,12 @@ export const playerViewSchema = z.object({
     credits: z.number(),
     stash: z.record(z.string(), goodsSchema),
     score: z.number(),
+    /** The newcomer rush ends at this time (0 or in the past: no rush). */
+    rushUntilMs: z.number(),
+    /** Your street jobs on offer. */
+    jobs: z.array(jobOfferSchema),
+    /** When the next street job arrives (0 while the list is full). */
+    jobNextMs: z.number(),
   }),
   standings: z.array(scoreSchema),
   districts: z.record(idSchema, districtViewSchema),
