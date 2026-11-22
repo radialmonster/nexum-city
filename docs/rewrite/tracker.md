@@ -64,13 +64,13 @@ Live status for [`plan.md`](plan.md). Update this file in the same commit as the
 
 ## Phase 3: The map
 
-| ID  | Task                                                         | Status | Notes |
-| --- | ------------------------------------------------------------ | ------ | ----- |
-| 31  | Pixi renderer: districts, streets, hubs, fog (theme palette) | todo   |       |
-| 32  | Pan, zoom, inertia; city, tactical and district zoom levels  | todo   |       |
-| 33  | Minimap, recentre and jump-to, off-screen arrows             | todo   |       |
-| 34  | Moving carriers, capture rings, price bars                   | todo   |       |
-| 35  | District selection, radial menu, route preview with ETA      | todo   |       |
+| ID  | Task                                                         | Status | Notes      |
+| --- | ------------------------------------------------------------ | ------ | ---------- |
+| 31  | Pixi renderer: districts, streets, hubs, fog (theme palette) | done   | 2026-11-22 |
+| 32  | Pan, zoom, inertia; city, tactical and district zoom levels  | done   | 2026-11-22 |
+| 33  | Minimap, recentre and jump-to, off-screen arrows             | done   | 2026-11-22 |
+| 34  | Moving carriers, capture rings, price bars                   | done   | 2026-11-22 |
+| 35  | District selection, radial menu, route preview with ETA      | done   | 2026-11-22 |
 
 ## Phase 4: HUD and first playable loop
 
@@ -114,3 +114,4 @@ Live status for [`plan.md`](plan.md). Update this file in the same commit as the
 - 2026-11-22: Phase A task A5 done. Cloudflare teardown complete: the cron worker, the Pages project and both D1 databases are deleted, and nothing named `nexum` remains on the account.
 - 2026-11-22: Phase 1 tasks 16, 18, 19 done (`45c2bed`). Siege (one capture bar per district, walls, stance, attrition rounds, loot, building damage, retreat, `reinforce`, battle report), fog (`viewFor`, `sightOf`, last-known owners) and season scoring (exact district-hours, hourly `score.tick`, catch-up modifiers, `standings`). An even fight captures in about 10 h. 134 tests pass.
 - 2026-11-22: sim-core merged into main (siege, fog and scoring). `packages/contracts` now mirrors the sim exactly (siege and reinforce orders, the `protected` error code, the new movement kinds, the fogged `PlayerView` and `Standing`; the compat test checks orders, events, movements, views and standings at compile time). The server uses the sim's `viewFor` for `/api/me` (the `viewForPlayer` adapter is gone, and a test proves a rival's warehouse and credits never appear), and `GET /api/standings` returns `standings(state)`. A new world now starts its season and first score tick at the wall-clock start time.
+- 2026-11-22: Phase 3 tasks 31–35 done. `apps/client/src/map/` has the PixiJS v8 map at `/map`: a pure model-to-scene layer (`scene.ts`), camera maths with inertia, cursor-anchored wheel and pinch zoom and three animated levels (`camera.ts`), edge arrows (`offscreen.ts`), a demo world (`demo.ts`, `?large&reveal&zoom=city|tactical|district`) and the renderer, with the minimap, jump list, recentre, radial menu and route ETA built from the UI kit. Map geometry and thresholds are the new `map` token group in `packages/theme`. Logged in, it draws the fogged `PlayerView` from `/api/me` (remembered districts dimmed, convoys moving); route ETA needs the street graph, which only the demo has.
