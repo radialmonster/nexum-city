@@ -167,3 +167,21 @@ export function inTransit(
 export function unitsToSend(view: PlayerView, c: ContractView): number {
   return Math.max(0, remainingUnits(c) - (inTransit(view, c)?.units ?? 0));
 }
+
+/**
+ * How long the starter contract's van trip takes, in minutes: from the van already on its way
+ * when there is one, otherwise the contract's window minus the grace the sim adds to the trip.
+ */
+export function starterTripMinutes(view: PlayerView, c: ContractView): number | null {
+  const onWay = inTransit(view, c);
+  if (onWay) return Math.max(1, Math.ceil((onWay.arriveMs - view.nowMs) / 60_000));
+  if (c.windowMs === undefined) return null;
+  return Math.max(1, Math.round(c.windowMs / 60_000 - balance.rush.starter.graceMinutes));
+}
+
+/** The "come back later" line for a starter contract. */
+export function starterHookCopy(view: PlayerView, c: ContractView): string | null {
+  const m = starterTripMinutes(view, c);
+  if (m === null) return null;
+  return `Your van gets there in about ${String(m)} min. Come back to collect your pay.`;
+}

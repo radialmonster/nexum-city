@@ -125,3 +125,26 @@ describe('in-transit deliveries', () => {
     expect(unitsToSend(v, c)).toBe(10);
   });
 });
+
+describe('starter contract hook', () => {
+  it('derives the trip from the window minus grace, or from the van on its way', async () => {
+    const { starterHookCopy } = await import('./contracts');
+    const c = contract({ windowMs: 70 * 60_000, reservedFor: 'me' });
+    expect(starterHookCopy(makeView(), c)).toBe(
+      'Your van gets there in about 50 min. Come back to collect your pay.',
+    );
+    const v = makeView({
+      movements: {
+        m1: {
+          id: 'm1',
+          kind: 'haul',
+          owner: 'me',
+          contractId: 'k1',
+          cargo: { power: cr(5) },
+          arriveMs: 1_000_000 + 12 * 60_000,
+        },
+      } as never,
+    });
+    expect(starterHookCopy(v, c)).toContain('about 12 min');
+  });
+});

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ContractView, GoodName } from '@nexum/contracts';
-import { unitsToSend } from './contracts';
+import { balance } from '@nexum/sim';
+import { starterHookCopy, unitsToSend } from './contracts';
 import type { PlayerView as SimView } from '@nexum/sim';
 import { Tabs } from '../ui';
 import { MapScreen } from '../map/MapScreen';
@@ -126,6 +127,9 @@ export function GameScreen() {
   /** The first hub you can see: the resource chips open its market. */
   const firstHub = Object.values(view.districts).find((d) => d.relation === 'hub')?.id;
   const openPlots = Object.values(view.districts).filter((d) => 'open' in d && d.open).length;
+  const starter = Object.values(view.contracts).find(
+    (c) => c.reservedFor === view.playerId && c.taker === null,
+  );
   const openMarket = (hub: string, good?: GoodName) => {
     if (!steps.openedMarket) updateSteps({ openedMarket: true });
     setPanel({ kind: 'market', hub, ...(good ? { good } : {}) });
@@ -258,7 +262,9 @@ export function GameScreen() {
                     hint:
                       openPlots > 0
                         ? 'Send a crew to an open plot to claim it. Keep 60 supplies in your home warehouse: settling spends them.'
-                        : 'No plot is open yet: the city surveys new ones for about 4 h. Keep 60 supplies in your home warehouse for then: settling spends them.',
+                        : view.self.rushUntilMs > view.nowMs
+                          ? `No plot is open right now: the next one opens about ${String(balance.frontier.rushSurveyMinutes)} min after the last is claimed. Keep 60 supplies in your home warehouse: settling spends them.`
+                          : 'No plot is open yet: the city surveys new ones for about 4 h. Keep 60 supplies in your home warehouse for then: settling spends them.',
                     done: Object.values(view.districts).filter(isOwn).length > 1,
                   },
                   {
@@ -270,10 +276,8 @@ export function GameScreen() {
                   {
                     id: 'contract',
                     label: 'Take a contract',
-                    hint: Object.values(view.contracts).some(
-                      (c) => c.reservedFor === view.playerId && c.taker === null,
-                    )
-                      ? 'A starter contract is reserved for you: open a hub market, pick CONTRACTS and take the one marked Reserved for you.'
+                    hint: starter
+                      ? `A starter contract is reserved for you: open a hub market, pick CONTRACTS and take the one marked Reserved for you. ${starterHookCopy(view, starter) ?? ''}`.trim()
                       : 'Open a hub market, pick the CONTRACTS tab and take a job.',
                     done: Object.values(view.contracts).some((c) => c.taker === view.playerId),
                   },

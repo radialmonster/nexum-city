@@ -11,6 +11,7 @@ import {
   hubBoard,
   posterName,
   referenceCredits,
+  starterHookCopy,
   takeBlocker,
   takerName,
   timeLeft,
@@ -112,7 +113,8 @@ export function ContractsBoard({
               {c.reservedFor === me && c.taker === null && (
                 <p className={styles['meta']} data-testid="reserved-mark">
                   <b>RESERVED FOR YOU</b>{' '}
-                  <span>Your starter contract: nobody else can take it yet.</span>
+                  <span>Your starter contract: nobody else can take it yet.</span>{' '}
+                  <span data-testid="starter-hook">{starterHookCopy(view, c)}</span>
                 </p>
               )}
               <p className={styles['sentence']}>{contractSentence(view, c)}</p>
