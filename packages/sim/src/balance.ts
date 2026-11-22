@@ -43,8 +43,20 @@ export const balance = {
     foot: { speed: 40, cargo: 5, toughness: 0, seats: 1, locked: false },
     van: { speed: 100, cargo: 40, toughness: 12, seats: 2, locked: false },
     hauler: { speed: 60, cargo: 150, toughness: 25, seats: 2, locked: false },
-    runner: { speed: 180, cargo: 15, toughness: 3, seats: 1, locked: true },
+    runner: { speed: 160, cargo: 16, toughness: 3, seats: 1, locked: false },
   } satisfies Record<CarrierKind, CarrierSpec>,
+
+  /**
+   * The Runner (milestone 2, docs/rewrite/sim-spec.md, "Runner carrier"): bought, not given. Vans
+   * come with the plot; a Runner is a purchase made with credits.
+   */
+  runner: {
+    credits: 300,
+    /** Runners one player may own at once. */
+    maxOwned: 2,
+    /** The chance, in percent, that a raid strike on a Runner's convoy finds nothing to catch. */
+    evadePercent: 35,
+  },
 
   production: {
     /** Units per hour of the district's main good. */

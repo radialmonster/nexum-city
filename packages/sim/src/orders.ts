@@ -52,6 +52,7 @@ type Plan =
   | { type: 'stance'; district: District; stance: 'hold' | 'pullback' }
   | { type: 'recall'; movement: Movement }
   | { type: 'recruit'; district: District }
+  | { type: 'buyCarrier'; district: District }
   | { type: 'place'; order: Extract<Order, { type: 'market.place' }> }
   | { type: 'cancel'; orderId: Id }
   | { type: 'post'; order: Extract<Order, { type: 'contract.post' }> }
@@ -338,6 +339,20 @@ function resolve(state: GameState, input: Input): Resolved {
       const error = validateCancel(state, actorId, order.contractId);
       return error ? fail(error) : { plan: { type: 'withdraw', contractId: order.contractId } };
     }
+    case 'carrier.buy': {
+      const district = state.districts[order.districtId];
+      if (!district) return fail('unknown_district');
+      if (district.kind === 'hub' || district.owner !== actorId) return fail('not_owner');
+      const owned = Object.values(state.carriers).filter(
+        (c) => c.owner === actorId && c.kind === 'runner',
+      ).length;
+      if (owned >= balance.runner.maxOwned) return fail('too_many_carriers');
+      const player = state.players[actorId];
+      if (!player || player.credits < toAtoms(balance.runner.credits)) {
+        return fail('insufficient_credits');
+      }
+      return { plan: { type: 'buyCarrier', district } };
+    }
     case 'recruit': {
       const district = state.districts[order.districtId];
       if (!district) return fail('unknown_district');
@@ -413,6 +428,25 @@ export function applyOrder(ctx: Ctx, input: Input): Validation {
     case 'withdraw':
       cancelContract(ctx, plan.contractId);
       break;
+    case 'buyCarrier': {
+      const { district } = plan;
+      const player = state.players[input.actorId] as { credits: number };
+      player.credits -= toAtoms(balance.runner.credits);
+      state.counters.carrier += 1;
+      const carrier: Carrier = {
+        id: `v${state.counters.carrier}`,
+        owner: input.actorId,
+        kind: 'runner',
+        loc: { at: district.id },
+      };
+      state.carriers[carrier.id] = carrier;
+      emit(ctx, 'carrier.bought', [input.actorId], [district.id], {
+        carrierId: carrier.id,
+        kind: 'runner',
+        credits: balance.runner.credits,
+      });
+      break;
+    }
     case 'recruit': {
       const { district } = plan;
       const player = state.players[input.actorId] as { credits: number };

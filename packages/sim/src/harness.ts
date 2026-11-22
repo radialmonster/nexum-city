@@ -39,6 +39,9 @@ export interface SeasonResult {
   raids: number;
   raidHits: number;
   raidsRepelled: number;
+  /** Strikes a Runner slipped away from, and Runners bought. */
+  raidsEvaded: number;
+  runnersBought: number;
   stolenUnits: number;
   destroyedUnits: number;
   districts: number;
@@ -95,6 +98,8 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
   let raids = 0;
   let raidHits = 0;
   let raidsRepelled = 0;
+  let raidsEvaded = 0;
+  let runnersBought = 0;
   let stolenUnits = 0;
   let destroyedUnits = 0;
   let lootReturned = 0;
@@ -136,6 +141,8 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
       } else if (e.kind === 'order.rejected') rejected += 1;
       else if (e.kind === 'raid.set') raids += 1;
       else if (e.kind === 'raid.repelled') raidsRepelled += 1;
+      else if (e.kind === 'raid.evaded') raidsEvaded += 1;
+      else if (e.kind === 'carrier.bought') runnersBought += 1;
       else if (e.kind === 'raid.ended') lootReturned += sumUnits(e.data['loot']);
       else if (e.kind === 'raid.hit') {
         raidHits += 1;
@@ -263,6 +270,8 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
     raids,
     raidHits,
     raidsRepelled,
+    raidsEvaded,
+    runnersBought,
     stolenUnits,
     destroyedUnits,
     districts: Object.keys(state.districts).length,

@@ -9,6 +9,8 @@ const types = {};
 let raids = 0;
 let hits = 0;
 let repelled = 0;
+let evaded = 0;
+let bought = 0;
 let stolen = 0;
 let destroyed = 0;
 let problems = 0;
@@ -21,6 +23,8 @@ for (let seed = first; seed <= last; seed++) {
   raids += r.raids;
   hits += r.raidHits;
   repelled += r.raidsRepelled;
+  evaded += r.raidsEvaded;
+  bought += r.runnersBought;
   stolen += r.stolenUnits;
   destroyed += r.destroyedUnits;
   problems += r.problems.length;
@@ -68,7 +72,7 @@ const others = Object.entries(types)
   .map(([, t]) => t.score / t.players);
 console.log(`raider lead over best other type: ${(raiderScore / Math.max(...others)).toFixed(2)}x`);
 console.log(
-  `raids/season=${(raids / n).toFixed(1)} hits/season=${(hits / n).toFixed(1)} repelled/season=${(repelled / n).toFixed(1)} success=${raids ? ((hits / Math.max(1, hits + repelled)) * 100).toFixed(0) : 0}% stolen/season=${(stolen / n).toFixed(0)} destroyed/season=${(destroyed / n).toFixed(0)}`,
+  `raids/season=${(raids / n).toFixed(1)} hits/season=${(hits / n).toFixed(1)} repelled/season=${(repelled / n).toFixed(1)} evaded/season=${(evaded / n).toFixed(1)} runners bought/season=${(bought / n).toFixed(1)} success=${raids ? ((hits / Math.max(1, hits + repelled + evaded)) * 100).toFixed(0) : 0}% stolen/season=${(stolen / n).toFixed(0)} destroyed/season=${(destroyed / n).toFixed(0)}`,
 );
 console.log(
   `contracts/season posted civic=${(posted.civic / n).toFixed(1)} player=${(posted.player / n).toFixed(1)} expired untaken/cancelled=${(expired / n).toFixed(1)}`,

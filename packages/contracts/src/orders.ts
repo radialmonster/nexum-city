@@ -92,6 +92,12 @@ export const orderSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('recall'), movementId: idSchema }),
   z.strictObject({ type: z.literal('recruit'), districtId: idSchema }),
   z.strictObject({
+    type: z.literal('carrier.buy'),
+    districtId: idSchema,
+    /** Only Runners are for sale; vans come with the plot. */
+    kind: z.literal('runner'),
+  }),
+  z.strictObject({
     type: z.literal('market.place'),
     hub: idSchema,
     side: sideSchema,
@@ -166,6 +172,7 @@ export const ORDER_ERROR_CODES = [
   'too_many_contracts',
   'bad_reward',
   'wrong_cargo',
+  'too_many_carriers',
 ] as const;
 export const orderErrorCodeSchema = z.enum(ORDER_ERROR_CODES);
 export type OrderErrorCode = z.infer<typeof orderErrorCodeSchema>;
