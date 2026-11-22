@@ -39,6 +39,28 @@ export interface ClearWorld {
   crews: Record<Id, Crew>;
   carriers: Record<Id, Carrier>;
   graph: { nodes: GameState['graph']['nodes']; edges: Edge[] };
+  /** The full state's sieges: a district under siege keeps its crews at home. */
+  sieges?: Record<Id, unknown>;
+  /** A view's districts: an own district whose `siege` is set is under siege. */
+  districts?: Record<Id, object>;
+  /** The full state's movements: an enemy siege or raid on the way to a district counts as a threat. */
+  movements?: Record<Id, { owner: Id; kind: string; to: Id }>;
+}
+
+/** Why no default force could be picked. */
+export interface ClearNone {
+  error: 'no_crew';
+  /** `busy`: no free crew anywhere. `under_siege`: the only free crews guard a district under attack. */
+  reason: 'busy' | 'under_siege';
+}
+
+/** A district whose crews must stay put: besieged, or an enemy siege is walking toward it. */
+function threatened(world: ClearWorld, player: Id, node: Id): boolean {
+  if (world.sieges?.[node] !== undefined) return true;
+  if ((world.districts?.[node] as { siege?: unknown } | undefined)?.siege) return true;
+  return Object.values(world.movements ?? {}).some(
+    (m) => m.owner !== player && m.kind === 'siege' && m.to === node,
+  );
 }
 
 export interface ClearPick {
@@ -62,11 +84,22 @@ export function pickClearCrews(
   /** Crews and carriers already spoken for (a bot's other orders this turn). */
   exclude: ReadonlySet<Id> = new Set(),
 ): ClearPick | null {
-  const free = Object.values(world.crews)
-    .filter(
-      (c) =>
-        c.owner === player && 'at' in c.loc && c.readyAtMs <= world.nowMs && !exclude.has(c.id),
-    )
+  const r = pickClearCrewsOrWhy(world, player, edge, exclude);
+  return 'error' in r ? null : r;
+}
+
+/** Like `pickClearCrews`, but says why when there is no force (`no_crew` with a reason). Never takes crews from a district under siege. */
+export function pickClearCrewsOrWhy(
+  world: ClearWorld,
+  player: Id,
+  edge: { a: Id; b: Id },
+  exclude: ReadonlySet<Id> = new Set(),
+): ClearPick | ClearNone {
+  const idle = Object.values(world.crews).filter(
+    (c) => c.owner === player && 'at' in c.loc && c.readyAtMs <= world.nowMs && !exclude.has(c.id),
+  );
+  const free = idle
+    .filter((c) => !threatened(world, player, (c.loc as { at: Id }).at))
     .sort((x, y) => y.strength - x.strength || (x.id < y.id ? -1 : 1));
   const nodes = [...new Set(free.map((c) => (c.loc as { at: Id }).at))].sort();
   let best: { node: Id; len: number } | null = null;
@@ -76,7 +109,12 @@ export function pickClearCrews(
     const len = Math.min(...lens.map((r) => r.lengthM));
     if (best === null || len < best.len) best = { node, len };
   }
-  if (!best) return null;
+  if (!best) {
+    return {
+      error: 'no_crew',
+      reason: idle.length > 0 && free.length === 0 ? 'under_siege' : 'busy',
+    };
+  }
   const here = free.filter((c) => (c.loc as { at: Id }).at === best.node);
   const ride = Object.values(world.carriers)
     .filter(
