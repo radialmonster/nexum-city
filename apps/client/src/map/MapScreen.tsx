@@ -91,6 +91,8 @@ export interface MapEmbed {
 }
 
 const ZOOM_STEP = 1.6;
+/** Rounding allowance when deciding whether the full radial ring fits. */
+const FIT_SLACK_PX = 3;
 const ROUTE_CARRIER: CarrierKind = 'van';
 
 export interface MapOptions {
@@ -456,7 +458,9 @@ export function MapScreen({
 
   // Selecting a plot pans the camera, only if needed, so the plot and its whole ring sit in the
   // clear part of the map. Once per selection; waits for a running camera move to finish.
-  const pannedFor = useRef<Id | null>(null);
+  // The key includes the measured ring size: the first measure can precede the HUD scale, and the
+  // fit must use the final size or the ring ends up a few pixels short and flips to a half ring.
+  const pannedFor = useRef<string | null>(null);
   useEffect(() => {
     if (!sel) {
       if (pannedFor.current !== null) {
@@ -467,10 +471,11 @@ export function MapScreen({
       return;
     }
     const r = rendererRef.current;
-    if (!wantMenu || !r || menuBox.half <= 0 || pannedFor.current === sel.id) return;
+    const key = `${sel.id}:${String(Math.round(menuBox.half))}`;
+    if (!wantMenu || !r || menuBox.half <= 0 || pannedFor.current === key) return;
     const c = r.controller;
     if (c.moving) return;
-    pannedFor.current = sel.id;
+    pannedFor.current = key;
     const at = worldToHud(sel, c.cam, c.viewport);
     const d = panToFit(at, menuBox.half, c.viewport, hudRects());
     if (!d || (d.dx === 0 && d.dy === 0)) return;
@@ -608,6 +613,7 @@ export function MapScreen({
               </div>
               <div className={styles['row']}>
                 <Button
+                  className={styles['step']}
                   aria-label="Zoom out"
                   onClick={() => {
                     act((r, now) => {
@@ -618,6 +624,7 @@ export function MapScreen({
                   -
                 </Button>
                 <Button
+                  className={styles['step']}
                   aria-label="Zoom in"
                   onClick={() => {
                     act((r, now) => {
@@ -627,7 +634,9 @@ export function MapScreen({
                 >
                   +
                 </Button>
-                <Button onClick={recentre}>RECENTRE</Button>
+                <Button className={styles['recentre']} onClick={recentre}>
+                  RECENTRE
+                </Button>
               </div>
             </div>
 
@@ -744,10 +753,12 @@ export function clampMenu(
   const clamp = (v: number, lo: number, hi: number) =>
     lo > hi ? (lo + hi) / 2 : Math.min(hi, Math.max(lo, v));
   const x = clamp(at.x, half, vp.w - half);
-  const underCard = x - half < inset.x * 2;
+  // a pan that just fits lands on the edge; sub-pixel rounding must not flip it to a half ring
+  const underCard = x - half < inset.x * 2 - FIT_SLACK_PX;
   const top = underCard ? inset.y * 2 : 0;
-  if (at.y - half < top) return { x, y: clamp(at.y, 0, vp.h - half), facing: 'down' };
-  if (at.y + half > vp.h) return { x, y: Math.max(at.y, half), facing: 'up' };
+  if (at.y - half < top - FIT_SLACK_PX)
+    return { x, y: clamp(at.y, 0, vp.h - half), facing: 'down' };
+  if (at.y + half > vp.h + FIT_SLACK_PX) return { x, y: Math.max(at.y, half), facing: 'up' };
   return { x, y: at.y, facing: 'around' };
 }
 
