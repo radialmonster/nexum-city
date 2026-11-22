@@ -12,6 +12,7 @@ import type {
   neonGlow,
   neonLetterSpacing,
   neonLineHeight,
+  neonMap,
   neonRadius,
   neonShadow,
   neonSize,
@@ -39,6 +40,7 @@ export type ShadowKey = keyof typeof neonShadow;
 export type DurationKey = keyof typeof neonDuration;
 export type EasingKey = keyof typeof neonEasing;
 export type ZKey = keyof typeof neonZ;
+export type MapKey = keyof typeof neonMap;
 
 /** One box-shadow layer. Lengths are px; `color` names a colour token. */
 export interface ShadowLayer {
@@ -102,6 +104,8 @@ export interface Theme {
   readonly duration: Readonly<Record<DurationKey, number>>;
   readonly easing: Readonly<Record<EasingKey, string>>;
   readonly z: Readonly<Record<ZKey, number>>;
+  /** Map geometry and camera numbers (plain numbers, world units). */
+  readonly map: Readonly<Record<MapKey, number>>;
   readonly scale: ScaleRules;
 }
 

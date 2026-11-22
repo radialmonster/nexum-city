@@ -21,6 +21,15 @@ describe.each(Object.entries(themes))('toPixiPalette(%s)', (_, theme) => {
     }
   });
 
+  it('passes font sizes and map numbers through', () => {
+    expect(palette.fontSize).toEqual(theme.fontSize);
+    expect(palette.map).toEqual(theme.map);
+    expect(palette.map.pitchX).toBeGreaterThan(palette.map.street);
+    expect(palette.map.acrossMin).toBeLessThan(palette.map.acrossDistrict);
+    expect(palette.map.acrossDistrict).toBeLessThan(palette.map.acrossTactical);
+    expect(palette.map.acrossTactical).toBeLessThan(palette.map.acrossCity);
+  });
+
   it('resolves glow layers to numbers', () => {
     for (const [key, layers] of Object.entries(theme.glow)) {
       const out = palette.glow[key as keyof typeof palette.glow];

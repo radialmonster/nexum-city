@@ -21,6 +21,7 @@ const PREFIX = {
   duration: 'duration',
   easing: 'easing',
   z: 'z',
+  map: 'map',
 } as const satisfies Record<TokenGroup, string>;
 
 /** The token groups, in the order they are written to CSS. */
@@ -99,6 +100,7 @@ function groupValues(theme: Theme, group: TokenGroup): [string, string][] {
     case 'fontWeight':
     case 'lineHeight':
     case 'z':
+    case 'map':
       return Object.entries(theme[group]).map(([k, v]) => [k, String(v)]);
     case 'letterSpacing':
       return Object.entries(theme[group]).map(([k, v]) => [k, v === 0 ? '0' : `${String(v)}em`]);

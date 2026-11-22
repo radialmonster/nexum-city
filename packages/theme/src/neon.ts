@@ -270,3 +270,60 @@ export const neonScale: ScaleRules = {
     { minWidth: 3500, minHeight: 1900, value: 2 },
   ],
 };
+
+/**
+ * Map geometry and behaviour, in world units (one plot is `pitchX` by `pitchY`)
+ * or plain numbers. The PixiJS map reads these through `toPixiPalette`; nothing in
+ * the renderer hard-codes a size, width, alpha or threshold.
+ */
+export const neonMap = {
+  // layout: plot pitch and the street gap between plots (world units)
+  pitchX: 210,
+  pitchY: 220,
+  street: 20,
+  // outlines and fills
+  chamfer: 28,
+  edgeWidth: 2,
+  edgeWidthSelected: 4,
+  fillAlpha: 0.2,
+  fillAlphaNeutral: 0.1,
+  fillAlphaCity: 0.85,
+  streetCoreWidth: 1.2,
+  streetDash: 6,
+  streetDashGap: 8,
+  frontierDash: 10,
+  frontierDashGap: 7,
+  // fog of war
+  fogDim: 0.4,
+  fogCover: 0.72,
+  fogLine: 6,
+  // hubs, rings, carriers, price bars
+  hubRadius: 44,
+  ringWidth: 4,
+  ringGap: 10,
+  carrierScale: 1.15,
+  priceBarWidth: 7,
+  priceBarHeight: 36,
+  priceBarGap: 5,
+  slotSize: 22,
+  // camera: how many plots fit across the viewport
+  acrossCity: 16,
+  acrossTactical: 7,
+  acrossDistrict: 2.2,
+  acrossMin: 1.4,
+  acrossMax: 40,
+  /** At or above this many plots across, the map is in the CITY level. */
+  levelCityAcross: 11,
+  /** At or below this many plots across, the map is in the DISTRICT level. */
+  levelDistrictAcross: 3.6,
+  panMarginPlots: 2,
+  inertiaFriction: 0.92,
+  inertiaStop: 0.02,
+  wheelSensitivity: 0.0015,
+  pickRadiusPx: 6,
+  arrowInset: 34,
+  /** Demo only: how long one looped carrier trip takes on screen, in ms. */
+  demoLoopMs: 14000,
+  /** Minimum drag distance in px before a press becomes a pan instead of a click. */
+  dragSlop: 5,
+} satisfies Record<string, number>;

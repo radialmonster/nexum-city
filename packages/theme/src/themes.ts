@@ -11,6 +11,7 @@ import {
   neonGlow,
   neonLetterSpacing,
   neonLineHeight,
+  neonMap,
   neonRadius,
   neonScale,
   neonShadow,
@@ -43,6 +44,7 @@ export const neon: Theme = {
   duration: neonDuration,
   easing: neonEasing,
   z: neonZ,
+  map: neonMap,
   scale: neonScale,
 };
 
@@ -71,6 +73,7 @@ export function createTheme(base: Theme, name: string, overrides: ThemeOverrides
     duration: { ...base.duration, ...overrides.duration },
     easing: { ...base.easing, ...overrides.easing },
     z: { ...base.z, ...overrides.z },
+    map: { ...base.map, ...overrides.map },
     scale: { ...base.scale, ...overrides.scale },
   };
 }

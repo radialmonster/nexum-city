@@ -1,5 +1,14 @@
 import { parseColor } from './color.js';
-import type { ColorKey, FactionRole, FontKey, GlowKey, ShadowLayer, Theme } from './types.js';
+import type {
+  ColorKey,
+  FactionRole,
+  FontKey,
+  FontSizeKey,
+  GlowKey,
+  MapKey,
+  ShadowLayer,
+  Theme,
+} from './types.js';
 
 /** A colour as PixiJS takes it, e.g. `graphics.fill({ color, alpha })`. */
 export interface PixiColor {
@@ -21,6 +30,10 @@ export interface PixiPalette {
   readonly faction: Readonly<Record<FactionRole, PixiColor>>;
   readonly glow: Readonly<Record<GlowKey, readonly PixiGlowLayer[]>>;
   readonly font: Readonly<Record<FontKey, string>>;
+  /** px at `--s: 1`; the map scales them by the HUD scale. */
+  readonly fontSize: Readonly<Record<FontSizeKey, number>>;
+  /** Map geometry and camera numbers. */
+  readonly map: Readonly<Record<MapKey, number>>;
 }
 
 function toPixiColor(value: string): PixiColor {
@@ -56,5 +69,7 @@ export function toPixiPalette(theme: Theme): PixiPalette {
     faction: mapValues(theme.faction, toPixiColor),
     glow: mapValues(theme.glow, (layers) => layers.map(glowLayer)),
     font: { ...theme.font },
+    fontSize: { ...theme.fontSize },
+    map: { ...theme.map },
   };
 }
