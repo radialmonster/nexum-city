@@ -34,7 +34,8 @@ const MENU: readonly RadialItem[] = [
 ];
 
 /** The orders the radial menu can open a confirm card for. */
-export type MapOrderKind = 'move' | 'haul' | 'siege' | 'reinforce' | 'scout' | 'build' | 'settle';
+export type MapOrderKind =
+  'move' | 'haul' | 'siege' | 'reinforce' | 'scout' | 'build' | 'settle' | 'raid';
 
 const ORDER_ITEMS: Record<MapOrderKind, RadialItem> = {
   move: { id: 'move', glyph: '>', label: 'MOVE' },
@@ -44,6 +45,7 @@ const ORDER_ITEMS: Record<MapOrderKind, RadialItem> = {
   scout: { id: 'scout', glyph: 'o', label: 'SCOUT' },
   build: { id: 'build', glyph: 'B', label: 'BUILD' },
   settle: { id: 'settle', glyph: 'F', label: 'SETTLE' },
+  raid: { id: 'raid', glyph: '!', label: 'RAID' },
 };
 const DETAILS_ITEM: RadialItem = { id: 'details', glyph: 'i', label: 'DETAILS' };
 const CLOSE_ITEM: RadialItem = { id: 'close', glyph: 'x', label: 'CLOSE' };
@@ -59,19 +61,27 @@ export function orderMenu(d: {
   readonly details?: boolean;
 }): readonly RadialItem[] {
   const kinds: MapOrderKind[] = d.mine
-    ? ['move', 'haul', 'reinforce', 'build']
+    ? ['move', 'haul', 'reinforce', 'build', 'raid']
     : d.isHub
-      ? ['move', 'haul']
+      ? ['move', 'haul', 'raid']
       : d.remembered
         ? ['scout']
         : d.open
-          ? ['settle', 'siege', 'scout']
-          : ['siege', 'scout'];
+          ? ['settle', 'siege', 'scout', 'raid']
+          : ['siege', 'scout', 'raid'];
   return [
     ...kinds.map((k) => ORDER_ITEMS[k]),
     ...(d.details === true ? [DETAILS_ITEM] : []),
     CLOSE_ITEM,
   ];
+}
+
+/** A transient red pulse on a street. */
+export interface MapFlash {
+  readonly key: string;
+  readonly a: Id;
+  readonly b: Id;
+  readonly text: string;
 }
 
 /** What the game screen hands the map: it owns the data, the selection and the orders. */
@@ -86,6 +96,8 @@ export interface MapEmbed {
   readonly route?: readonly Id[] | null;
   /** Hide the radial menu, e.g. while an order card is open. */
   readonly menuHidden?: boolean;
+  /** Raid hits to flash on the map: a street pulses red with a callout. Repeat keys are ignored. */
+  readonly flashes?: readonly MapFlash[];
   /** Phone: the radial gets a DETAILS item that opens the district panel. */
   readonly onDetails?: (districtId: Id) => void;
 }
@@ -331,6 +343,13 @@ export function MapScreen({
   useEffect(() => {
     rendererRef.current?.setRoutePreview(embedPath ?? routeInfo?.path ?? null);
   }, [routeInfo, embedPath, ready]);
+
+  const embedFlashes = embed?.flashes;
+  useEffect(() => {
+    const r = rendererRef.current;
+    if (!r || !embedFlashes) return;
+    for (const f of embedFlashes) r.flashStreet(f.key, f.a, f.b, f.text);
+  }, [embedFlashes, scene, ready]);
 
   const act = (fn: (r: MapRenderer, now: number) => void) => {
     const r = rendererRef.current;

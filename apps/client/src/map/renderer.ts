@@ -99,6 +99,15 @@ export class MapRenderer {
   /** A district whose own labels are hidden because the radial menu is drawn over it. */
   private menuFor: Id | null = null;
   private preview: number[] | null = null;
+  private flashes: {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    text: string;
+    startedAt: number;
+  }[] = [];
+  private readonly flashed = new Set<string>();
   private hudScale = 1;
   private dirty = true;
   private baseDirty = true;
@@ -194,6 +203,24 @@ export class MapRenderer {
   setMenuFor(id: Id | null): void {
     if (this.menuFor === id) return;
     this.menuFor = id;
+    this.dirty = true;
+  }
+
+  /** Flashes a street red with a callout, e.g. when a raid hits a haul. Repeat keys are ignored. */
+  flashStreet(key: string, a: Id, b: Id, text: string): void {
+    if (this.flashed.has(key)) return;
+    const da = this.scene.byId[a];
+    const db = this.scene.byId[b];
+    if (!da || !db) return;
+    this.flashed.add(key);
+    this.flashes.push({
+      x1: da.cx,
+      y1: da.cy,
+      x2: db.cx,
+      y2: db.cy,
+      text,
+      startedAt: performance.now(),
+    });
     this.dirty = true;
   }
 
@@ -358,6 +385,8 @@ export class MapRenderer {
     const animated =
       this.scene.movers.length > 0 ||
       this.scene.alerts.length > 0 ||
+      this.scene.ambushes.length > 0 ||
+      this.flashes.length > 0 ||
       this.scene.districts.some((d) => d.siege !== null);
     if (moved || this.dirty || animated) this.draw(now);
   };
@@ -687,6 +716,31 @@ export class MapRenderer {
       });
     }
 
+    // ambushes: a dashed street with a pulse; red for rivals, the faction colour for mine
+    const pulse = (now % m.ambushPulseMs) / m.ambushPulseMs;
+    for (const a of scene.ambushes) {
+      const col = a.mine ? pal.faction[a.role] : pal.color.danger;
+      dashedLine(g, a.x1, a.y1, a.x2, a.y2, m.streetDash * px * 2, m.streetDashGap * px * 2);
+      g.stroke({ width: m.edgeWidthSelected * px, ...col });
+      const mx = (a.x1 + a.x2) / 2;
+      const my = (a.y1 + a.y2) / 2;
+      g.circle(mx, my, m.slotSize * (0.5 + pulse)).stroke({
+        width: m.edgeWidth * px,
+        ...withA(col, 1 - pulse),
+      });
+    }
+
+    // raid-hit flashes: a red pulse on the street
+    this.flashes = this.flashes.filter((f) => now - f.startedAt < m.flashMs);
+    for (const f of this.flashes) {
+      const k = (now - f.startedAt) / m.flashMs;
+      g.moveTo(f.x1, f.y1).lineTo(f.x2, f.y2);
+      g.stroke({
+        width: m.edgeWidthSelected * px * (2 + k * 2),
+        ...withA(pal.color.danger, 1 - k),
+      });
+    }
+
     // route preview
     const pv = this.preview;
     if (pv && pv.length >= 4) {
@@ -783,6 +837,24 @@ export class MapRenderer {
     } else if (lod.name) {
       this.districtLabels(level, cam, lod);
     }
+    // ambush countdown tags (mine) and raid-hit callouts
+    const gameNow = this.baseNow + (performance.now() - this.t0);
+    const tagSize = fs.xs * this.hudScale * m.cityLabelScale;
+    for (const a of scene.ambushes) {
+      if (!a.mine || level === 'city') continue;
+      const s = worldToScreen(cam, vp, (a.x1 + a.x2) / 2, (a.y1 + a.y2) / 2);
+      const left = Math.max(0, a.untilMs - gameNow);
+      const mins = Math.ceil(left / 60000);
+      const text =
+        mins >= 60 ? `AMBUSH ${String(Math.ceil(mins / 60))} H` : `AMBUSH ${String(mins)} MIN`;
+      const t = this.label(`am:${a.id}`, text, tagSize, pal.faction[a.role], true);
+      this.place(t, s.x, s.y - tagSize * 1.6, m.pitchX * cam.zoom);
+    }
+    this.flashes.forEach((f, i) => {
+      const s = worldToScreen(cam, vp, (f.x1 + f.x2) / 2, (f.y1 + f.y2) / 2);
+      const t = this.label(`fl:${String(i)}`, f.text, tagSize * 1.3, pal.color.danger, true);
+      this.place(t, s.x, s.y + tagSize * 1.8, m.pitchX * cam.zoom * 2);
+    });
     // the Sound
     const w = worldToScreen(
       cam,

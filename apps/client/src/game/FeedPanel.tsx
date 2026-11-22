@@ -5,6 +5,7 @@ import { ago, buildFeedEntries, siegeProgress, type FeedEntry } from './feed';
 import type { CrewNames } from './derive';
 import styles from './FeedPanel.module.css';
 import { hasReport } from './report';
+import { hasRaidReport } from './raidReport';
 
 export interface FeedPanelProps {
   readonly view: PlayerView;
@@ -60,9 +61,13 @@ export function FeedPanel({
                 type="button"
                 className={cx(styles['entry'], e.at > lastSeenMs && styles['fresh'])}
                 style={vars({ '--k': toneColor(e.tone) })}
-                disabled={e.districtId === null && !(onReport && hasReport(e.eventKind))}
+                disabled={
+                  e.districtId === null &&
+                  !(onReport && (hasReport(e.eventKind) || hasRaidReport(e.eventKind)))
+                }
                 onClick={() => {
-                  if (onReport && hasReport(e.eventKind)) onReport(e.seq);
+                  if (onReport && (hasReport(e.eventKind) || hasRaidReport(e.eventKind)))
+                    onReport(e.seq);
                   else if (e.districtId !== null) onFly(e.districtId);
                 }}
               >

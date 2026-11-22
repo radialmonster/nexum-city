@@ -142,3 +142,56 @@ describe('settle events', () => {
     expect(failed?.text).toContain('someone else got there first');
   });
 });
+
+describe('raid events', () => {
+  const at = { districts: ['a', 'b'] };
+  const hit = (actors: string[]) =>
+    feedItem(1, 'raid.hit', {
+      ...at,
+      actors,
+      data: {
+        stolen: { parts: 12 },
+        destroyed: {},
+        remaining: { parts: 18 },
+        raiderStrength: 5,
+        guard: 0,
+        escortLost: 0,
+      },
+    });
+
+  it('words a hit from the victim, the raider and a bystander', () => {
+    const victim = describeEvent(hit(['rival', 'me']), view);
+    expect(victim?.tone).toBe('danger');
+    expect(victim?.text).toContain('Raiders hit your haul on');
+    expect(victim?.text).toContain('lost 12 parts');
+    const raider = describeEvent(hit(['me', 'rival']), view);
+    expect(raider?.text).toContain('Your ambush on');
+    expect(raider?.text).toContain('stole 12 parts');
+    expect(describeEvent(hit(['x', 'y']), view)?.text).toContain('raided');
+  });
+
+  it('announces an ambush being set, repelled and ended', () => {
+    const set = describeEvent(feedItem(2, 'raid.set', { ...at, actors: ['me'] }), view);
+    expect(set?.kind).toBe('AMBUSH');
+    expect(set?.text).toContain('waiting in ambush');
+    expect(
+      describeEvent(
+        feedItem(3, 'raid.repelled', {
+          ...at,
+          actors: ['rival', 'me'],
+          data: { raiderStrength: 3, guard: 6, raiderLost: 1 },
+        }),
+        view,
+      ),
+    ).toBeTruthy();
+    const ended = describeEvent(
+      feedItem(4, 'raid.ended', {
+        ...at,
+        actors: ['me'],
+        data: { loot: { parts: 7 }, reason: 'expired', struck: true },
+      }),
+      view,
+    );
+    expect(ended?.text).toContain('7 parts');
+  });
+});

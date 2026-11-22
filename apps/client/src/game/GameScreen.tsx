@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { GoodName } from '@nexum/contracts';
 import type { PlayerView as SimView } from '@nexum/sim';
 import { Tabs } from '../ui';
@@ -6,6 +6,9 @@ import { MapScreen } from '../map/MapScreen';
 import { BattleReport } from './BattleReport';
 import { buildDossier } from './rivalDossier';
 import { buildReport } from './report';
+import { buildRaidReport } from './raidReport';
+import { RaidReport } from './RaidReportCard';
+import { goodsText } from './feed';
 import { Dossier } from './Dossier';
 import { MarketPanel } from './MarketPanel';
 import { DistrictPanel } from './DistrictPanel';
@@ -65,6 +68,29 @@ export function GameScreen() {
     saveFirstSteps(next);
   };
 
+  const playerId = view?.playerId;
+  // Raid hits that arrive while the screen is open flash on the map; older history does not.
+  const [flashFrom] = useState(() => Math.max(0, ...state.feed.map((f) => f.seq)));
+  const flashes = useMemo(
+    () =>
+      state.feed
+        .filter((f) => f.event.kind === 'raid.hit' && f.seq > flashFrom)
+        .flatMap((f) => {
+          const [a, b] = f.event.districts;
+          if (!a || !b) return [];
+          const lost = goodsText(f.event.data, 'stolen') ?? 'nothing';
+          const mine = f.event.actors[0] === playerId;
+          return [
+            {
+              key: String(f.seq),
+              a,
+              b,
+              text: mine ? `Ambush hit: +${lost}` : `Raid hit: -${lost}`,
+            },
+          ];
+        }),
+    [state.feed, flashFrom, playerId],
+  );
   if (!view || !account) return null;
   const nowMs = gameNow(state, wall);
   const alerts = Object.values(view.districts).filter((d) => isOwn(d) && d.siege !== null).length;
@@ -87,6 +113,7 @@ export function GameScreen() {
   };
   const report =
     panel?.kind === 'report' ? buildReport(state.feed, view, panel.seq, state.names) : null;
+  const raidReport = panel?.kind === 'report' ? buildRaidReport(state.feed, view, panel.seq) : null;
   /** Panels render over the map, so on a phone they pull the map tab to the front. */
   const drawer: Drawer = panel && compact ? 'map' : chosenDrawer;
 
@@ -201,6 +228,7 @@ export function GameScreen() {
               session.openDraft({ kind, districtId });
             },
             route,
+            flashes,
             menuHidden: state.draft !== null,
             // phone: the radial shows on the map; DETAILS opens the district tab
             ...(compact
@@ -245,6 +273,18 @@ export function GameScreen() {
                     draft: { kind: 'haul', districtId: home.id, from: hub },
                   });
                 }}
+              />
+            )}
+            {raidReport && (
+              <RaidReport
+                report={raidReport}
+                names={state.names}
+                me={view.playerId}
+                onFly={(id) => {
+                  closePanel();
+                  fly(id);
+                }}
+                onClose={closePanel}
               />
             )}
             {report && (

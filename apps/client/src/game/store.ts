@@ -19,7 +19,7 @@ export interface ToastMessage {
 
 /** The open order card: what to do and where. Crews and carrier are picked inside the card. */
 export interface OrderDraft {
-  readonly kind: 'move' | 'haul' | 'siege' | 'reinforce' | 'scout' | 'build' | 'settle';
+  readonly kind: 'move' | 'haul' | 'siege' | 'reinforce' | 'scout' | 'build' | 'settle' | 'raid';
   readonly districtId: string;
   /** Pre-picks where the crews set out from (e.g. a hub, to haul its stash home). */
   readonly from?: string;

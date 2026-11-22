@@ -34,6 +34,18 @@ const num = (d: Data, k: string): number | undefined => {
   return typeof v === 'number' ? v : undefined;
 };
 
+/** A goods-in-units record from event data, as "12 parts, 3 power", or null when it is empty. */
+export function goodsText(d: Data, k: string): string | null {
+  const v = d[k];
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  const parts: string[] = [];
+  for (const g of ['parts', 'power', 'data', 'supplies']) {
+    const n = v[g];
+    if (typeof n === 'number' && n > 0) parts.push(`${formatUnits(n)} ${g}`);
+  }
+  return parts.length > 0 ? parts.join(', ') : null;
+}
+
 const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** Whole units with thousands separators and no decimals below one. */
@@ -59,6 +71,8 @@ export function describeEvent(
     if (!id) return 'the city';
     return view.districts[id]?.name ?? id;
   };
+  const streetName = (a: string | null | undefined, b: string | null | undefined): string =>
+    a && b ? `the ${name(a)} - ${name(b)} street` : 'a street';
   const who = (id: string | undefined): string => (id ? whoIs(names, me, id) : 'Someone');
   const base = { seq: item.seq, at: event.at, districtId: placeId, eventKind: event.kind };
 
@@ -120,6 +134,78 @@ export function describeEvent(
             : mineDefence
               ? `The siege on ${name(placeId)} was broken.`
               : `A siege of ${name(placeId)} ended.`,
+      };
+    }
+    case 'raid.set': {
+      const street = streetName(placeId, event.districts[1]);
+      return {
+        ...base,
+        kind: 'AMBUSH',
+        glyph: '!',
+        tone: 'accent',
+        text: `Your crews are waiting in ambush on ${street}.`,
+      };
+    }
+    case 'raid.hit': {
+      const street = streetName(placeId, event.districts[1]);
+      const raider = event.actors[0];
+      const victim = event.actors[1];
+      const stolen = goodsText(d, 'stolen') ?? 'nothing';
+      if (victim === me) {
+        return {
+          ...base,
+          kind: 'RAID',
+          glyph: '!',
+          tone: 'danger',
+          text: `Raiders hit your haul on ${street}: lost ${stolen}.`,
+        };
+      }
+      return {
+        ...base,
+        kind: 'RAID',
+        glyph: '!',
+        tone: raider === me ? 'ok' : 'news',
+        text:
+          raider === me
+            ? `Your ambush on ${street} stole ${stolen}.`
+            : `${who(raider)} raided ${who(victim)}'s haul on ${street}.`,
+      };
+    }
+    case 'raid.repelled': {
+      const street = streetName(placeId, event.districts[1]);
+      const raider = event.actors[0];
+      const victim = event.actors[1];
+      return {
+        ...base,
+        kind: 'RAID',
+        glyph: 'x',
+        tone: raider === me ? 'warn' : victim === me ? 'ok' : 'news',
+        text:
+          raider === me
+            ? `Your ambush on ${street} was beaten off by an escort.`
+            : victim === me
+              ? `Your escort beat off raiders on ${street}.`
+              : `${who(victim)}'s escort beat off ${who(raider)} on ${street}.`,
+      };
+    }
+    case 'raid.ended': {
+      const street = streetName(placeId, event.districts[1]);
+      const loot = goodsText(d, 'loot');
+      const reason = str(d, 'reason');
+      const why =
+        reason === 'recalled'
+          ? 'called off'
+          : reason === 'repelled'
+            ? 'beaten off'
+            : reason === 'full'
+              ? 'ended with full hands'
+              : 'ran out of time';
+      return {
+        ...base,
+        kind: 'AMBUSH',
+        glyph: '!',
+        tone: loot ? 'ok' : 'warn',
+        text: `Your ambush on ${street} ${why}${loot ? `, carrying home ${loot}` : ' with no loot'}.`,
       };
     }
     case 'arrived': {

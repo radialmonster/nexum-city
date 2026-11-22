@@ -125,6 +125,19 @@ export interface SceneAlert {
   y: number;
 }
 
+/** An ambush on a street: crews waiting to strike the first enemy haul that passes. */
+export interface SceneAmbush {
+  id: Id;
+  mine: boolean;
+  role: FactionRole;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  /** Game time the ambush stands until. */
+  untilMs: number;
+}
+
 export interface Bounds {
   minX: number;
   minY: number;
@@ -138,6 +151,7 @@ export interface Scene {
   streets: SceneStreet[];
   movers: SceneMover[];
   alerts: SceneAlert[];
+  ambushes: SceneAmbush[];
   /** The extent of all districts in world units. */
   bounds: Bounds;
   /** World y where the Sound (water) starts. */
@@ -276,6 +290,7 @@ export function assignRoles(player: PlayerView): Map<Owner, FactionRole> {
     if (o !== 'neutral' && o !== player.playerId) others.add(o);
   }
   for (const c of player.convoys) if (c.owner !== player.playerId) others.add(c.owner);
+  for (const a of player.ambushes ?? []) if (a.owner !== player.playerId) others.add(a.owner);
   roles.set(player.playerId, 'self');
   [...others].sort().forEach((id, i) => {
     roles.set(id, RIVAL_ROLES[i % RIVAL_ROLES.length] as FactionRole);
@@ -490,6 +505,28 @@ export function layoutWorld(view: MapView, t: MapTokens): Scene {
     });
   }
 
+  // ambushes: the ones in sight, plus my own (a standing ambush is also one of my movements)
+  const ambushes: SceneAmbush[] = [];
+  const addAmbush = (id: Id, owner: Id, ea: Id, eb: Id, untilMs: number): void => {
+    const a = byId[ea];
+    const b = byId[eb];
+    if (!a || !b || ambushes.some((x) => x.id === id)) return;
+    ambushes.push({
+      id,
+      mine: owner === p.playerId,
+      role: roles.get(owner) ?? 'rival',
+      x1: a.cx,
+      y1: a.cy,
+      x2: b.cx,
+      y2: b.cy,
+      untilMs,
+    });
+  };
+  for (const a of p.ambushes ?? []) addAmbush(a.id, a.owner, a.edge[0], a.edge[1], a.untilMs);
+  for (const m of Object.values(p.movements)) {
+    if (m.kind === 'ambush' && m.raid) addAmbush(m.id, m.owner, m.raid.a, m.raid.b, m.raid.untilMs);
+  }
+
   const alerts: SceneAlert[] = [];
   for (const a of view.alerts ?? []) {
     const d = byId[a.districtId];
@@ -519,6 +556,7 @@ export function layoutWorld(view: MapView, t: MapTokens): Scene {
     streets: layoutStreets(view, t, byId),
     movers,
     alerts,
+    ambushes,
     bounds,
     waterTop: (maxY + 0.5) * t.pitchY,
     mine: districts

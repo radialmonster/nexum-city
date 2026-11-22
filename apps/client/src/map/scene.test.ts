@@ -142,3 +142,19 @@ describe('open and settling plots', () => {
     expect(scene.districts.filter((x) => x.id !== target.id).every((x) => !x.settling)).toBe(true);
   });
 });
+
+describe('ambushes', () => {
+  it('lays out a visible ambush as a street between two districts', () => {
+    const base = demoView({ large: true, reveal: true });
+    const [a = '', b = ''] = Object.keys(base.player.districts);
+    const player = {
+      ...base.player,
+      ambushes: [
+        { id: 'z1', owner: base.player.playerId, edge: [a, b] as [string, string], untilMs: 5 },
+      ],
+    };
+    const scene = layoutWorld({ ...base, player }, t);
+    expect(scene.ambushes).toHaveLength(1);
+    expect(scene.ambushes[0]).toMatchObject({ id: 'z1', mine: true, untilMs: 5 });
+  });
+});
