@@ -36,19 +36,19 @@ Live status for [`plan.md`](plan.md). Update this file in the same commit as the
 
 ## Phase 1: Simulation core
 
-| ID  | Task                                                                                  | Status | Notes                 |
-| --- | ------------------------------------------------------------------------------------- | ------ | --------------------- |
-| 11  | World model: district grid, street graph, hubs, frontier, ownership                   | done   | 2026-11-22, `59b7800` |
-| 12  | Seeded RNG and a deterministic step function, `(state, inputs, dt) -> state + events` | done   | 2026-11-22, `59b7800` |
-| 13  | Orders: move, haul, build, scout, stance; asset-limited                               | done   | 2026-11-22, `59b7800` |
-| 14  | Travel: carriers (on foot, van, hauler), routing, ETAs                                | done   | 2026-11-22, `59b7800` |
-| 15  | Production and warehouses                                                             | done   | 2026-11-22, `59b7800` |
-| 16  | Siege: a single capture bar with modifiers; garrison, walls and stance                | todo   |                       |
-| 17  | Markets: a hub order book with civic baseline traders                                 | todo   |                       |
-| 18  | Fog and sight                                                                         | todo   |                       |
-| 19  | Season clock and district-hour scoring                                                | todo   |                       |
-| 1A  | New-player placement on the frontier, with protection; city growth                    | todo   | ADR 0028              |
-| 1B  | Fast-forward harness: simulate N days, determinism test                               | todo   |                       |
+| ID  | Task                                                                                  | Status | Notes                  |
+| --- | ------------------------------------------------------------------------------------- | ------ | ---------------------- |
+| 11  | World model: district grid, street graph, hubs, frontier, ownership                   | done   | 2026-11-22, `59b7800`  |
+| 12  | Seeded RNG and a deterministic step function, `(state, inputs, dt) -> state + events` | done   | 2026-11-22, `59b7800`  |
+| 13  | Orders: move, haul, build, scout, stance; asset-limited                               | done   | 2026-11-22, `59b7800`  |
+| 14  | Travel: carriers (on foot, van, hauler), routing, ETAs                                | done   | 2026-11-22, `59b7800`  |
+| 15  | Production and warehouses                                                             | done   | 2026-11-22, `59b7800`  |
+| 16  | Siege: a single capture bar with modifiers; garrison, walls and stance                | done   | 2026-11-22 (`45c2bed`) |
+| 17  | Markets: a hub order book with civic baseline traders                                 | todo   |                        |
+| 18  | Fog and sight                                                                         | done   | 2026-11-22 (`45c2bed`) |
+| 19  | Season clock and district-hour scoring                                                | done   | 2026-11-22 (`45c2bed`) |
+| 1A  | New-player placement on the frontier, with protection; city growth                    | todo   | ADR 0028               |
+| 1B  | Fast-forward harness: simulate N days, determinism test                               | todo   |                        |
 
 ## Phase 2: Server and persistence
 
@@ -108,3 +108,4 @@ Live status for [`plan.md`](plan.md). Update this file in the same commit as the
 - 2026-11-22: Plan and tracker created. Owner approved: rewrite in this repo, keep docs and ADRs, archive the prototype under a tag, tear down Cloudflare (it has no users), host with Docker Compose on the FlyWP server. FlyWP can deploy a compose app straight from the GitHub repo, so `docker-compose.yml` lives at the repo root.
 - 2026-11-22: Phase 0 tasks 01–03 done (`1b88308`). Root npm workspace with strict TypeScript project references, ESLint, Prettier, Vitest and `npm run check`; CI runs it on Node 22. `packages/theme` has the `neon` and `highContrast` token sets, the CSS variable and `--s` scale generators and the Pixi palette. The `nexum/no-raw-colors` ESLint rule (`tools/eslint-plugin-nexum`) and stylelint reject raw colours and px font sizes outside the theme. TypeScript is pinned to 6.0.x because typescript-eslint does not support TypeScript 7 yet.
 - 2026-11-22: Phase 1 tasks 11–15 done (`59b7800`). `packages/sim` has the world model, a seeded RNG, an exact integer `step` (2 s ticks and one jump hash the same), the seven orders with typed validation, Dijkstra travel with ETAs, and production with warehouses. Siege, markets, fog, scoring and the frontier are left as extension points. Decisions are in `sim-spec.md`.
+- 2026-11-22: Phase 1 tasks 16, 18, 19 done (`45c2bed`). Siege (one capture bar per district, walls, stance, attrition rounds, loot, building damage, retreat, `reinforce`, battle report), fog (`viewFor`, `sightOf`, last-known owners) and season scoring (exact district-hours, hourly `score.tick`, catch-up modifiers, `standings`). An even fight captures in about 10 h. 134 tests pass.
