@@ -24,6 +24,16 @@ The city grows as new players arrive.
 - **Client:** React for the HUD and PixiJS for the map, both styled from a single theme token package.
 - **Hosting:** self-hosted with Docker Compose.
 
+## Run locally
+
+```sh
+npm install
+npm run dev            # game server on :8080 and the Vite dev server on :5173 (proxies /api)
+docker compose up --build   # the production image on http://localhost:8080 (set APP_PORT to change it)
+```
+
+The UI kit gallery is at `/kit`. `npm run check` runs lint, format, typecheck, tests and build.
+
 ## Licence
 
 Copyright © 2026 radialmonster. All rights reserved. The source is visible for reference, but no licence to use, copy or redistribute it is granted.

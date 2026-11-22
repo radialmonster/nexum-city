@@ -5,6 +5,8 @@
     { "path": "./packages/theme" },
     { "path": "./packages/theme/tsconfig.test.json" },
     { "path": "./apps/client" },
+    { "path": "./apps/server" },
+    { "path": "./apps/server/tsconfig.test.json" },
     { "path": "./tsconfig.tools.json" }
   ]
 }

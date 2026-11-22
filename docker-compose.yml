@@ -1,0 +1,34 @@
+# Nexum City. `docker compose up --build` runs it locally; FlyWP reads this file from GitHub.
+services:
+  app:
+    build: .
+    image: nexum-city:latest
+    restart: unless-stopped
+    ports:
+      - '${APP_PORT:-8080}:8080'
+    environment:
+      NODE_ENV: production
+      PORT: '8080'
+      DATA_DIR: /app/data
+    volumes:
+      - nexum-data:/app/data
+    mem_limit: 256m
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:8080/api/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+volumes:
+  nexum-data:

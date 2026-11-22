@@ -13,6 +13,9 @@
     "apps/*"
   ],
   "scripts": {
+    "dev": "concurrently -k -n server,client \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:server": "npm run dev -w @nexum/server",
+    "dev:client": "npm run dev -w @nexum/client",
     "lint": "eslint . && stylelint \"**/*.css\" --allow-empty-input",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -24,6 +27,7 @@
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "@types/node": "22.20.5",
+    "concurrently": "10.0.7",
     "eslint": "10.15.0",
     "globals": "17.14.0",
     "prettier": "3.10.1",
