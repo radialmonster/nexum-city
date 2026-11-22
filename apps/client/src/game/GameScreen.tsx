@@ -168,6 +168,7 @@ export function GameScreen() {
     panel?.kind === 'report' ? buildReport(state.feed, view, panel.seq, state.names) : null;
   const raidReport = panel?.kind === 'report' ? buildRaidReport(state.feed, view, panel.seq) : null;
   /** Panels render over the map, so on a phone they pull the map tab to the front. */
+  const seasonEndOpen = finaleClock(view, nowMs).phase === 'over' && endSeen !== view.season.endMs;
   const drawer: Drawer = panel && compact ? 'map' : chosenDrawer;
 
   const feed = (
@@ -305,7 +306,7 @@ export function GameScreen() {
             route,
             flashes,
             // the radial gives way to an order card or any modal (market, report, dossier)
-            menuHidden: state.draft !== null || panel !== null,
+            menuHidden: state.draft !== null || panel !== null || seasonEndOpen,
             // phone: the radial shows on the map; DETAILS opens the district tab
             ...(compact
               ? {
@@ -316,7 +317,7 @@ export function GameScreen() {
               : {}),
           }}
         />
-        {finaleClock(view, nowMs).phase === 'over' && endSeen !== view.season.endMs && (
+        {seasonEndOpen && (
           <div className={styles['modal']}>
             <SeasonEnd
               view={view}
