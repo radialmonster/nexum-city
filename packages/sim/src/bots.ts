@@ -878,7 +878,7 @@ export const hunter: Bot = (s, me) => {
   const want = nextWant(s, me, HUNTER_BUILDINGS);
   const keep = keepGoods(want);
   const orders = [
-    ...economy(s, me, budget, 4, HUNTER_BUILDINGS),
+    ...economy(s, me, budget, 6, HUNTER_BUILDINGS),
     ...settleOrders(s, me, budget, SETTLE_RESERVE, 1),
     ...stageGoods(s, me, want),
   ];

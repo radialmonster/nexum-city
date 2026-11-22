@@ -27,9 +27,9 @@ export const ROSTER: readonly BotKind[] = [
   'raider',
   'turtle',
   'merchant',
-  'raider',
-  'merchant',
   'hunter',
+  'merchant',
+  'turtle',
 ];
 
 export const PERSONAS: Record<BotKind, readonly Persona[]> = {

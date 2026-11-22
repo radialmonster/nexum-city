@@ -82,7 +82,7 @@ export interface SeasonResult {
 /** The early-income checkpoint: 48 game hours. */
 const EARLY_MS = 48 * 3_600_000;
 
-const DEFAULT_BOTS: BotKind[] = ['raider', 'raider', 'turtle', 'merchant', 'merchant', 'hunter'];
+const DEFAULT_BOTS: BotKind[] = ['raider', 'turtle', 'turtle', 'merchant', 'merchant', 'hunter'];
 
 /** A fresh world with the bots joined at game time 0. */
 export function seasonStart(options: SeasonOptions = {}): {

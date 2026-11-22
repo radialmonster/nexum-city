@@ -602,26 +602,26 @@ Parts only come from docks districts, and bots never bought parts at the hub mar
 
 ### Results (seeds 1 to 16, invariants 0)
 
-Buildings per player after the change (with the hunter in the mix): raider workshop 1.00, watchtower 0.03; turtle workshop 0.19; merchant workshop 0.91, garage 0.03; hunter workshop 0.88, watchtower 0.13. Before (see "Bots" under Watchtower and Garage): turtle towers 0.09, merchant garage 0.06, no walls or depots at all. Building stays rare because production fills warehouses with one good and a single van is shared between hauling, raiding and shopping. The parts price stayed between 18.0 and 19.8 (base 18). `scripts/building-diag.mjs [seeds] [days]` prints these numbers.
+Buildings per player (seeds 1 to 16, with the hunter in the mix): raider workshop 1.00; turtle workshop 0.34, watchtower 0.53; merchant workshop 0.97, garage 0.03; hunter workshop 1.00, watchtower 0.06. Before (see "Bots" under Watchtower and Garage): turtle towers 0.09, merchant garage 0.06, no walls or depots at all, so turtles now build about six times as many towers. Walls and depots still do not appear: they need power or data on top of parts, and a district warehouse holds one good. Building stays rare because production fills warehouses with one good and a single van is shared between hauling, raiding and shopping. The parts price stayed between 18.0 and 19.6 (base 18). `scripts/building-diag.mjs [seeds] [days]` prints these numbers.
 
 ## Hunter bot (task 76)
 
-A new bot personality, `hunter`. It never attacks. It builds a Watchtower in every district it can pay for (raiders skip streets under a rival tower they can see), takes street jobs, runs escorted contract hauls with two crews in the van, and holds a haul while its own sight shows an ambush on the route. Server roster: raider, turtle, merchant, raider, merchant, hunter; the theme already had a hunter faction colour.
+A new bot personality, `hunter`. It never attacks. It builds a Watchtower in every district it can pay for (raiders skip streets under a rival tower they can see), takes street jobs, runs escorted contract hauls with two crews in the van, and holds a haul while its own sight shows an ambush on the route. Server roster: raider, turtle, merchant, hunter, merchant, turtle; the theme already had a hunter faction colour.
 
 ### Harness mix
 
-The default mix is now 2 raiders, 1 turtle, 2 merchants, 1 hunter (six players, as before). A seventh player (a second turtle plus the hunter) crowded the map and pushed merchants to 2.31 districts on seeds 1 to 8, under the 2.4 floor; two hunters (eight players) held the floors but gave no clear drop in raid success. One turtle slot became the hunter.
+The default mix is now 1 raider, 2 turtles, 2 merchants, 1 hunter (six players, as before: one raider slot became the hunter). Other mixes were measured on the same code: a seventh or eighth player crowded the map and pushed merchants under the 2.4 floor on seeds 1 to 8 (2.31); 2 raiders with 1 turtle left merchants at 1.81; two hunters gave no drop in raid success. Fewer raiders also means less raiding, so the raider is now the weakest scorer but stays above 0.85 of the best (0.91 on seeds 1 to 8).
 
 ### Results (seeds 1 to 16, invariants 0)
 
-| Seeds 1-16 | Districts | Credits at 48 h | Score | Contracts |
-| ---------- | --------- | --------------- | ----- | --------- |
-| Merchant   | 3.19      | 1071            | 566   | 5.97      |
-| Raider     | 4.72      | 412             | 628   | 0         |
-| Turtle     | 4.63      | 896             | 683   | 4.00      |
-| Hunter     | 2.63      | 1130            | 509   | 6.81      |
+| Seeds 1-16 | Districts, before | after | Credits at 48 h, before | after | Score, before | after | Contracts, before | after |
+| ---------- | ----------------- | ----- | ----------------------- | ----- | ------------- | ----- | ----------------- | ----- |
+| Merchant   | 2.53              | 3.06  | n/a                     | 863   | 500           | 563   | n/a               | 5.13  |
+| Raider     | 4.66              | 4.31  | n/a                     | 509   | 629           | 596   | 0                 | 0     |
+| Turtle     | 5.06              | 5.41  | n/a                     | 809   | 680           | 700   | n/a               | 3.81  |
+| Hunter     | none              | 2.88  | none                    | 889   | none          | 531   | none              | 6.88  |
 
-Before (merchant 2.47, raider 5.03, turtle 3.75 districts; scores 486, 640, 561). Raider lead 0.92x of the best (limit 1.4x). Raid success 43 percent (233 of 539), per seed min 18, max 75, sd 14; success against hunters 37 percent (89 of 238), against merchants 47 percent, against the turtle 50 percent. The hunter is viable (score 509 against 566 for the merchant). Raid success stays in the 40 to 70 percent band.
+Before is the old mix (2 raiders, 2 turtles, 2 merchants) on the same code. Raider lead 0.85x (0.93x before), limit 1.4x. Raid success 47 percent (242 of 514), per seed min 23, max 83, sd 16 (48 percent before). Success against hunters 37 percent (84 of 228), merchants 53 percent, turtles 66 percent, so a hunter is struck about a fifth less often than the field: its towers hold raiders off some streets and its two-crew escorts win more fights. The hunter is viable (score 531 against 563 for the merchant). Raid success stays in the 40 to 70 percent band.
 
 ### Clear ambush (not built)
 
