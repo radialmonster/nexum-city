@@ -3,6 +3,7 @@
  * so it runs (and is tested) without WebGL. Sizes come from the theme's `map`
  * tokens, which the caller passes in as `MapTokens`.
  */
+import { myTowers, spottingTower, towerCoverage } from '../game/towers';
 import type { FactionRole, MapKey } from '@nexum/theme';
 import {
   ATOMS_PER_UNIT,
@@ -94,6 +95,16 @@ export interface SceneDistrict {
   prices: number[] | null;
 }
 
+/** One of your Watchtowers and the districts it covers, for the range highlight. */
+export interface SceneTower {
+  id: Id;
+  level: number;
+  cx: number;
+  cy: number;
+  /** Centres of the other districts in reach, in world units. */
+  covered: { x: number; y: number }[];
+}
+
 export interface SceneStreet {
   id: string;
   x1: number;
@@ -136,6 +147,8 @@ export interface SceneAmbush {
   y2: number;
   /** Game time the ambush stands until. */
   untilMs: number;
+  /** Another player's ambush that one of your Watchtowers sees. */
+  spotted: boolean;
 }
 
 export interface Bounds {
@@ -152,6 +165,8 @@ export interface Scene {
   movers: SceneMover[];
   alerts: SceneAlert[];
   ambushes: SceneAmbush[];
+  /** Your Watchtowers, with the districts they cover. */
+  towers: SceneTower[];
   /** The extent of all districts in world units. */
   bounds: Bounds;
   /** World y where the Sound (water) starts. */
@@ -520,12 +535,24 @@ export function layoutWorld(view: MapView, t: MapTokens): Scene {
       x2: b.cx,
       y2: b.cy,
       untilMs,
+      spotted: owner !== p.playerId && spottingTower(p, ea, eb) !== null,
     });
   };
   for (const a of p.ambushes ?? []) addAmbush(a.id, a.owner, a.edge[0], a.edge[1], a.untilMs);
   for (const m of Object.values(p.movements)) {
     if (m.kind === 'ambush' && m.raid) addAmbush(m.id, m.owner, m.raid.a, m.raid.b, m.raid.untilMs);
   }
+
+  const towers: SceneTower[] = myTowers(p).flatMap((tw) => {
+    const at = byId[tw.districtId];
+    if (!at) return [];
+    const covered: { x: number; y: number }[] = [];
+    for (const id of towerCoverage(p, tw)) {
+      const n = byId[id];
+      if (n && id !== tw.districtId) covered.push({ x: n.cx, y: n.cy });
+    }
+    return [{ id: tw.districtId, level: tw.level, cx: at.cx, cy: at.cy, covered }];
+  });
 
   const alerts: SceneAlert[] = [];
   for (const a of view.alerts ?? []) {
@@ -557,6 +584,7 @@ export function layoutWorld(view: MapView, t: MapTokens): Scene {
     movers,
     alerts,
     ambushes,
+    towers,
     bounds,
     waterTop: (maxY + 0.5) * t.pitchY,
     mine: districts

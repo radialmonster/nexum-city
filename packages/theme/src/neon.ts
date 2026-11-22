@@ -354,6 +354,12 @@ export const neonMap = {
   demoLoopMs: 14000,
   /** One pulse of an ambush street, in ms. */
   ambushPulseMs: 1800,
+  /** Opacity of the ring around one of your Watchtowers. */
+  towerRingAlpha: 0.7,
+  /** Opacity of the faint ring on each district a Watchtower covers. */
+  towerReachAlpha: 0.28,
+  /** Opacity of the steady ring that marks an ambush your tower spotted. */
+  spottedRingAlpha: 0.9,
   /** How long a raid-hit flash and its callout stay on the street, in ms. */
   flashMs: 2600,
   /** How long the quick flash for a Runner slipping past an ambush stays, in ms. */

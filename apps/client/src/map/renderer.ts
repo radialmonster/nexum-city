@@ -713,6 +713,22 @@ export class MapRenderer {
       });
     }
 
+    // watchtower range: a ring on each of your towers and a faint ring on what it covers
+    for (const tw of scene.towers) {
+      const own = scene.byId[tw.id];
+      const base = own ? Math.max(own.w, own.h) / 2 : m.hubRadius;
+      g.circle(tw.cx, tw.cy, base + m.ringGap * 2).stroke({
+        width: m.ringWidth * px * 1.5,
+        ...withA(pal.faction.self, m.towerRingAlpha),
+      });
+      for (const c of tw.covered) {
+        g.circle(c.x, c.y, base * 0.75 + m.ringGap).stroke({
+          width: m.edgeWidth * px,
+          ...withA(pal.faction.self, m.towerReachAlpha),
+        });
+      }
+    }
+
     // alert pings
     for (const a of scene.alerts) {
       const d = scene.byId[a.districtId];
@@ -736,6 +752,13 @@ export class MapRenderer {
         width: m.edgeWidth * px,
         ...withA(col, 1 - pulse),
       });
+      if (a.spotted) {
+        // spotted by your tower: a steady ring in your colour around the pulse
+        g.circle(mx, my, m.slotSize * 2).stroke({
+          width: m.edgeWidthSelected * px,
+          ...withA(pal.faction.self, m.spottedRingAlpha),
+        });
+      }
     }
 
     // raid-hit flashes: a red pulse on the street
@@ -853,6 +876,17 @@ export class MapRenderer {
     const gameNow = this.baseNow + (performance.now() - this.t0);
     const tagSize = fs.xs * this.hudScale * m.cityLabelScale;
     for (const a of scene.ambushes) {
+      if (a.spotted && level !== 'city') {
+        const s = worldToScreen(cam, vp, (a.x1 + a.x2) / 2, (a.y1 + a.y2) / 2);
+        const t = this.label(
+          `sp:${a.id}`,
+          'SPOTTED BY YOUR TOWER',
+          tagSize,
+          pal.faction.self,
+          true,
+        );
+        this.place(t, s.x, s.y + tagSize * 2.4, m.pitchX * cam.zoom);
+      }
       if (!a.mine || level === 'city') continue;
       const s = worldToScreen(cam, vp, (a.x1 + a.x2) / 2, (a.y1 + a.y2) / 2);
       const left = Math.max(0, a.untilMs - gameNow);
