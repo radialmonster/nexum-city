@@ -1,7 +1,8 @@
 import type { FeedItem, PlayerView } from '@nexum/contracts';
 import { balance, buildDurationMs } from '@nexum/sim';
 import type { Faction } from '../ui/util';
-import { isOwn, streetEnds } from './derive';
+import { isOwn, rushed, streetEnds } from './derive';
+import { JOB_NAMES } from './streetJobs';
 
 /** The time axis of the bottom band runs from now to this far ahead. */
 export const TIMELINE_SPAN_MS = 4 * 3_600_000;
@@ -125,7 +126,9 @@ export function timelineEntries(
           ? `AMBUSH ${streetEnds(name(m.raid.a), name(m.raid.b))}, ends in ${shortDuration(m.arriveMs - nowMs)}`
           : m.kind === 'raid' && m.raid
             ? `RAID ${streetEnds(name(m.raid.a), name(m.raid.b))}, ETA ${shortDuration(m.arriveMs - nowMs)}`
-            : `${returning ? 'RETURN' : m.kind === 'haul' && m.contractId ? 'CONTRACT HAUL' : (verb[m.kind] ?? 'MOVE')} to ${name(target)}  ETA ${shortDuration(m.arriveMs - nowMs)}`,
+            : m.job && !returning
+              ? `JOB ${JOB_NAMES[m.job.kind].toUpperCase()}, ${m.kind === 'haul' ? 'to' : 'out to'} ${name(target)}  ETA ${shortDuration(m.arriveMs - nowMs)}`
+              : `${returning ? 'RETURN' : m.kind === 'haul' && m.contractId ? 'CONTRACT HAUL' : (verb[m.kind] ?? 'MOVE')} to ${name(target)}  ETA ${shortDuration(m.arriveMs - nowMs)}`,
       state: m.kind === 'siege' && !returning ? 'hot' : 'running',
       recallId: returning ? null : m.id,
       districtId: target,
@@ -134,7 +137,10 @@ export function timelineEntries(
 
   for (const d of Object.values(view.districts)) {
     if (isOwn(d) && d.construction) {
-      const total = buildDurationMs(d.construction.building, d.construction.level);
+      const total = Math.max(
+        rushed(view, nowMs, buildDurationMs(d.construction.building, d.construction.level)),
+        d.construction.completesAtMs - nowMs,
+      );
       const start = d.construction.completesAtMs - total;
       out.push({
         id: `build:${d.id}`,
@@ -152,7 +158,10 @@ export function timelineEntries(
       });
     }
     if (d.relation !== 'own' && d.relation !== 'remembered' && d.settling?.owner === me) {
-      const total = balance.settle.hours * 3_600_000;
+      const total = Math.max(
+        rushed(view, nowMs, balance.settle.hours * 3_600_000),
+        d.settling.completesAtMs - nowMs,
+      );
       const start = d.settling.completesAtMs - total;
       out.push({
         id: `settle:${d.id}`,

@@ -4,6 +4,7 @@ import { Bar, Button, Chip, Gauge, Panel, StanceSwitch, Tag, type Tone } from '.
 import { cx } from '../ui/util';
 import {
   carriersAt,
+  crewLabel,
   crewsAt,
   fromKitStance,
   GOOD_KEYS,
@@ -20,7 +21,9 @@ import {
 } from './derive';
 import { crewName, empireSummary, formatEta, type CrewNames } from './derive';
 import { formatUnits } from './feed';
+import { JobsPanel } from './JobsPanel';
 import { MyContracts } from './MyContracts';
+import type { JobOffer } from './streetJobs';
 import { buyRunnerBlocker, RUNNER_PITCH } from './runner';
 import styles from './DistrictPanel.module.css';
 
@@ -49,6 +52,8 @@ export interface DistrictPanelProps {
   readonly onDeliver?: ((contract: ContractView) => void) | undefined;
   /** Opens a hub's contracts board. */
   readonly onBoard?: ((hubId: string) => void) | undefined;
+  /** Opens the order card for a street job. */
+  readonly onTakeJob?: ((job: JobOffer) => void) | undefined;
 }
 
 const relationLabel = (d: DistrictView, me: string): string => {
@@ -72,11 +77,19 @@ export function DistrictPanel({
   onRival,
   onDeliver,
   onBoard,
+  onTakeJob,
 }: DistrictPanelProps) {
   const d = districtId ? view.districts[districtId] : undefined;
   if (!d)
     return (
-      <Empire view={view} nowMs={nowMs} onFly={onFly} onDeliver={onDeliver} onBoard={onBoard} />
+      <Empire
+        view={view}
+        nowMs={nowMs}
+        onFly={onFly}
+        onDeliver={onDeliver}
+        onBoard={onBoard}
+        onTakeJob={onTakeJob}
+      />
     );
   return (
     <Panel
@@ -92,6 +105,7 @@ export function DistrictPanel({
           onStance={onStance}
           onBuild={onBuild}
           onBuyRunner={onBuyRunner}
+          onTakeJob={onTakeJob}
         />
       ) : d.relation === 'remembered' ? (
         <p className={styles['empty']}>
@@ -133,7 +147,11 @@ function Own({
   onStance,
   onBuild,
   onBuyRunner,
-}: Pick<DistrictPanelProps, 'view' | 'nowMs' | 'onStance' | 'onBuild' | 'onBuyRunner'> & {
+  onTakeJob,
+}: Pick<
+  DistrictPanelProps,
+  'view' | 'nowMs' | 'onStance' | 'onBuild' | 'onBuyRunner' | 'onTakeJob'
+> & {
   d: OwnDistrict;
 }) {
   const crews = crewsAt(view, d.id);
@@ -155,6 +173,7 @@ function Own({
           </span>
         ))}
       </div>
+      {onTakeJob && <JobsPanel view={view} nowMs={nowMs} onTake={onTakeJob} />}
       {d.siege && (
         <div className={styles['block']}>
           <span className={styles['cap']}>CAPTURE BAR</span>
@@ -224,6 +243,14 @@ function Own({
           carrier{carriers.length === 1 ? '' : 's'}
           {carriers.length > 0 && `: ${carriers.map((c) => c.kind).join(', ')}`}
         </span>
+        {crews
+          .filter((c) => c.strength < balance.recruit.startStrength)
+          .map((c) => (
+            <small key={c.id} className={styles['hint']} data-testid="crew-mend">
+              {crewLabel(view, c.id)} is hurt: {c.strength}/{balance.recruit.startStrength}, mending
+              +1 every {String(balance.raid.mendHours)} h while it rests.
+            </small>
+          ))}
         <Button
           disabled={runnerBlocker !== null}
           onClick={() => {
@@ -410,7 +437,8 @@ function Empire({
   onFly,
   onDeliver,
   onBoard,
-}: Pick<DistrictPanelProps, 'view' | 'nowMs' | 'onFly' | 'onDeliver' | 'onBoard'>) {
+  onTakeJob,
+}: Pick<DistrictPanelProps, 'view' | 'nowMs' | 'onFly' | 'onDeliver' | 'onBoard' | 'onTakeJob'>) {
   const e = empireSummary(view);
   const own = ownDistricts(view);
   return (
@@ -438,6 +466,7 @@ function Empire({
             {e.besieged} UNDER SIEGE
           </span>
         )}
+        {onTakeJob && <JobsPanel view={view} nowMs={nowMs} onTake={onTakeJob} />}
         {onDeliver && (
           <MyContracts view={view} nowMs={nowMs} onDeliver={onDeliver} onBoard={onBoard} />
         )}

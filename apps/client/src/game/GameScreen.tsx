@@ -19,8 +19,10 @@ import { OrderCard } from './OrderCard';
 import { useCompact, useSession, useWallClock } from './sessionContext';
 import { gameNow, useGame, useStore } from './store';
 import { Timeline } from './Timeline';
+import { RushBanner } from './RushBanner';
 import { TopBar } from './TopBar';
-import { finaleClock, isOwn, ownDistricts } from './derive';
+import type { JobOffer } from './streetJobs';
+import { finaleClock, isOwn, ownDistricts, readyNodes } from './derive';
 import { SeasonEnd } from './SeasonEnd';
 import { FirstSteps } from './FirstSteps';
 import { loadFirstSteps, saveFirstSteps, type FirstStepsState } from './stepsStore';
@@ -140,6 +142,20 @@ export function GameScreen() {
       },
     });
   };
+  /** Opens the order card for a street job, starting from the selected own plot if it has a ready crew. */
+  const takeJob = (job: JobOffer) => {
+    const sel = state.selected;
+    const from =
+      sel && readyNodes(view, nowMs).includes(sel) && isOwn(view.districts[sel])
+        ? sel
+        : readyNodes(view, nowMs).find((n) => isOwn(view.districts[n]));
+    session.openDraft({
+      kind: 'job',
+      jobId: job.id,
+      districtId: from ?? sel ?? Object.values(view.districts).find(isOwn)?.id ?? '',
+      ...(from ? { from } : {}),
+    });
+  };
   const closePanel = () => {
     setPanel(null);
   };
@@ -182,6 +198,7 @@ export function GameScreen() {
         openMarket(hub);
       }}
       onDeliver={deliver}
+      onTakeJob={takeJob}
       onBoard={(hub) => {
         setPanel({ kind: 'market', hub, tab: 'contracts' });
       }}
@@ -221,6 +238,7 @@ export function GameScreen() {
           void session.logout();
         }}
       />
+      <RushBanner view={view} nowMs={nowMs} />
       {(!compact || drawer === 'feed') && (
         <div className={styles['feed']}>
           {!steps.dismissed && (
@@ -236,7 +254,7 @@ export function GameScreen() {
                   {
                     id: 'settle',
                     label: 'Settle a frontier plot',
-                    hint: 'Send a crew with 60 supplies to an open plot to claim it.',
+                    hint: 'Send a crew to an open plot to claim it. Keep 60 supplies in your home warehouse: settling spends them.',
                     done: Object.values(view.districts).filter(isOwn).length > 1,
                   },
                   {
@@ -248,7 +266,11 @@ export function GameScreen() {
                   {
                     id: 'contract',
                     label: 'Take a contract',
-                    hint: 'Open a hub market, pick the CONTRACTS tab and take a job.',
+                    hint: Object.values(view.contracts).some(
+                      (c) => c.reservedFor === view.playerId && c.taker === null,
+                    )
+                      ? 'A starter contract is reserved for you: open a hub market, pick CONTRACTS and take the one marked Reserved for you.'
+                      : 'Open a hub market, pick the CONTRACTS tab and take a job.',
                     done: Object.values(view.contracts).some((c) => c.taker === view.playerId),
                   },
                 ]}

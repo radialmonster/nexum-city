@@ -12,6 +12,7 @@ import {
   GOOD_KEYS,
   isOwn,
   readyNodes,
+  rushed,
   seatsFor,
 } from './derive';
 import { CarrierCompare } from './CarrierCompare';
@@ -19,6 +20,7 @@ import { contractSentence } from './contracts';
 import { formatUnits } from './feed';
 import { messageFor } from './messages';
 import { siegeOdds } from './odds';
+import { JOB_NAMES, jobDuration, jobMinutes, jobPay, jobRisk, jobSentence } from './streetJobs';
 import { compareCarriers, suggestRunner } from './runner';
 import type { OrderDraft } from './store';
 import styles from './OrderCard.module.css';
@@ -32,6 +34,7 @@ const TITLES: Record<OrderDraft['kind'], string> = {
   build: 'Build',
   settle: 'Settle a plot',
   raid: 'Set an ambush',
+  job: 'Take a street job',
 };
 
 const CONFIRM: Record<OrderDraft['kind'], string> = {
@@ -43,6 +46,7 @@ const CONFIRM: Record<OrderDraft['kind'], string> = {
   build: 'BUILD',
   settle: 'SETTLE',
   raid: 'SET AMBUSH',
+  job: 'TAKE',
 };
 
 /** What the player has picked in the card. */
@@ -100,6 +104,17 @@ export function buildOrder(draft: OrderDraft, pick: Pick): OrderBody | null {
             hours: pick.hours ?? 4,
           }
         : null;
+    case 'job': {
+      const crewId = pick.crewIds[0];
+      return draft.jobId && crewId
+        ? {
+            type: 'job.take',
+            jobId: draft.jobId,
+            crewId,
+            ...(pick.carrierId ? { carrierId: pick.carrierId } : {}),
+          }
+        : null;
+    }
     case 'haul': {
       const cargo: Record<string, number> = {};
       for (const g of GOOD_KEYS) {
@@ -138,11 +153,15 @@ export function carrierKindOf(view: PlayerView, id: string | null): CarrierKind 
 export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: OrderCardProps) {
   const target = view.districts[draft.districtId];
   const contract = draft.contractId ? view.contracts[draft.contractId] : undefined;
+  const job = draft.jobId ? view.self.jobs.find((j) => j.id === draft.jobId) : undefined;
   const nodes = useMemo(
     () =>
       draft.kind === 'build'
         ? []
-        : readyNodes(view, nowMs).filter((n) => draft.kind === 'raid' || n !== draft.districtId),
+        : draft.kind === 'job'
+          ? // street jobs start from one of your own plots (never a hub)
+            readyNodes(view, nowMs).filter((n) => isOwn(view.districts[n]))
+          : readyNodes(view, nowMs).filter((n) => draft.kind === 'raid' || n !== draft.districtId),
     [view, nowMs, draft],
   );
   // A contract delivery that fits a Runner and is short on time starts with the Runner picked.
@@ -185,7 +204,7 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
   const chosenCrews = crews.filter((c) => crewIds.includes(c.id));
   const kind = carrierKindOf(view, carrierId);
   const seats = seatsFor(kind);
-  const maxCrews = draft.kind === 'scout' ? 1 : seats;
+  const maxCrews = draft.kind === 'scout' || draft.kind === 'job' ? 1 : seats;
   const tooMany = chosenCrews.length > maxCrews;
 
   // Raid: the streets that leave the chosen plot.
@@ -210,7 +229,7 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
     streetA !== null && streetB !== null ? [streetA, streetB] : null;
 
   const route = useMemo(() => {
-    if (!source || draft.kind === 'build') return null;
+    if (!source || draft.kind === 'build' || draft.kind === 'job') return null;
     if (draft.kind === 'raid') {
       // The crews walk to the nearer end of the street (ties: the smaller id), as the sim does.
       if (streetA === null || streetB === null) return null;
@@ -280,12 +299,21 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
     blocker = `That carrier seats ${String(seats)}. Pick fewer crews or a bigger carrier.`;
   } else if (draft.kind === 'raid' && !street) {
     blocker = 'This plot has no street to wait on.';
+  } else if (draft.kind === 'job') {
+    if (!job) blocker = 'That job is gone. Pick another from the list.';
+    else if (
+      job.kind === 'courier' &&
+      job.good &&
+      stock &&
+      toUnits(stock[job.good]) < (job.qty ?? 0)
+    )
+      blocker = `This warehouse does not hold the ${formatUnits(job.qty ?? 0)} ${job.good} to carry. Pick another plot or another job.`;
   } else if (!route) {
     blocker = 'There is no street route there.';
   } else if (draft.kind === 'settle') {
     const have = stock ? toUnits(stock.supplies) : 0;
     if (have < balance.settle.supplies)
-      blocker = `Settling takes ${String(balance.settle.supplies)} supplies from the starting warehouse, which holds ${formatUnits(have)}.`;
+      blocker = `Settling takes ${String(balance.settle.supplies)} supplies from this warehouse, which holds ${formatUnits(have)}. Buy more at a hub market or haul them in.`;
   } else if (draft.kind === 'haul') {
     if (cargoTotal === 0) blocker = 'Choose something to carry.';
     else if (cargoTotal > carry) blocker = `This carrier holds ${String(carry)} units.`;
@@ -323,6 +351,7 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
 
   const level = (own?.buildings.find((b) => b.type === building)?.level ?? 0) + 1;
   const cost = buildCost(building, level);
+  const buildRush = rushed(view, nowMs, 600_000) < 600_000;
 
   return (
     <Panel
@@ -355,7 +384,9 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
               {GOOD_KEYS.filter((g) => cost[g] > 0)
                 .map((g) => `${formatUnits(toUnits(cost[g]))} ${g}`)
                 .join(', ')}{' '}
-              from this warehouse, and takes {formatEta(buildDurationMs(building, level))}.
+              from this warehouse, and takes{' '}
+              {formatEta(rushed(view, nowMs, buildDurationMs(building, level)))}
+              {buildRush ? ' (newcomer rush)' : ''}.
             </p>
           </>
         ) : (
@@ -513,17 +544,31 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
                 </p>
               </>
             )}
+            {job && (
+              <div className={styles['field']} data-testid="job-card">
+                <span className={styles['cap']}>{JOB_NAMES[job.kind].toUpperCase()}</span>
+                <span className={styles['line']}>{jobSentence(job)}</span>
+                <span className={styles['line']}>
+                  Pays {jobPay(job)}. Takes{' '}
+                  {carrierId ? `${String(jobMinutes(job, true))} min` : jobDuration(job)}.
+                </span>
+                <span className={styles['line']}>{jobRisk(job)}</span>
+              </div>
+            )}
             <p className={styles['line']} data-testid="eta">
-              {route
-                ? draft.kind === 'raid' && route.lengthM < 1
-                  ? 'Crews are in place at once.'
-                  : `ETA ${formatEta(route.durationMs)} over ${String(Math.round(route.lengthM))} m`
-                : 'No route'}
+              {draft.kind === 'job'
+                ? 'The crew rests when the errand ends.'
+                : route
+                  ? draft.kind === 'raid' && route.lengthM < 1
+                    ? 'Crews are in place at once.'
+                    : `ETA ${formatEta(route.durationMs)} over ${String(Math.round(route.lengthM))} m`
+                  : 'No route'}
             </p>
             {draft.kind === 'settle' && (
               <p className={styles['line']} data-testid="settle-cost">
                 Costs {balance.settle.supplies} supplies from this warehouse. The plot is yours{' '}
-                {balance.settle.hours} h after the crew arrives, if it holds.
+                {formatEta(rushed(view, nowMs, balance.settle.hours * 3_600_000))} after the crew
+                arrives, if it holds.
               </p>
             )}
             {fogged && (

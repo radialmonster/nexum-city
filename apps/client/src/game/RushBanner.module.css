@@ -1,0 +1,46 @@
+.banner {
+  grid-area: banner;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: color-mix(in srgb, var(--faction-merchant) 12%, var(--color-panel-solid));
+  border-bottom: var(--border-thin) solid var(--faction-merchant);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-xs) var(--space-xl);
+  min-width: 0;
+  background: none;
+  border: 0;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--font-size-md);
+  text-align: left;
+  cursor: pointer;
+}
+
+.text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.text b {
+  color: var(--color-text-bright);
+}
+
+.more {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--letter-spacing-widest);
+  color: var(--color-text-dim);
+}
+
+.help {
+  margin: 0;
+  padding: 0 var(--space-xl) var(--space-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-dim);
+}

@@ -61,6 +61,7 @@
   display: grid;
   grid-template:
     'top top top' auto
+    'banner banner banner' auto
     'feed map side' minmax(0, 1fr)
     'timeline timeline timeline' auto / var(--size-column) 1fr var(--size-column);
   background: var(--color-bg);
@@ -69,6 +70,7 @@
 .game[data-compact='true'] {
   grid-template:
     'top' auto
+    'banner' auto
     'map' 1fr
     'tabs' auto / 1fr;
 }

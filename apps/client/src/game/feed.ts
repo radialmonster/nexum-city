@@ -262,6 +262,50 @@ export function describeEvent(
         text: `${word} ${name(placeId)}.`,
       };
     }
+    case 'job.done': {
+      const kind = str(d, 'job') ?? 'courier';
+      const credits = num(d, 'credits') ?? 0;
+      const parts = num(d, 'parts') ?? 0;
+      const pay = [
+        credits > 0 ? `${formatUnits(credits)} credits` : null,
+        parts > 0 ? `${formatUnits(parts)} parts` : null,
+      ].filter((x) => x !== null);
+      const found = num(d, 'found') ?? 0;
+      const what =
+        kind === 'courier'
+          ? 'Courier run done'
+          : kind === 'salvage'
+            ? 'Salvage done'
+            : found > 0
+              ? `Patrol done: ${String(found)} ambush${found === 1 ? '' : 'es'} revealed`
+              : 'Patrol done: no ambushes found';
+      return {
+        ...base,
+        kind: 'JOB',
+        glyph: '$',
+        tone: 'ok',
+        text: `${what} from ${name(placeId)}${pay.length > 0 ? `. Paid ${pay.join(' and ')}` : ''}.`,
+      };
+    }
+    case 'job.failed': {
+      const sent = num(d, 'sent') ?? 0;
+      const back = num(d, 'returned') ?? 0;
+      return {
+        ...base,
+        kind: 'JOB',
+        glyph: '!',
+        tone: 'warn',
+        text: `Courier run from ${name(placeId)} was raided: ${formatUnits(back)} of ${formatUnits(sent)} came home. No pay.`,
+      };
+    }
+    case 'rush.ended':
+      return {
+        ...base,
+        kind: 'NEWCOMER',
+        glyph: '+',
+        tone: 'special',
+        text: 'Your newcomer rush is over: builds and settling run at normal speed now.',
+      };
     case 'build.done': {
       const building = str(d, 'building') ?? 'building';
       const level = num(d, 'level');

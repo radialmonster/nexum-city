@@ -109,6 +109,12 @@ export function ContractsBoard({
               data-status={c.status}
               data-mine={mine || taken}
             >
+              {c.reservedFor === me && c.taker === null && (
+                <p className={styles['meta']} data-testid="reserved-mark">
+                  <b>RESERVED FOR YOU</b>{' '}
+                  <span>Your starter contract: nobody else can take it yet.</span>
+                </p>
+              )}
               <p className={styles['sentence']}>{contractSentence(view, c)}</p>
               <p className={styles['meta']}>
                 <span>

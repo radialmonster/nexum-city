@@ -195,6 +195,25 @@ export const toKitStance = (s: 'hold' | 'pullback'): 'hold' | 'pullBack' =>
 export const fromKitStance = (s: 'hold' | 'pullBack'): 'hold' | 'pullback' =>
   s === 'pullBack' ? 'pullback' : 'hold';
 
+/** How long your newcomer rush still runs (0 when it is over). */
+export const rushLeftMs = (view: PlayerView, nowMs: number): number =>
+  Math.max(0, view.self.rushUntilMs - nowMs);
+
+/**
+ * A build or settle time as it runs for you now: the newcomer rush makes both
+ * `balance.rush.factor` times faster (the sim's `rushDuration`). Travel never changes.
+ */
+export function rushed(view: PlayerView, nowMs: number, ms: number): number {
+  return rushLeftMs(view, nowMs) > 0 ? Math.max(1, Math.ceil(ms / balance.rush.factor)) : ms;
+}
+
+/** A span as "5h 12m" or "42m", rounded up to whole minutes. */
+export function longSpan(ms: number): string {
+  const m = Math.max(1, Math.ceil(ms / 60_000));
+  if (m < 60) return `${String(m)}m`;
+  return `${String(Math.floor(m / 60))}h ${String(m % 60)}m`;
+}
+
 export function formatEta(ms: number): string {
   const m = Math.max(1, Math.round(ms / 60_000));
   return m >= 60

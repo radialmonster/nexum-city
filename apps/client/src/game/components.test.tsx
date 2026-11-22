@@ -221,7 +221,7 @@ describe('OrderCard: settle, labels and fog', () => {
         onRoute={vi.fn()}
       />,
     );
-    expect(screen.getByTestId('settle-cost').textContent).toMatch(/60 supplies.*10 h/);
+    expect(screen.getByTestId('settle-cost').textContent).toMatch(/60 supplies.*10h/);
     expect(screen.getByText('Crew 1')).toBeTruthy();
     expect(screen.queryByText('c1')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /^settle$/i }));
