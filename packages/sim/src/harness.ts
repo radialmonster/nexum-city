@@ -46,6 +46,12 @@ export interface SeasonResult {
   raidsRepelled: number;
   /** Strikes a Runner slipped away from, and Runners bought. */
   raidsEvaded: number;
+  /** Diagnostic: strikes by target label (job, contract, haul, settle, runner; +escort). */
+  raidTargets: Record<string, { hit: number; repelled: number; evaded: number }>;
+  /** Diagnostic: summed raider strength and guard over decided fights. */
+  raidFights: { raiderStrength: number; guard: number; n: number };
+  /** Diagnostic: per raider player, ambushes set, hits, repels and strength lost. */
+  raidsBy: Record<string, { set: number; hit: number; repelled: number; lost: number }>;
   runnersBought: number;
   stolenUnits: number;
   destroyedUnits: number;
@@ -112,6 +118,20 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
   let raidHits = 0;
   let raidsRepelled = 0;
   let raidsEvaded = 0;
+  const raidTargets: SeasonResult['raidTargets'] = {};
+  const raidFights = { raiderStrength: 0, guard: 0, n: 0 };
+  const raidsBy: SeasonResult['raidsBy'] = {};
+  const raidOf = (id: unknown): SeasonResult['raidsBy'][string] =>
+    (raidsBy[String(id)] ??= { set: 0, hit: 0, repelled: 0, lost: 0 });
+  const tally = (e: SimEvent, field: 'hit' | 'repelled' | 'evaded'): void => {
+    const t = (raidTargets[String(e.data['target'])] ??= { hit: 0, repelled: 0, evaded: 0 });
+    t[field] += 1;
+    if (field !== 'evaded') {
+      raidFights.raiderStrength += Number(e.data['raiderStrength']);
+      raidFights.guard += Number(e.data['guard']);
+      raidFights.n += 1;
+    }
+  };
   let runnersBought = 0;
   let stolenUnits = 0;
   let destroyedUnits = 0;
@@ -156,13 +176,23 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
         const qty = e.data['qty'];
         if (typeof qty === 'number') filledUnits += qty;
       } else if (e.kind === 'order.rejected') rejected += 1;
-      else if (e.kind === 'raid.set') raids += 1;
-      else if (e.kind === 'raid.repelled') raidsRepelled += 1;
-      else if (e.kind === 'raid.evaded') raidsEvaded += 1;
-      else if (e.kind === 'carrier.bought') runnersBought += 1;
+      else if (e.kind === 'raid.set') {
+        raids += 1;
+        raidOf(e.actors[0]).set += 1;
+      } else if (e.kind === 'raid.repelled') {
+        raidsRepelled += 1;
+        tally(e, 'repelled');
+        raidOf(e.actors[0]).repelled += 1;
+        raidOf(e.actors[0]).lost += Number(e.data['raiderLost']);
+      } else if (e.kind === 'raid.evaded') {
+        raidsEvaded += 1;
+        tally(e, 'evaded');
+      } else if (e.kind === 'carrier.bought') runnersBought += 1;
       else if (e.kind === 'raid.ended') lootReturned += sumUnits(e.data['loot']);
       else if (e.kind === 'raid.hit') {
         raidHits += 1;
+        tally(e, 'hit');
+        raidOf(e.actors[0]).hit += 1;
         const stolen = sumUnits(e.data['stolen']);
         const destroyed = sumUnits(e.data['destroyed']);
         stolenUnits += stolen;
@@ -312,6 +342,9 @@ export function runSeason(options: SeasonOptions = {}): SeasonResult {
     raidHits,
     raidsRepelled,
     raidsEvaded,
+    raidTargets,
+    raidFights,
+    raidsBy,
     runnersBought,
     stolenUnits,
     destroyedUnits,

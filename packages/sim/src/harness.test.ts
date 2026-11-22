@@ -80,7 +80,14 @@ describe('balance pass', () => {
     }
     // Seeds 1 to 8 are noisy (the rush and street jobs shifted the raid stream); over seeds 1 to 32
     // every type holds about 3 districts, so the per-8-seed floor is a little lower.
-    for (const a of Object.values(agg)) expect(a.d / a.n).toBeGreaterThanOrEqual(2.5);
+    // Merchants sit near 2.6 on seeds 1 to 8 (3.5 before the newcomer kit let them build a Workshop
+    // early and haul more than they settle; see "Raid balance after task 77" in sim-spec.md).
+    for (const a of Object.values(agg)) expect(a.d / a.n).toBeGreaterThanOrEqual(2.4);
+    // Raids succeed about 45 to 65 percent of the time (task 77 had collapsed it to 10 percent).
+    const hits = eight.reduce((n, r) => n + r.raidHits, 0);
+    const decided = eight.reduce((n, r) => n + r.raidHits + r.raidsRepelled + r.raidsEvaded, 0);
+    expect(hits / decided).toBeGreaterThan(0.4);
+    expect(hits / decided).toBeLessThan(0.7);
     const avg = (k: string) => (agg[k] ? agg[k].score / agg[k].n : 0);
     const best = Math.max(avg('turtle'), avg('merchant'));
     // The raider must not run away with it (task 77: at most 1.4x), nor be a dead strategy.
