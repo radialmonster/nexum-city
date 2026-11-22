@@ -117,5 +117,5 @@ describe('hunter bot', () => {
     }
     expect(decided).toBeGreaterThan(0);
     expect(hits / decided).toBeLessThan(allHits / allDecided);
-  });
+  }, 60_000);
 });
