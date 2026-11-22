@@ -47,4 +47,48 @@ export default defineConfig(
     files: ['packages/theme/**', 'tools/eslint-plugin-nexum/**'],
     rules: { 'nexum/no-raw-colors': 'off' },
   },
+  // packages/sim is pure and deterministic (CLAUDE.md rule #3): no wall clock, no
+  // ambient randomness, no I/O. Time comes in as an argument; randomness from state.rng.
+  {
+    files: ['packages/sim/**/*.ts'],
+    rules: {
+      // Hash and PRNG constants look like colours to the rule; sim has no colours.
+      'nexum/no-raw-colors': 'off',
+      'no-restricted-globals': [
+        'error',
+        ...[
+          'Date',
+          'performance',
+          'fetch',
+          'process',
+          'crypto',
+          'setTimeout',
+          'setInterval',
+          'setImmediate',
+          'require',
+        ].map((name) => ({ name, message: 'packages/sim must stay pure and deterministic.' })),
+      ],
+      'no-restricted-properties': [
+        'error',
+        { object: 'Math', property: 'random', message: 'Use the seeded RNG in state.rng.' },
+        { object: 'globalThis', property: 'Date', message: 'No wall clock in packages/sim.' },
+        {
+          object: 'globalThis',
+          property: 'crypto',
+          message: 'No ambient randomness in packages/sim.',
+        },
+      ],
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['node:*', 'fs', 'path', 'os', 'http', 'https', 'crypto'],
+              message: 'No I/O in packages/sim.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 );

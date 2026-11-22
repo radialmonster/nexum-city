@@ -1,0 +1,106 @@
+import { MS_PER_HOUR, balance } from './balance.js';
+import { emit, schedule, unschedule, type Ctx } from './ctx.js';
+import { deposit } from './production.js';
+import type { Route } from './routing.js';
+import type { System } from './systems.js';
+import type { Carrier, Crew, Goods, Id, Movement, MovementKind } from './types.js';
+
+/** Puts a crew at a node. It joins the garrison when the node is its owner's district. */
+export function placeCrew(ctx: Ctx, crew: Crew, nodeId: Id): void {
+  crew.loc = { at: nodeId };
+  const d = ctx.state.districts[nodeId];
+  if (d && d.owner === crew.owner && !d.garrison.includes(crew.id)) d.garrison.push(crew.id);
+}
+
+function leaveGarrison(ctx: Ctx, crew: Crew): void {
+  if (!('at' in crew.loc)) return;
+  const d = ctx.state.districts[crew.loc.at];
+  if (d) d.garrison = d.garrison.filter((id) => id !== crew.id);
+}
+
+export interface MovementSpec {
+  owner: Id;
+  kind: MovementKind;
+  carrier: Carrier | null;
+  crews: Crew[];
+  cargo: Goods;
+  route: Route;
+  durationMs: number;
+}
+
+/** Moves units out of their location and into a new movement. Units are never in two places. */
+export function startMovement(ctx: Ctx, spec: MovementSpec): Movement {
+  const { state } = ctx;
+  state.counters.movement += 1;
+  const id = `m${state.counters.movement}`;
+  const from = spec.route.route[0] as Id;
+  const to = spec.route.route[spec.route.route.length - 1] as Id;
+  const movement: Movement = {
+    id,
+    owner: spec.owner,
+    kind: spec.kind,
+    carrierId: spec.carrier?.id ?? null,
+    carrierKind: spec.carrier?.kind ?? 'foot',
+    crewIds: spec.crews.map((c) => c.id),
+    cargo: spec.cargo,
+    route: spec.route.route,
+    lengthM: spec.route.lengthM,
+    from,
+    to,
+    departMs: state.nowMs,
+    arriveMs: state.nowMs + spec.durationMs,
+  };
+  for (const crew of spec.crews) {
+    leaveGarrison(ctx, crew);
+    crew.loc = { movement: id };
+  }
+  if (spec.carrier) spec.carrier.loc = { movement: id };
+  state.movements[id] = movement;
+  schedule(ctx, movement.arriveMs, { kind: 'arrive', movementId: id });
+  return movement;
+}
+
+/** Turns a movement around: it returns to where it started, taking as long as it has travelled. */
+export function recallMovement(ctx: Ctx, movement: Movement): void {
+  const { state } = ctx;
+  const elapsed = state.nowMs - movement.departMs;
+  const total = movement.arriveMs - movement.departMs;
+  unschedule(state, (e) => e.kind === 'arrive' && e.movementId === movement.id);
+  movement.recalledAtMs = state.nowMs;
+  movement.recallFraction = total <= 0 ? 1 : Math.min(1, elapsed / total);
+  movement.to = movement.from;
+  movement.arriveMs = state.nowMs + Math.max(1, elapsed);
+  schedule(ctx, movement.arriveMs, { kind: 'arrive', movementId: movement.id });
+}
+
+export const travelSystem: System = {
+  name: 'travel',
+  handlers: {
+    arrive: (ctx, ev) => {
+      const { state } = ctx;
+      const m = state.movements[ev.movementId];
+      if (!m) return;
+      for (const crewId of m.crewIds) {
+        const crew = state.crews[crewId];
+        if (crew) placeCrew(ctx, crew, m.to);
+      }
+      const carrier = m.carrierId ? state.carriers[m.carrierId] : undefined;
+      if (carrier) carrier.loc = { at: m.to };
+      deposit(ctx, m.owner, m.to, m.cargo);
+      const recalled = m.recalledAtMs !== undefined;
+      if (m.kind === 'scout' && !recalled) {
+        const key = `${m.owner}|${m.to}`;
+        const until = state.nowMs + balance.scout.revealHours * MS_PER_HOUR;
+        state.reveals[key] = Math.max(state.reveals[key] ?? 0, until);
+      }
+      Reflect.deleteProperty(state.movements, m.id);
+      emit(ctx, 'arrived', [m.owner], [m.to], {
+        movementId: m.id,
+        movement: m.kind,
+        carrier: m.carrierKind,
+        crewIds: m.crewIds,
+        recalled,
+      });
+    },
+  },
+};
