@@ -247,6 +247,7 @@ How the server runs them (tasks 51 to 53): bots are real players with a row in `
 - A full warehouse offers a prefilled haul to the nearest hub, and the district panel shows how long until it is full.
 - The clock shows the season day with the time (`D3 23:46`). The order bar and the order card share one siege estimate.
 - The radial menu closes once an order is launched; clicking the plot again reopens it.
+- An open frontier plot (nothing owned there) offers only SETTLE (the highlighted primary item), SCOUT, DETAILS and CLOSE in the radial; RAID and SIEGE appear only on neutral plots that are not open. The ACTIVE ORDERS band is a fixed token-sized height (about 3 rows, then it scrolls) so the map never resizes.
 
 ## Away from the game
 
