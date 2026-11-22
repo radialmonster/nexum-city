@@ -17,6 +17,8 @@ const schema = z.object({
   /** UTC hour after which the nightly backup runs. */
   BACKUP_HOUR_UTC: z.coerce.number().int().min(0).max(23).default(3),
   BACKUP_KEEP: z.coerce.number().int().min(1).default(7),
+  /** Development only: mounts `/api/dev` (seed bots, fast-forward the clock). Never enable in production. */
+  DEV_SEED: z.enum(['true', 'false']).default('false'),
   CLIENT_DIR: z.string().min(1).optional(),
 });
 
@@ -31,6 +33,7 @@ export interface Config {
   readonly trustProxy: boolean;
   readonly backupHourUtc: number;
   readonly backupKeep: number;
+  readonly devSeed: boolean;
 }
 
 /** Parse and validate the environment; throws a readable error when it is invalid. */
@@ -51,5 +54,6 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     trustProxy: parsed.data.TRUST_PROXY === 'true',
     backupHourUtc: parsed.data.BACKUP_HOUR_UTC,
     backupKeep: parsed.data.BACKUP_KEEP,
+    devSeed: parsed.data.DEV_SEED === 'true',
   };
 }

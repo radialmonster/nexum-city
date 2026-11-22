@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { gameRoutes } from './game/routes.js';
 import type { Game } from './game/index.js';
+import { devRoutes, type DevClock } from './game/devseed.js';
 import { serveClient } from './static.js';
 
 export interface AppOptions {
@@ -9,6 +10,8 @@ export interface AppOptions {
   readonly version: string;
   /** The game services; omit to serve only `/api/health` and the client. */
   readonly game?: Game;
+  /** Dev-only fast-forward and seeding routes under `/api/dev`; leave unset in production. */
+  readonly dev?: DevClock;
   /** Called with one JSON-serialisable record per request. */
   readonly log?: (entry: Record<string, unknown>) => void;
   /** Injectable for tests. */
@@ -43,6 +46,8 @@ export function createApp(options: AppOptions): Hono {
   );
 
   if (options.game) app.route('/api', gameRoutes(options.game));
+
+  if (options.game && options.dev) app.route('/api/dev', devRoutes(options.game, options.dev));
 
   app.all('/api/*', (c) => c.json({ ok: false, error: 'not_found' }, 404));
 

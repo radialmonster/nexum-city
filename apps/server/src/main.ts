@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { serve } from '@hono/node-server';
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
+import { createDevClock } from './game/devseed.js';
 import { createGame } from './game/index.js';
 
 const here = (rel: string): string => fileURLToPath(new URL(rel, import.meta.url));
@@ -17,7 +18,9 @@ const pkg = JSON.parse(readFileSync(here('../package.json'), 'utf8')) as { versi
 // src/ and dist/ both sit one level below apps/server, so this resolves to apps/client/dist.
 const clientDir = config.clientDir ?? here('../../client/dist');
 
+const devClock = config.devSeed ? createDevClock() : undefined;
 const game = createGame({
+  now: devClock?.now,
   dataDir: config.dataDir,
   tickMs: config.tickMs,
   snapshotMs: config.snapshotMs,
@@ -30,7 +33,13 @@ const game = createGame({
 });
 game.start();
 
-const app = createApp({ clientDir, version: pkg.version, game, log });
+const app = createApp({
+  clientDir,
+  version: pkg.version,
+  game,
+  log,
+  ...(devClock ? { dev: devClock } : {}),
+});
 const server = serve({ fetch: app.fetch, port: config.port }, (info) => {
   log({
     time: new Date().toISOString(),
