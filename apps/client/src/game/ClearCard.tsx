@@ -33,7 +33,10 @@ export function ClearCard({ view, ambushId, nowMs, onConfirm, onClose }: ClearCa
   let blocker: string | null = null;
   if (underway) blocker = 'A crew of yours is already on its way.';
   else if (!plan.pick)
-    blocker = 'No crew is free right now. Crews rest for a while after an order.';
+    blocker =
+      plan.whyNone === 'under_siege'
+        ? "Your crews are defending a siege and can't leave."
+        : 'No crew is free right now. Crews rest for a while after an order.';
   else if (plan.etaMs === null) blocker = 'There is no street route there.';
 
   const confirm = async () => {

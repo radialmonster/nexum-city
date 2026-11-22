@@ -29,4 +29,13 @@ describe('siegeOdds', () => {
     const lead = siegeOdds({ attackers: [100], defenders: [100], leader: true });
     expect(lead.hoursToCapture).toBeLessThan(plain.hoursToCapture);
   });
+
+  it('faces the neutral guard of 20 on an unowned plot, not the militia', () => {
+    // one crew of 10: 10 against 20 is a third of the fight, about 12 h
+    const o = siegeOdds({ attackers: [10], defenderCount: 0, neutral: true });
+    expect(o.edge).toBeCloseTo(1 / 3, 2);
+    expect(o.hoursToCapture).toBeGreaterThan(11);
+    expect(o.hoursToCapture).toBeLessThan(13);
+    expect(siegeOdds({ attackers: [10, 10], neutral: true }).edge).toBeCloseTo(0.5, 2);
+  });
 });

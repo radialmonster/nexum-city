@@ -33,6 +33,13 @@ const str = (d: Data, k: string): string | undefined => {
   const v = d[k];
   return typeof v === 'string' ? v : undefined;
 };
+/** ", losing N power an hour" for a full warehouse whose event says the loss rate. */
+export function fullLoss(d: Data): string {
+  const perHour = num(d, 'perHour');
+  return perHour !== undefined && perHour > 0
+    ? `, losing ${formatUnits(perHour)} ${str(d, 'good') ?? 'goods'} an hour`
+    : ' and wasting output';
+}
 const num = (d: Data, k: string): number | undefined => {
   const v = d[k];
   return typeof v === 'number' ? v : undefined;
@@ -127,6 +134,17 @@ export function describeEvent(
     case 'siege.broken': {
       const attacker = str(d, 'attacker');
       const mineDefence = str(d, 'defender') === me;
+      if (attacker === me && str(d, 'reason') === 'routed') {
+        const defence = num(d, 'defence');
+        const guard = str(d, 'defender') === 'neutral';
+        return {
+          ...base,
+          kind: 'SIEGE',
+          glyph: 'x',
+          tone: 'warn',
+          text: `Your crew was worn down by ${guard ? 'the neutral guard' : 'the defenders'}${defence === undefined ? '' : ` (defence ${String(Math.round(defence))})`} and pulled back at ${name(placeId)}.${guard ? ' Send two crews to take a neutral plot.' : ' Send more strength.'}`,
+        };
+      }
       return {
         ...base,
         kind: 'SIEGE',
@@ -405,7 +423,7 @@ export function describeEvent(
           kind: 'FULL',
           glyph: '!',
           tone: 'warn',
-          text: `${name(placeId)} is full and wasting output.`,
+          text: `${name(placeId)} is full${fullLoss(d)}.`,
         };
       }
       const amount = num(d, 'amount') ?? 0;

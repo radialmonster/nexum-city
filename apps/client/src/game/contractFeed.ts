@@ -12,6 +12,8 @@ const num = (d: Data, k: string): number => {
   const v = d[k];
   return typeof v === 'number' ? v : 0;
 };
+/** A starter contract that was offered a second time says so. */
+const again = (d: Data): string => (d['reoffered'] === true ? " We've offered it again." : '');
 const fmt = (n: number): string => Math.round(n).toLocaleString('en-US');
 
 /** The contract id an event is about, or undefined for other events. */
@@ -94,17 +96,29 @@ export function describeContract(
         taker === me
           ? `Contract at ${hubName} failed: you were late${num(d, 'forfeited') > 0 ? ` and lost your ${fmt(num(d, 'forfeited'))} cr deposit` : ''}.`
           : `${who(taker)} was late on your job at ${hubName}. ${num(d, 'forfeited') > 0 ? `You keep their ${fmt(num(d, 'forfeited'))} cr deposit and get` : 'You get'} your reward back.`;
-      return { ...base, tone: 'danger', text };
+      return { ...base, tone: 'danger', text: text + again(d) };
     }
     case 'contract.expired': {
+      if (d['starter'] === true && civic) {
+        // The newcomer's own reserved offer: only the player it is reserved for reads it.
+        const mine = Object.values(view.contracts).some((c) => c.reservedFor === me);
+        if (!mine) return null;
+        return {
+          ...base,
+          tone: 'warn',
+          text: `Your starter job at ${hubName} lapsed untaken.${again(d)}`,
+        };
+      }
       if (civic || poster !== me) return null;
       const cancelled = str(d, 'reason') === 'cancelled';
       return {
         ...base,
         tone: 'warn',
-        text: cancelled
-          ? `You cancelled your job at ${hubName}. ${fmt(num(d, 'refunded'))} cr came back.`
-          : `Nobody took your job at ${hubName}, so it lapsed. ${fmt(num(d, 'refunded'))} cr came back.`,
+        text:
+          (cancelled
+            ? `You cancelled your job at ${hubName}. ${fmt(num(d, 'refunded'))} cr came back.`
+            : `Nobody took your job at ${hubName}, so it lapsed. ${fmt(num(d, 'refunded'))} cr came back.`) +
+          again(d),
       };
     }
     default:

@@ -1,5 +1,5 @@
 import type { PlayerView } from '@nexum/contracts';
-import { estimateClear, pickClearCrews, type ClearEstimate } from '@nexum/sim';
+import { estimateClear, pickClearCrewsOrWhy, type ClearEstimate } from '@nexum/sim';
 import type { PlayerView as SimView } from '@nexum/sim';
 import { wearInfo, wornRoute } from './wear';
 
@@ -18,6 +18,8 @@ export interface ClearPlan {
   /** True when the crews would arrive after the ambush has ended on its own. */
   readonly tooLate: boolean;
   readonly estimate: ClearEstimate | null;
+  /** Why there is no force: all crews resting, or the free ones are defending a siege. Null with a pick. */
+  readonly whyNone: 'busy' | 'under_siege' | null;
 }
 
 /** The ambushes of rivals you can see that end at a district. */
@@ -43,13 +45,22 @@ export function clearUnderway(view: PlayerView, ambushId: string): boolean {
 export function planClear(view: PlayerView, ambush: SeenAmbush, nowMs: number): ClearPlan {
   const remainingMs = Math.max(0, ambush.untilMs - nowMs);
   // The wire view and the sim view differ only in optional-property typing.
-  const found = pickClearCrews(view as unknown as SimView, view.playerId, {
+  const result = pickClearCrewsOrWhy(view as unknown as SimView, view.playerId, {
     a: ambush.edge[0],
     b: ambush.edge[1],
   });
-  if (!found) {
-    return { ambush, remainingMs, pick: null, etaMs: null, tooLate: false, estimate: null };
+  if ('error' in result) {
+    return {
+      ambush,
+      remainingMs,
+      pick: null,
+      etaMs: null,
+      tooLate: false,
+      estimate: null,
+      whyNone: result.reason,
+    };
   }
+  const found = result;
   const carrier = found.carrierId ? view.carriers[found.carrierId] : undefined;
   const kind = carrier?.kind ?? 'foot';
   const wear = wearInfo({ wear: carrier?.wear ?? 0 }).wear;
@@ -65,5 +76,6 @@ export function planClear(view: PlayerView, ambush: SeenAmbush, nowMs: number): 
     etaMs,
     tooLate: etaMs !== null && etaMs >= remainingMs,
     estimate: estimateClear(found.strength, ambush),
+    whyNone: null,
   };
 }

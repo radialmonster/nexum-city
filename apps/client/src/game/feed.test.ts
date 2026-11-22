@@ -280,3 +280,31 @@ describe('watchtower and wear events', () => {
     ).toBeNull();
   });
 });
+
+describe('playtest fix events', () => {
+  it('explains a routed siege in plain words', () => {
+    const e = describeEvent(
+      feedItem(1, 'siege.broken', {
+        districts: ['b'],
+        actors: ['me'],
+        data: { attacker: 'me', defender: 'neutral', reason: 'routed', defence: 20 },
+      }),
+      view,
+    );
+    expect(e?.text).toContain('worn down by the neutral guard (defence 20)');
+    expect(e?.text).toContain('Send two crews to take a neutral plot.');
+  });
+
+  it('says how much a full warehouse loses an hour', () => {
+    const e = describeEvent(
+      feedItem(1, 'production.wasted', {
+        districts: ['a'],
+        actors: ['me'],
+        data: { ongoing: true, good: 'power', perHour: 18, capacity: 120 },
+      }),
+      view,
+    );
+    expect(e?.text).toContain('Full'.toLowerCase());
+    expect(e?.text).toContain('losing 18 power an hour');
+  });
+});

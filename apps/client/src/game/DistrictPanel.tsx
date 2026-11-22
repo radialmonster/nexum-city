@@ -226,6 +226,11 @@ function Own({
           Warehouse full in {formatEta(fullEta)}.
         </small>
       )}
+      {d.overflowing && rate > 0 && good && (
+        <small className={styles['hint']} data-testid="full-loss">
+          Full, losing {formatUnits(rate)} {good} an hour.
+        </small>
+      )}
       {surplus && onHaulSurplus && (
         <Button
           onClick={() => {

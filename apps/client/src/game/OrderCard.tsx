@@ -356,7 +356,13 @@ export function OrderCard({ view, draft, nowMs, onConfirm, onClose, onRoute }: O
         : 0;
     const owner = 'owner' in target ? target.owner : '';
     const leader = view.standings.find((s) => s.rank === 1)?.playerId === owner;
-    return siegeOdds({ attackers: chosenCrews.map((c) => c.strength), defenderCount, leader });
+    const neutral = owner === 'neutral' || owner === '';
+    return siegeOdds({
+      attackers: chosenCrews.map((c) => c.strength),
+      defenderCount,
+      leader,
+      neutral,
+    });
   })();
 
   const toggle = (id: string) => {
