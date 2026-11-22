@@ -111,6 +111,38 @@ export const feedResponseSchema = z.object({
   hasMore: z.boolean(),
 });
 
+export const MARKET_HISTORY_BUCKET_MS = 3_600_000;
+export const MARKET_HISTORY_MAX_BUCKETS = 168;
+export const marketHistoryQuerySchema = z.object({
+  hub: idSchema,
+  good: z.string().min(1).max(32),
+});
+/** Trade prices (centi-credits per unit) per game hour, plus the hub's current civic quote. */
+export const marketHistoryResponseSchema = z.object({
+  ok: z.literal(true),
+  nowMs: z.number(),
+  hub: idSchema,
+  good: z.string(),
+  bucketMs: z.number().int(),
+  buckets: z.array(
+    z.object({
+      t: z.number(),
+      open: z.number(),
+      low: z.number(),
+      high: z.number(),
+      close: z.number(),
+      qty: z.number(),
+      n: z.number().int(),
+    }),
+  ),
+  civic: z.object({
+    refCents: z.number(),
+    baseCents: z.number(),
+    lastCents: z.number().nullable(),
+  }),
+});
+export type MarketHistoryResponse = z.infer<typeof marketHistoryResponseSchema>;
+
 /** Server-sent events on `GET /api/stream`. Each event's `data` is JSON of the named schema. */
 export const streamHelloSchema = z.object({ nowMs: z.number(), playerId: idSchema });
 export const streamTickSchema = z.object({ nowMs: z.number() });

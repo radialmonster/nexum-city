@@ -13,6 +13,13 @@ import type {
 
 const zeroGoods = (): Goods => ({ parts: 0, power: 0, data: 0, supplies: 0 });
 
+/** Turns a pile's goods and its average cost per unit back into the sim's total-value record. */
+function worth(goods: Goods, costs: Goods | undefined): Goods {
+  const out = zeroGoods();
+  if (costs) for (const g of GOODS) out[g] = goods[g] * costs[g];
+  return out;
+}
+
 /** Trade-score bookkeeping (task 54). Bots only read it through the score, so it stays zero. */
 /** A bot's view of players has no rush and no street jobs (those are private to each player). */
 const noRush = { rushUntilMs: 0, jobs: [], jobNextMs: 0 };
@@ -48,6 +55,7 @@ export function stateFromView(view: PlayerView): GameState {
       buildings: [],
       slots: 0,
       warehouse: zeroGoods(),
+      warehouseValue: zeroGoods(),
       construction: null,
       overflowing: false,
       wasted: 0,
@@ -61,6 +69,7 @@ export function stateFromView(view: PlayerView): GameState {
         buildings: d.buildings,
         slots: d.slots,
         warehouse: d.warehouse,
+        warehouseValue: worth(d.warehouse, view.self.costs.districts[d.id]),
         frontier: d.frontier,
         construction: d.construction,
         overflowing: d.overflowing,
@@ -100,6 +109,7 @@ export function stateFromView(view: PlayerView): GameState {
       id: s.playerId,
       credits: 0,
       stash: {},
+      stashValue: {},
       score: s.score,
       ...noTrade,
       ...noContractScore,
@@ -110,6 +120,12 @@ export function stateFromView(view: PlayerView): GameState {
     id: view.playerId,
     credits: view.self.credits,
     stash: view.self.stash,
+    stashValue: Object.fromEntries(
+      Object.entries(view.self.stash).map(([hub, goods]) => [
+        hub,
+        worth(goods, view.self.costs.stash[hub]),
+      ]),
+    ),
     score: view.self.score,
     ...noTrade,
     ...noContractScore,
@@ -127,6 +143,8 @@ export function stateFromView(view: PlayerView): GameState {
         bids: [],
         asks: [],
         refCents: b.refCents,
+        baseCents: b.baseCents,
+        why: b.why,
         bidDepth: b.civic.bidDepth,
         askDepth: b.civic.askDepth,
         lastCents: b.lastCents,
@@ -146,6 +164,7 @@ export function stateFromView(view: PlayerView): GameState {
     nowMs: view.nowMs,
     rng: [0, 0, 0, 0],
     counters: { crew: 0, carrier: 0, movement: 0, event: 0, seq: 0, order: 0, contract: 0, job: 0 },
+    heat: {},
     world: { cols: 0, rows: 0, soundY: 0 },
     graph: { nodes: view.graph.nodes, edges: view.graph.edges },
     districts,

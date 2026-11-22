@@ -116,4 +116,23 @@ export const migrations: readonly Migration[] = [
       );
     `,
   },
+  {
+    id: 4,
+    name: 'trades',
+    sql: `
+      -- One row per trade.filled event (civic fills included): the source of the price chart.
+      -- event_id is the sim's event id, so replay after a crash is idempotent. Cleared at season reset.
+      CREATE TABLE trades (
+        event_id TEXT PRIMARY KEY,
+        hub      TEXT NOT NULL,
+        good     TEXT NOT NULL,
+        at_ms    INTEGER NOT NULL,
+        price    INTEGER NOT NULL,
+        qty      INTEGER NOT NULL,
+        buyer    TEXT NOT NULL,
+        seller   TEXT NOT NULL
+      ) WITHOUT ROWID;
+      CREATE INDEX trades_by_series ON trades (hub, good, at_ms);
+    `,
+  },
 ];

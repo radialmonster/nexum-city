@@ -1,6 +1,15 @@
 import type { DatabaseSync, StatementSync } from 'node:sqlite';
 import type { BotKind, GameState, Input, Order, SimEvent } from '@nexum/sim';
 import type { SeasonStats, Standing } from '@nexum/contracts';
+export interface TradeBucket {
+  t: number;
+  open: number;
+  low: number;
+  high: number;
+  close: number;
+  qty: number;
+  n: number;
+}
 import { transaction } from './db.js';
 import { RULES_VERSION, SNAPSHOT_VERSION, upgradeSnapshot } from './snapshot.js';
 
@@ -186,7 +195,7 @@ export class Store {
   /** Clears everything that belongs to one world, ready for the next season's. Accounts stay. */
   clearWorldData(): void {
     this.db.exec(
-      'DELETE FROM event_actors; DELETE FROM events; DELETE FROM inputs; DELETE FROM bots;',
+      'DELETE FROM event_actors; DELETE FROM events; DELETE FROM trades; DELETE FROM inputs; DELETE FROM bots;',
     );
   }
 
@@ -248,6 +257,7 @@ export class Store {
         e.kind,
         JSON.stringify(e),
       );
+      if (e.kind === 'trade.filled') this.insertTrade(e);
       const row = this.q('SELECT seq FROM events WHERE id = ?').get(e.id) as Row;
       const seq = Number(row['seq']);
       const audience = audienceOf?.(e);
@@ -260,6 +270,52 @@ export class Store {
       out.push(everyone ? { seq, event: e, audience: everyone } : { seq, event: e });
     }
     return out;
+  }
+
+  /** Remembers one fill for the price chart (idempotent on the event id). */
+  private insertTrade(e: SimEvent): void {
+    const d = e.data;
+    if (typeof d['hub'] !== 'string' || typeof d['good'] !== 'string') return;
+    this.q(
+      'INSERT OR IGNORE INTO trades (event_id, hub, good, at_ms, price, qty, buyer, seller) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    ).run(
+      e.id,
+      d['hub'],
+      d['good'],
+      e.at,
+      Number(d['price']),
+      Number(d['qty']),
+      String(d['buyer']),
+      String(d['seller']),
+    );
+  }
+
+  /**
+   * Trade prices for one hub and good as hourly buckets (open, low, high, close, volume, count),
+   * oldest first. At most `maxBuckets` of the most recent hours, so the reply is always bounded.
+   */
+  tradeSeries(hub: string, good: string, bucketMs: number, maxBuckets: number): TradeBucket[] {
+    const rows = this.q(
+      `SELECT (at_ms / CAST(?1 AS INTEGER)) * CAST(?1 AS INTEGER) AS t, MIN(price) AS low, MAX(price) AS high,
+              SUM(qty) AS qty, COUNT(*) AS n,
+              (SELECT price FROM trades f WHERE f.hub = ?2 AND f.good = ?3
+                 AND f.at_ms / CAST(?1 AS INTEGER) = x.at_ms / CAST(?1 AS INTEGER) ORDER BY f.at_ms, f.event_id LIMIT 1) AS open,
+              (SELECT price FROM trades f WHERE f.hub = ?2 AND f.good = ?3
+                 AND f.at_ms / CAST(?1 AS INTEGER) = x.at_ms / CAST(?1 AS INTEGER) ORDER BY f.at_ms DESC, f.event_id DESC LIMIT 1) AS close
+         FROM trades x WHERE hub = ?2 AND good = ?3
+        GROUP BY t ORDER BY t DESC LIMIT ?4`,
+    ).all(bucketMs, hub, good, maxBuckets) as Row[];
+    return rows
+      .map((r) => ({
+        t: Number(r['t']),
+        open: Number(r['open']),
+        low: Number(r['low']),
+        high: Number(r['high']),
+        close: Number(r['close']),
+        qty: Number(r['qty']),
+        n: Number(r['n']),
+      }))
+      .reverse();
   }
 
   /** Events concerning a player, oldest first; fetches one extra row to report `hasMore`. */

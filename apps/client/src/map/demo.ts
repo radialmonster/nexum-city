@@ -110,6 +110,7 @@ export function demoState(opts: DemoOptions = {}): GameState {
         carrierKind: 'van',
         crewIds: [],
         cargo: { parts: 0, power: 0, data: 0, supplies: 0 },
+        value: { parts: 0, power: 0, data: 0, supplies: 0 },
         route: r.route,
         lengthM: r.lengthM,
         from: first.id,

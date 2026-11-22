@@ -6,9 +6,12 @@ import { streamSSE } from 'hono/streaming';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { getConnInfo } from '@hono/node-server/conninfo';
 import { eta, standings, viewFor } from '@nexum/sim';
-import type { Order } from '@nexum/sim';
+import type { Book, Good, Order } from '@nexum/sim';
 import {
   FEED_DEFAULT_LIMIT,
+  MARKET_HISTORY_BUCKET_MS,
+  MARKET_HISTORY_MAX_BUCKETS,
+  marketHistoryQuerySchema,
   credentialsSchema,
   etaQuerySchema,
   feedQuerySchema,
@@ -20,6 +23,7 @@ import type {
   EtaResponse,
   ErrorResponse,
   FeedResponse,
+  MarketHistoryResponse,
   MeResponse,
   PlaceOrderResponse,
   SeasonsResponse,
@@ -282,6 +286,30 @@ export function gameRoutes(game: Game): Hono<Env> {
       items,
       cursor: items.at(-1)?.seq ?? q.after ?? 0,
       hasMore,
+    };
+    return c.json(res);
+  });
+
+  api.get('/market/history', requireAuth, (c) => {
+    const q = parseQuery(c, marketHistoryQuerySchema);
+    if (isResponse(q)) return q;
+    const book = (engine.current.markets[q.hub] as Partial<Record<Good, Book>> | undefined)?.[
+      q.good as Good
+    ];
+    if (!book) return fail(c, 404, 'not_found');
+    const res: MarketHistoryResponse = {
+      ok: true,
+      nowMs: engine.current.nowMs,
+      hub: q.hub,
+      good: q.good,
+      bucketMs: MARKET_HISTORY_BUCKET_MS,
+      buckets: store.tradeSeries(
+        q.hub,
+        q.good,
+        MARKET_HISTORY_BUCKET_MS,
+        MARKET_HISTORY_MAX_BUCKETS,
+      ),
+      civic: { refCents: book.refCents, baseCents: book.baseCents, lastCents: book.lastCents },
     };
     return c.json(res);
   });

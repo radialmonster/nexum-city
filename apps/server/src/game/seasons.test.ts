@@ -9,6 +9,7 @@ import type { Game, GameOptions } from './index.js';
 import { SNAPSHOT_VERSION, RULES_VERSION, upgradeSnapshot } from './snapshot.js';
 import { seasonSeed } from './seasons.js';
 import { backupNow } from './backup.js';
+import { balance, toAtoms } from '@nexum/sim';
 import { DatabaseSync } from 'node:sqlite';
 
 const T0 = Date.UTC(2026, 10, 22, 12, 0, 0);
@@ -97,6 +98,7 @@ describe('snapshot upgrades', () => {
       rushUntilMs: 0,
       jobs: [],
       jobNextMs: 0,
+      stashValue: {},
     });
     expect(up.players['p2']?.['tradeMs']).toBe(9);
   });
@@ -117,6 +119,7 @@ describe('snapshot upgrades', () => {
       rushUntilMs: 77,
       jobs: [],
       jobNextMs: 0,
+      stashValue: {},
     });
     expect(up.counters['job']).toBe(0);
   });
@@ -136,6 +139,24 @@ describe('snapshot upgrades', () => {
     expect(up.contracts).toEqual({});
     expect(up.counters['contract']).toBe(0);
     expect(up.queue.some((q) => q.kind === 'contract.civic')).toBe(true);
+  });
+
+  it('values a version 3 snapshot at the global base and adds the regional fields', () => {
+    const base = balance.market.baseRefCents.parts;
+    const old = {
+      nowMs: 1000,
+      districts: { d1: { id: 'd1', warehouse: { parts: 10, power: 0 } } },
+      players: { p1: { id: 'p1', credits: 5, stash: { h1: { parts: 2 } } } },
+      markets: { h1: { parts: { refCents: 900, lastCents: null, asks: [{ qty: 1 }], bids: [] } } },
+    };
+    const up = upgradeSnapshot(old, 3) as unknown as Record<string, any>;
+    expect(up['heat']).toEqual({});
+    expect(up['districts'].d1.warehouseValue.parts).toBe(10 * base);
+    expect(up['players'].p1.stashValue.h1.parts).toBe(2 * base);
+    const book = up['markets'].h1.parts;
+    expect(book.baseCents).toBe(base);
+    expect(book.why.transport).toBe(0);
+    expect(book.asks[0].value).toBe(toAtoms(1) * 900);
   });
 
   it('is a no-op at the current version and rejects newer or malformed input', () => {

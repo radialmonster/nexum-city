@@ -1,4 +1,4 @@
-import { MS_PER_HOUR, balance } from '@nexum/sim';
+import { GOODS, MS_PER_HOUR, balance, toAtoms } from '@nexum/sim';
 import type { GameState } from '@nexum/sim';
 
 /**
@@ -11,8 +11,11 @@ import type { GameState } from '@nexum/sim';
  *   `contractDay`, `contractDayMs`, and the queue holds a `contract.civic` tick.
  * - 3: newcomer rush and street jobs (task 77): players carry `rushUntilMs`, `jobs`, `jobNextMs`,
  *   and `counters.job` exists. Players already in a season get no rush and no jobs.
+ * - 4: cost basis and regional prices (economy plan stages 1 and 2, tasks 79 and 80): districts
+ *   carry `warehouseValue`, players `stashValue`, movements `value`, sell orders `value`, books
+ *   `baseCents` and `why`, and the state has `heat`. Old piles are valued at the global base price.
  */
-export const SNAPSHOT_VERSION = 3;
+export const SNAPSHOT_VERSION = 4;
 
 /**
  * Version of the sim rules the stored state was produced under. Bump it whenever a sim change
@@ -84,6 +87,58 @@ const UPGRADES: readonly ((state: Json) => Json)[] = [
     }
     const counters = isObject(state['counters']) ? state['counters'] : {};
     return { ...state, players, counters: { job: 0, ...counters } };
+  },
+  // 3 -> 4: cost basis (old piles are worth the global base price) and the regional price fields.
+  (state) => {
+    const base = balance.market.baseRefCents as Record<string, number>;
+    const worth = (goods: unknown): Json => {
+      const out: Json = {};
+      const g = isObject(goods) ? goods : {};
+      for (const good of GOODS) {
+        const n = typeof g[good] === 'number' ? g[good] : 0;
+        out[good] = n * (base[good] ?? 0);
+      }
+      return out;
+    };
+    const map = (rec: unknown, f: (v: Json) => Json): Json => {
+      const out: Json = {};
+      for (const [id, v] of Object.entries(isObject(rec) ? rec : {}))
+        out[id] = isObject(v) ? f(v) : v;
+      return out;
+    };
+    const markets: Json = {};
+    for (const [hub, books] of Object.entries(isObject(state['markets']) ? state['markets'] : {})) {
+      const out: Json = {};
+      for (const [good, book] of Object.entries(isObject(books) ? books : {})) {
+        if (!isObject(book)) continue;
+        const global = base[good] ?? 0;
+        const asks = Array.isArray(book['asks']) ? book['asks'] : [];
+        const bids = Array.isArray(book['bids']) ? book['bids'] : [];
+        const ref = typeof book['refCents'] === 'number' ? book['refCents'] : global;
+        out[good] = {
+          baseCents: global,
+          why: { from: null, distM: 0, global, transport: 0, demand: 0, raid: 0 },
+          ...book,
+          // A resting sell order's goods are valued at the book's reference price.
+          asks: asks.map((o) =>
+            isObject(o) ? { value: toAtoms(Number(o['qty'])) * ref, ...o } : o,
+          ),
+          bids: bids.map((o) => (isObject(o) ? { value: 0, ...o } : o)),
+        };
+      }
+      markets[hub] = out;
+    }
+    return {
+      ...state,
+      heat: isObject(state['heat']) ? state['heat'] : {},
+      districts: map(state['districts'], (d) => ({ warehouseValue: worth(d['warehouse']), ...d })),
+      players: map(state['players'], (p) => ({
+        stashValue: map(p['stash'], worth),
+        ...p,
+      })),
+      movements: map(state['movements'], (m) => ({ value: worth(m['cargo']), ...m })),
+      markets,
+    };
   },
 ];
 
